@@ -1,268 +1,144 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="SETH VII - A visceral explosion of digital art, cyberpunk aesthetics, and grunge visuals.">
-    <meta name="theme-color" content="#111">
-    <title>SETH VII - Digital Art Studio</title>
-    
-    <!-- Favicon -->
+    <meta name="description" content="SETH VII - A visceral digital art collective pushing the boundaries of grunge and cyberpunk aesthetics.">
+    <meta name="theme-color" content="#111111">
+    <title>SETH VII - Digital Art Collective</title>
     <link rel="icon" type="image/png" href="assets/images/seth-vii-favicon.png">
-    
-    <!-- Preload critical fonts -->
-    <link rel="preload" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" as="style">
-    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-    
-    <!-- Stylesheets -->
     <link rel="stylesheet" href="css/styles.css">
-    <link rel="stylesheet" href="css/responsive.css">
 </head>
 <body>
-    <!-- Header/Navigation -->
-    <header class="header" id="header">
-        <nav class="nav-container">
-            <a href="#" class="logo" id="logo">SETH VII</a>
-            <ul class="nav-menu" id="navMenu">
-                <li><a href="#home" class="nav-link">HOME</a></li>
-                <li><a href="#portfolio" class="nav-link">PORTFOLIO</a></li>
-                <li><a href="#about" class="nav-link">ABOUT</a></li>
-                <li><a href="#team" class="nav-link">TEAM</a></li>
-                <li><a href="#contact" class="nav-link">CONTACT</a></li>
-            </ul>
-            <button class="menu-toggle" id="menuToggle" aria-label="Toggle menu" aria-expanded="false">
-                <span></span>
-                <span></span>
-                <span></span>
-            </button>
-        </nav>
-    </header>
-
-    <!-- Main Content -->
-    <main>
+    <main class="container">
         <!-- Hero Section -->
-        <section class="hero" id="home">
-            <div class="section-container" style="grid-column: 1 / -1;">
-                <div class="hero-content">
-                    <h1 class="hero-title">SETH VII</h1>
-                    <p class="hero-tagline">A visceral explosion of digital art, cyberpunk aesthetics, and grunge visuals.</p>
-                    
-                    <!-- Metadata Grid -->
-                    <div class="metadata-grid">
-                        <div class="metadata-item">
-                            <span class="metadata-label">Year</span>
-                            <span class="metadata-value">2025</span>
-                        </div>
-                        <div class="metadata-item">
-                            <span class="metadata-label">Type</span>
-                            <span class="metadata-value">Digital Studio</span>
-                        </div>
-                        <div class="metadata-item">
-                            <span class="metadata-label">Focus</span>
-                            <span class="metadata-value">Visual Arts</span>
-                        </div>
-                        <div class="metadata-item">
-                            <span class="metadata-label">Aesthetic</span>
-                            <span class="metadata-value">Cyberpunk Grunge</span>
-                        </div>
-                    </div>
-
-                    <!-- Category Tags -->
-                    <div class="category-tags">
-                        <span class="tag">DIGITAL ART</span>
-                        <span class="tag">CYBERPUNK</span>
-                        <span class="tag">GRUNGE</span>
-                        <span class="tag">NEON</span>
-                    </div>
+        <header class="hero">
+            <h1 class="title">SETH VII</h1>
+            <p class="tagline">A visceral explosion of digital art, cyberpunk aesthetics, and grunge visuals.</p>
+            
+            <!-- Metadata Grid -->
+            <div class="metadata-grid">
+                <div class="metadata-item">
+                    <span class="metadata-label">Year</span>
+                    <span class="metadata-value">2025</span>
                 </div>
-
-                <!-- Video Container -->
-                <div class="video-container">
-                    <div class="video-frame" id="videoFrame">
-                        <img src="assets/images/hero-animation.gif" alt="SETH VII - Hero Animation" class="video-thumbnail" loading="lazy" width="600" height="400">
-                        <button class="play-button" id="playButton" aria-label="Play video">
-                            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <polygon points="5 3 19 12 5 21 5 3"></polygon>
-                            </svg>
-                        </button>
-                    </div>
-                    <div class="video-info">
-                        <p class="video-title">Explore our latest digital creations and artistic vision</p>
-                        <a href="#" class="watch-link">View Portfolio →</a>
-                    </div>
+                <div class="metadata-item">
+                    <span class="metadata-label">Type</span>
+                    <span class="metadata-value">Digital Studio</span>
+                </div>
+                <div class="metadata-item">
+                    <span class="metadata-label">Focus</span>
+                    <span class="metadata-value">Visual Arts</span>
+                </div>
+                <div class="metadata-item">
+                    <span class="metadata-label">Aesthetic</span>
+                    <span class="metadata-value">Cyberpunk Grunge</span>
                 </div>
             </div>
+
+            <!-- Tags -->
+            <div class="tags">
+                <span class="tag">DIGITAL ART</span>
+                <span class="tag">CYBERPUNK</span>
+                <span class="tag">GRUNGE</span>
+                <span class="tag">NEON</span>
+            </div>
+        </header>
+
+        <!-- Video Section -->
+        <section class="video-section">
+            <div class="video-frame">
+                <img src="assets/images/hero-animation.gif" alt="SETH VII showcase" loading="lazy" width="600" height="400">
+                <button id="playButton" class="play-button" aria-label="Play video">
+                    <svg viewBox="0 0 24 24" width="48" height="48">
+                        <polygon points="5 3 19 12 5 21" fill="currentColor"/>
+                    </svg>
+                </button>
+            </div>
+            <p class="video-description">Explore our latest digital creations and artistic vision</p>
         </section>
 
-        <!-- Intro Section -->
+        <!-- Intro Text -->
         <section class="intro">
-            <div class="section-container">
-                <p class="intro-text">
-                    We are SETH VII, a digital art collective pushing the boundaries of cyberpunk aesthetics and grunge visual culture. Our work explores the intersection of digital technology and visceral, raw artistic expression. Every project is a statement—bold, unapologetic, and designed to provoke.
-                </p>
-            </div>
+            <p>We are SETH VII, a digital art collective pushing the boundaries of cyberpunk aesthetics and grunge visual culture. Our work explores the intersection of digital technology and visceral, raw artistic expression. Every project is a statement—bold, unapologetic, and designed to provoke.</p>
         </section>
 
-        <!-- Process Section -->
-        <section class="process" id="portfolio">
-            <div class="section-container">
-                <h2 class="section-title">Our Creative Process</h2>
+        <!-- Creative Process -->
+        <section class="process">
+            <h2>Our Creative Process</h2>
+            
+            <article class="process-article">
+                <h3>Visual Direction</h3>
+                <p>We start by establishing a strong visual direction. Our styleframes explore color palettes, composition, and the raw energy we want to capture. Every frame is carefully crafted to evoke emotion and establish the aesthetic foundation for the entire project.</p>
+                <figure>
+                    <img src="assets/images/styleframes-animation.gif" alt="Visual direction and styleframes" loading="lazy" width="400" height="300">
+                    <figcaption>Styleframes exploring visual direction</figcaption>
+                </figure>
+            </article>
 
-                <!-- Styleframes -->
-                <article class="process-article">
-                    <h3 class="process-subtitle">Visual Direction</h3>
-                    <p class="process-description">
-                        We start by establishing a strong visual direction. Our styleframes explore color palettes, composition, and the raw energy we want to capture. Every frame is carefully crafted to evoke emotion and establish the aesthetic foundation for the entire project.
-                    </p>
-                    <figure class="process-figure">
-                        <img src="assets/images/styleframes-animation.gif" alt="Visual Direction - Styleframes Exploration" loading="lazy" width="800" height="600">
-                        <figcaption>Visual Direction Exploration</figcaption>
-                    </figure>
-                </article>
+            <article class="process-article">
+                <h3>Character Design</h3>
+                <p>Characters are the heart of our work. We design with intention, creating personalities that resonate with the project's core message. From concept to final design, every detail matters—proportions, expressions, and the subtle nuances that bring characters to life.</p>
+                <figure>
+                    <img src="assets/images/character-design-animation.gif" alt="Character design process" loading="lazy" width="400" height="300">
+                    <figcaption>Character design exploration</figcaption>
+                </figure>
+            </article>
 
-                <!-- Character Design -->
-                <article class="process-article">
-                    <h3 class="process-subtitle">Character Development</h3>
-                    <p class="process-description">
-                        Character design is where personality meets aesthetics. We develop unique characters that embody the spirit of our projects. From concept to final design, each character is a vessel for storytelling and visual impact.
-                    </p>
-                    <figure class="process-figure">
-                        <img src="assets/images/character-design-animation.gif" alt="Character Design - Development Iterations" loading="lazy" width="800" height="600">
-                        <figcaption>Character Design Iterations</figcaption>
-                    </figure>
-                </article>
+            <article class="process-article">
+                <h3>Animation & Motion</h3>
+                <p>Motion brings everything together. We craft animations that feel organic and visceral, breathing life into static designs. Every movement is purposeful, every transition deliberate. The animation process is where the magic happens.</p>
+                <figure>
+                    <img src="assets/images/animation-process-animation.gif" alt="Animation process" loading="lazy" width="400" height="300">
+                    <figcaption>Animation and motion design</figcaption>
+                </figure>
+            </article>
 
-                <!-- Animation -->
-                <article class="process-article">
-                    <h3 class="process-subtitle">Digital Animation</h3>
-                    <p class="process-description">
-                        Animation brings our visions to life. We blend traditional animation principles with cutting-edge digital techniques to create movement that feels both organic and otherworldly. Every frame is deliberate, every transition purposeful.
-                    </p>
-                    <figure class="process-figure">
-                        <img src="assets/images/animation-process-animation.gif" alt="Digital Animation - Process Showcase" loading="lazy" width="800" height="600">
-                        <figcaption>Digital Animation Process</figcaption>
-                    </figure>
-                </article>
-
-                <!-- Production -->
-                <article class="process-article">
-                    <h3 class="process-subtitle">Production & Rendering</h3>
-                    <p class="process-description">
-                        The final stage is where everything comes together. We meticulously render and composite our work, ensuring every pixel contributes to the overall vision. Color grading, effects, and final touches transform raw animation into polished art.
-                    </p>
-                    <figure class="process-figure">
-                        <img src="assets/images/setup-animation.gif" alt="Production - Rendering & Compositing" loading="lazy" width="800" height="600">
-                        <figcaption>Production & Rendering</figcaption>
-                    </figure>
-                </article>
-            </div>
+            <article class="process-article">
+                <h3>Production Setup</h3>
+                <p>Behind every digital creation is meticulous planning and technical execution. Our production setup ensures quality at every stage—from pre-visualization to final rendering. We document the journey because the process is as important as the product.</p>
+                <figure>
+                    <img src="assets/images/setup-animation.gif" alt="Production setup" loading="lazy" width="400" height="300">
+                    <figcaption>Behind-the-scenes production setup</figcaption>
+                </figure>
+            </article>
         </section>
 
-        <!-- Team Section -->
-        <section class="team" id="team">
-            <div class="section-container">
-                <h2 class="section-title">The Collective</h2>
-                <div class="team-grid">
-                    <div class="team-member">
-                        <h3>NEXUS</h3>
-                        <p class="role">Creative Director</p>
-                        <p>Visionary leader driving the artistic direction and conceptual foundation of all SETH VII projects.</p>
-                        <a href="#" class="team-link">Profile →</a>
-                    </div>
-                    <div class="team-member">
-                        <h3>CIPHER</h3>
-                        <p class="role">Lead Designer</p>
-                        <p>Master of visual aesthetics, crafting the grunge and cyberpunk elements that define our brand.</p>
-                        <a href="#" class="team-link">Profile →</a>
-                    </div>
-                    <div class="team-member">
-                        <h3>PULSE</h3>
-                        <p class="role">Animation Director</p>
-                        <p>Breathing life into every frame with dynamic motion and visceral movement that captivates audiences.</p>
-                        <a href="#" class="team-link">Profile →</a>
-                    </div>
-                    <div class="team-member">
-                        <h3>ECHO</h3>
-                        <p class="role">Technical Lead</p>
-                        <p>Ensuring technical excellence and pushing the boundaries of what's possible in digital production.</p>
-                        <a href="#" class="team-link">Profile →</a>
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        <!-- Contact Section -->
-        <section class="contact" id="contact">
-            <div class="section-container">
-                <h2 class="section-title">Get In Touch</h2>
-                <p class="contact-intro">
-                    Interested in collaborating with SETH VII? We're always looking for exciting projects and creative partnerships.
-                </p>
-                <div class="contact-methods">
-                    <a href="mailto:contact@sethvii.studio" class="contact-link">
-                        <span class="contact-label">Email</span>
-                        <span class="contact-value">contact@sethvii.studio</span>
-                    </a>
-                    <a href="tel:+1-555-0123" class="contact-link">
-                        <span class="contact-label">Phone</span>
-                        <span class="contact-value">+1 - (555) - 0123</span>
-                    </a>
-                </div>
-            </div>
+        <!-- Call to Action -->
+        <section class="cta">
+            <h2>Ready to Create Something Bold?</h2>
+            <p>We're always looking for exciting projects and creative partnerships that push boundaries.</p>
+            <a href="mailto:contact@sethvii.studio" class="cta-button">Get in Touch</a>
         </section>
     </main>
 
     <!-- Footer -->
     <footer class="footer">
-        <div class="section-container">
-            <div class="footer-content">
-                <div class="footer-brand">
-                    <img src="assets/images/seth-vii-logo-main.png" alt="SETH VII Logo" class="footer-logo" width="100" height="100">
-                    <p class="footer-tagline">Digital Art Studio</p>
-                </div>
-                <nav class="footer-nav">
-                    <h4>Navigation</h4>
-                    <ul>
-                        <li><a href="#home">Home</a></li>
-                        <li><a href="#portfolio">Portfolio</a></li>
-                        <li><a href="#about">About</a></li>
-                        <li><a href="#team">Team</a></li>
-                        <li><a href="#contact">Contact</a></li>
-                    </ul>
-                </nav>
-                <div class="footer-social">
-                    <h4>Follow Us</h4>
-                    <div class="social-links">
-                        <a href="#" aria-label="X / Twitter">X / Twitter</a>
-                        <a href="#" aria-label="Discord">Discord</a>
-                        <a href="#" aria-label="Instagram">Instagram</a>
-                    </div>
-                </div>
+        <div class="footer-content">
+            <div class="footer-section">
+                <h3>SETH VII</h3>
+                <p>Digital art collective pushing boundaries.</p>
             </div>
-            <div class="footer-bottom">
-                <p>&copy; 2025 SETH VII. All rights reserved.</p>
-                <p>Crafted with visceral passion and cyberpunk aesthetics.</p>
+            <div class="footer-section">
+                <h3>Connect</h3>
+                <ul>
+                    <li><a href="https://twitter.com" target="_blank" rel="noopener">X / Twitter</a></li>
+                    <li><a href="https://discord.com" target="_blank" rel="noopener">Discord</a></li>
+                    <li><a href="https://instagram.com" target="_blank" rel="noopener">Instagram</a></li>
+                </ul>
             </div>
+            <div class="footer-section">
+                <h3>Contact</h3>
+                <p>Email: <a href="mailto:contact@sethvii.studio">contact@sethvii.studio</a></p>
+                <p>Phone: <a href="tel:+15550123">+1 (555) 0123</a></p>
+            </div>
+        </div>
+        <div class="footer-bottom">
+            <p>&copy; 2025 SETH VII. All rights reserved.</p>
         </div>
     </footer>
 
-    <!-- Video Modal -->
-    <div class="modal" id="videoModal" style="display: none;">
-        <div class="modal-content">
-            <button class="modal-close" id="modalClose" aria-label="Close modal">×</button>
-            <div class="modal-video">
-                <iframe width="100%" height="600" src="https://www.youtube.com/embed/dQw4w9WgXcQ" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
-            </div>
-        </div>
-    </div>
-
-    <!-- Advanced Animation Libraries -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js" defer></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pixi.js/v8.0.0/pixi.min.js" defer></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js" defer></script>
-    
     <!-- Scripts -->
     <script src="js/scripts.js" defer></script>
-    <script src="js/advanced-animations.js" defer></script>
 </body>
 </html>
