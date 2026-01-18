@@ -6,7 +6,6 @@
   "outputDirectory": ".",
   "framework": null,
   "regions": ["sfo1"],
-  "functions": {},
   "env": {},
   "headers": [
     {
