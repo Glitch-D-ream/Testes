@@ -1,0 +1,38 @@
+{
+  "name": "seth-vii",
+  "version": 2,
+  "public": true,
+  "buildCommand": "",
+  "outputDirectory": ".",
+  "framework": null,
+  "regions": ["sfo1"],
+  "functions": {},
+  "env": {},
+  "headers": [
+    {
+      "source": "/assets/images/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ]
+    },
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=3600, s-maxage=3600"
+        }
+      ]
+    }
+  ],
+  "redirects": [],
+  "rewrites": [
+    {
+      "source": "/:path((?!assets|css|js|index\\.html).*)",
+      "destination": "/index.html"
+    }
+  ]
+}
