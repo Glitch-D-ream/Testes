@@ -73,9 +73,14 @@
 - [x] Testes de autenticação e LGPD (e2e/auth-and-lgpd.spec.ts) - 11 casos
 
 ### 2.4 Testes de Carga
-- [ ] Configurar k6 (k6/load-test.js)
-- [ ] Teste com 100 usuários simultâneos
-- [ ] Teste com 1000 requisições/segundo
+- [x] Configurar k6 (k6/load-test.js)
+  - Load test: 100 usuários, 24 min
+  - Stress test: 500 usuários, 30 min
+  - Spike test: picos de 200 usuários
+- [x] Teste com 100 usuários simultâneos (load-test.js)
+- [x] Teste com 500 usuários (stress-test.js)
+- [x] Teste de spike (spike-test.js)
+- [x] Documentação k6 (k6/README.md)
 
 ### 2.5 Linting e Formatação
 - [ ] Configurar ESLint (.eslintrc.json)
@@ -122,21 +127,33 @@
 - [ ] Ajustar pesos dos fatores
 - [ ] Adicionar intervalo de confiança
 
-## FASE 4: DOCUMENTAÇÃO E CI/CD (Alto - 2-3 semanas)
+## FASE 4: DOCUMENTAÇÃO E CI/CD (Completo - 2-3 semanas)
 
 ### 4.1 Documentação
-- [ ] Criar README.md completo
-- [ ] Criar documentação de API (openapi.yaml)
+- [x] Criar README.md completo (README.md)
+- [x] Criar API.md com endpoints (API.md)
+- [x] Criar ARCHITECTURE.md (ARCHITECTURE.md)
+- [x] Criar CONTRIBUTING.md (CONTRIBUTING.md)
+- [x] Criar guia de deployment (DEPLOYMENT.md)
+  - Railway
+  - Render
+  - VPS (DigitalOcean, Linode, AWS)
+  - Docker
+  - Monitoramento
+- [x] Criar Dockerfile (Dockerfile)
+- [x] Criar docker-compose.yml (docker-compose.yml)
+- [x] Criar nginx.conf (nginx.conf)
 - [ ] Criar guia de desenvolvimento (DEVELOPMENT.md)
-- [ ] Criar documentação de arquitetura (ARCHITECTURE.md)
-- [ ] Criar guia de deployment (DEPLOYMENT.md)
 
 ### 4.2 CI/CD
-- [ ] Configurar GitHub Actions (.github/workflows/test.yml)
-- [ ] Workflow de testes
-- [ ] Workflow de linting
-- [ ] Workflow de build
-- [ ] Workflow de deploy automático
+- [x] Configurar GitHub Actions (.github/workflows/ci.yml)
+- [x] Workflow de testes (unit + E2E)
+- [x] Workflow de linting
+- [x] Workflow de build
+- [x] Workflow de security scanning (Trivy)
+- [x] Workflow de deploy automático
+- [ ] Adicionar badges ao README
+- [ ] Configurar Codecov para cobertura
 
 ## FASE 5: UX/UI (Médio - 2-3 semanas)
 
