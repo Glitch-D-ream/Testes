@@ -14,7 +14,7 @@ export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElemen
  * Accessible button component with animations and multiple variants
  * Supports WCAG 2.1 AA accessibility standards
  */
-export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
+export const Button = forwardRef<HTMLButtonElement, ButtonProps & { [key: string]: any }>(
   (
     {
       variant = 'primary',
@@ -31,11 +31,11 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
     ref
   ) => {
     const variantClasses = {
-      primary: 'bg-primary text-primary-foreground hover:bg-primary/90 active:bg-primary/80',
-      secondary: 'bg-secondary text-secondary-foreground hover:bg-secondary/80 active:bg-secondary/70',
-      destructive: 'bg-destructive text-destructive-foreground hover:bg-destructive/90 active:bg-destructive/80',
-      outline: 'border-2 border-border text-foreground hover:bg-muted active:bg-muted/80',
-      ghost: 'text-foreground hover:bg-muted active:bg-muted/80',
+      primary: 'bg-blue-600 text-white hover:bg-blue-700 active:bg-blue-800',
+      secondary: 'bg-gray-200 text-gray-900 hover:bg-gray-300 active:bg-gray-400',
+      destructive: 'bg-red-600 text-white hover:bg-red-700 active:bg-red-800',
+      outline: 'border-2 border-gray-300 text-gray-900 hover:bg-gray-100 active:bg-gray-200',
+      ghost: 'text-gray-900 hover:bg-gray-100 active:bg-gray-200',
     };
 
     const sizeClasses = {
@@ -52,14 +52,14 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         whileTap={!disabled && !loading ? { scale: 0.98 } : {}}
         className={`
           inline-flex items-center justify-center font-medium rounded-md
-          transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2
+          transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2
           disabled:opacity-50 disabled:cursor-not-allowed
-          ${variantClasses[variant]}
-          ${sizeClasses[size]}
+          ${variantClasses[variant as keyof typeof variantClasses]}
+          ${sizeClasses[size as keyof typeof sizeClasses]}
           ${fullWidth ? 'w-full' : ''}
           ${className || ''}
         `}
-        {...props}
+        {...(props as any)}
       >
         {loading ? (
           <>

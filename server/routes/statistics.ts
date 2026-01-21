@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { logger } from '../core/logger';
+import logger from '../core/logger';
 
 export const statisticsRouter = Router();
 

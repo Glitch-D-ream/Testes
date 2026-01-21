@@ -1,4 +1,8 @@
 import React, { useState } from 'react';
+import { FormInput } from './FormInput';
+import { FormTextarea } from './FormTextarea';
+import { Button } from './Button';
+import { useFormValidation } from '../hooks/useFormValidation';
 
 interface AnalysisFormProps {
   onSubmit: (data: {
@@ -26,67 +30,102 @@ export default function AnalysisForm({ onSubmit, isLoading }: AnalysisFormProps)
   const [text, setText] = useState('');
   const [author, setAuthor] = useState('');
   const [category, setCategory] = useState('');
+  const [submitError, setSubmitError] = useState('');
+  const [textError, setTextError] = useState('');
+  const [authorError, setAuthorError] = useState('');
+
+  const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const value = e.target.value;
+    setText(value);
+    
+    if (value.length < 10 && value.length > 0) {
+      setTextError('Mínimo de 10 caracteres');
+    } else if (value.length > 5000) {
+      setTextError('Máximo de 5000 caracteres');
+    } else {
+      setTextError('');
+    }
+  };
+
+  const handleAuthorChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setAuthor(value);
+    
+    if (value.length > 100) {
+      setAuthorError('Máximo de 100 caracteres');
+    } else {
+      setAuthorError('');
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (text.trim().length === 0) {
-      alert('Por favor, insira um texto para análise');
+    setSubmitError('');
+
+    // Validar campos
+    if (text.trim().length < 10) {
+      setTextError('Por favor, insira pelo menos 10 caracteres');
       return;
     }
-    await onSubmit({
-      text: text.trim(),
-      author: author.trim() || undefined,
-      category: category || undefined,
-    });
+
+    if (text.trim().length > 5000) {
+      setTextError('Texto muito longo (máximo 5000 caracteres)');
+      return;
+    }
+
+    try {
+      await onSubmit({
+        text: text.trim(),
+        author: author.trim() || undefined,
+        category: category || undefined,
+      });
+    } catch (error) {
+      setSubmitError(
+        error instanceof Error ? error.message : 'Erro ao enviar análise'
+      );
+    }
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
-      {/* Texto */}
-      <div>
-        <label htmlFor="text" className="block text-sm font-medium text-slate-700 mb-2">
-          Texto para Análise *
-        </label>
-        <textarea
-          id="text"
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          placeholder="Cole aqui o discurso, post ou texto político para análise..."
-          className="w-full h-48 px-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-          disabled={isLoading}
-        />
-        <p className="text-xs text-slate-500 mt-1">
-          Máximo de 10.000 caracteres
-        </p>
-      </div>
+    <form onSubmit={handleSubmit} className="space-y-6 bg-white dark:bg-gray-900 p-6 rounded-lg shadow">
+      {/* Erro geral */}
+      {submitError && (
+        <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+          <p className="text-red-800 dark:text-red-200 text-sm">{submitError}</p>
+        </div>
+      )}
 
-      {/* Autor */}
-      <div>
-        <label htmlFor="author" className="block text-sm font-medium text-slate-700 mb-2">
-          Autor (Opcional)
-        </label>
-        <input
-          id="author"
-          type="text"
-          value={author}
-          onChange={(e) => setAuthor(e.target.value)}
-          placeholder="Nome do político, empresa ou influencer"
-          className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          disabled={isLoading}
-        />
-      </div>
+      {/* Texto para Análise */}
+      <FormTextarea
+        label="Texto para Análise"
+        placeholder="Cole aqui o discurso, post ou texto político para análise..."
+        value={text}
+        onChange={handleTextChange}
+        error={textError}
+        maxLength={5000}
+        required
+      />
 
-      {/* Categoria */}
+      {/* Autor (opcional) */}
+      <FormInput
+        label="Autor/Político (opcional)"
+        placeholder="Nome do autor ou político"
+        value={author}
+        onChange={handleAuthorChange}
+        error={authorError}
+        maxLength={100}
+      />
+
+      {/* Categoria (opcional) */}
       <div>
-        <label htmlFor="category" className="block text-sm font-medium text-slate-700 mb-2">
-          Categoria (Opcional)
+        <label htmlFor="category" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+          Categoria (opcional)
         </label>
         <select
           id="category"
           value={category}
           onChange={(e) => setCategory(e.target.value)}
-          className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          disabled={isLoading}
+          className="w-full px-4 py-2 rounded-lg border-2 border-gray-300 dark:border-gray-600 focus:border-blue-500 focus:ring-4 focus:ring-blue-200 dark:focus:ring-blue-900 dark:bg-gray-800 dark:text-white transition-colors"
         >
           <option value="">Selecione uma categoria...</option>
           {CATEGORIES.map((cat) => (
@@ -97,14 +136,39 @@ export default function AnalysisForm({ onSubmit, isLoading }: AnalysisFormProps)
         </select>
       </div>
 
-      {/* Botão Submit */}
-      <button
-        type="submit"
-        disabled={isLoading || text.trim().length === 0}
-        className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-slate-400 text-white font-medium py-3 rounded-lg transition-colors"
-      >
-        {isLoading ? 'Analisando...' : 'Analisar Promessas'}
-      </button>
+      {/* Botões */}
+      <div className="flex gap-4 pt-4">
+        <Button
+          type="submit"
+          variant="primary"
+          size="lg"
+          loading={isLoading}
+          fullWidth
+        >
+          {isLoading ? 'Analisando...' : 'Analisar Promessa'}
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          size="lg"
+          onClick={() => {
+            setText('');
+            setAuthor('');
+            setCategory('');
+            setSubmitError('');
+          }}
+          disabled={isLoading}
+        >
+          Limpar
+        </Button>
+      </div>
+
+      {/* Dica */}
+      <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+        <p className="text-sm text-blue-800 dark:text-blue-200">
+          💡 <strong>Dica:</strong> Quanto mais específico o texto, melhor será a análise. Inclua contexto e detalhes sobre a promessa.
+        </p>
+      </div>
     </form>
   );
 }
