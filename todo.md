@@ -82,7 +82,36 @@
 - [x] Teste de spike (spike-test.js)
 - [x] Documentação k6 (k6/README.md)
 
-### 2.5 Linting e Formatação
+### 2.5 Observabilidade e Monitoramento
+- [x] Integrar Sentry para error tracking (server/core/observability.ts)
+- [x] Integrar Prometheus para métricas (server/core/observability.ts)
+- [x] Implementar health checks (GET /health, /health/live, /health/ready)
+- [x] Criar rotas de observabilidade (server/routes/observability.ts)
+  - GET /metrics - Prometheus metrics
+  - GET /health - Health check completo
+  - GET /health/live - Liveness probe
+  - GET /health/ready - Readiness probe
+  - GET /version - Versão e build info
+- [x] Testes de observabilidade (server/core/observability.test.ts) - 30+ casos
+- [x] Documentação (OBSERVABILITY.md)
+  - Configuração Sentry
+  - Configuração Prometheus
+  - Integração Grafana
+  - Docker Compose
+  - Queries Prometheus
+  - Troubleshooting
+
+### 2.6 Testes E2E de Rotas Avançadas
+- [x] Testes E2E para rotas PLN (e2e/advanced-analysis.spec.ts) - 40+ casos
+  - POST /api/analyze/advanced (10 casos)
+  - POST /api/analyze/batch (5 casos)
+  - GET /api/analyze/compare (6 casos)
+  - GET /api/analyze/history (5 casos)
+  - Cenários complexos (5 casos)
+  - Testes de performance (2 casos)
+  - Casos reais de promessas políticas brasileiras
+
+### 2.7 Linting e Formatação
 - [ ] Configurar ESLint (.eslintrc.json)
 - [ ] Configurar Prettier (.prettierrc.json)
 - [ ] Integrar em pre-commit hooks (.husky/pre-commit)
@@ -90,12 +119,22 @@
 ## FASE 3: PLN E DADOS PÚBLICOS (Alto - 4-6 semanas)
 
 ### 3.1 Melhorar Motor de PLN
-- [ ] Integrar biblioteca NLP (natural ou compromise)
-- [ ] Adicionar análise de negações ("não vou...")
-- [ ] Adicionar análise de condições ("se eleito...")
-- [ ] Adicionar análise de escopo geográfico
-- [ ] Adicionar análise de similaridade entre promessas
-- [ ] Adicionar detecção de conflitos
+- [x] Integrar biblioteca NLP (natural + compromise) (server/modules/nlp-advanced.ts)
+- [x] Adicionar análise de negações ("não vou...")
+- [x] Adicionar análise de condições ("se eleito...")
+- [x] Adicionar análise de escopo geográfico (nacional, estadual, municipal)
+- [x] Adicionar análise de similaridade entre promessas (Levenshtein)
+- [x] Adicionar dedu plicação de promessas
+- [x] Adicionar análise de sentimento
+- [x] Adicionar extração de entidades (locais, organizações, números)
+- [x] Adicionar classificação Bayes
+- [x] Criar 50+ testes (server/modules/nlp-advanced.test.ts)
+- [x] Documentar metodologia (NLP_METHODOLOGY.md)
+- [x] Integrar PLN na API (server/routes/analysis-advanced.ts)
+  - POST /api/analyze/advanced - Análise avançada
+  - POST /api/analyze/batch - Análise em lote
+  - GET /api/analyze/compare - Comparar promessas
+  - GET /api/analyze/history - Histórico de análises
 
 ### 3.2 Integrar Dados Públicos
 - [x] Integrar API SICONFI (server/integrations/siconfi.ts)
