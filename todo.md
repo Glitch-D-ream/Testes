@@ -111,7 +111,41 @@
   - Testes de performance (2 casos)
   - Casos reais de promessas políticas brasileiras
 
-### 2.7 Linting e Formatação
+### 2.7 Refinamentos de UX/UI e Dashboard
+- [x] Hook de validação em tempo real (client/src/hooks/useFormValidation.ts)
+- [x] Hook de tema dark/light (client/src/hooks/useTheme.ts)
+- [x] Componente FormInput com acessibilidade (client/src/components/FormInput.tsx)
+- [x] Componente FormTextarea com contador (client/src/components/FormTextarea.tsx)
+- [x] Componente Button com animações (client/src/components/Button.tsx)
+- [x] Componente PromiseDistributionChart (client/src/components/PromiseDistributionChart.tsx)
+- [x] Componente ComplianceTrendChart (client/src/components/ComplianceTrendChart.tsx)
+- [x] Página de Estatísticas/Dashboard (client/src/pages/Statistics.tsx)
+  - KPIs (total análises, promessas, confiança, cumprimento)
+  - Gráficos de distribuição e tendências
+  - Tabela detalhada por categoria
+  - Animações Framer Motion
+- [x] Endpoint de API para estatísticas (server/routes/statistics.ts)
+  - GET /api/statistics - Estatísticas gerais
+  - GET /api/statistics/category/:category - Por categoria
+  - GET /api/statistics/author/:authorId - Por autor
+- [x] Hook useStatistics para consumir API (client/src/hooks/useStatistics.ts)
+  - useStatistics() - Dados gerais com refetch automático
+  - useCategoryStatistics(category) - Por categoria
+  - useAuthorStatistics(authorId) - Por autor
+- [x] Integrar Statistics.tsx com API real
+  - Consome dados via useStatistics
+  - Tratamento de erro com botão refetch
+  - Refetch automático a cada 5 minutos
+- [ ] Implementar modo escuro em toda a aplicação
+- [ ] Adicionar loading states
+- [ ] Adicionar filtros e exportação
+
+### 2.8 Testes de Integração API
+- [ ] Testes para endpoints de estatísticas (server/routes/statistics.test.ts)
+- [ ] Testes para hooks useStatistics (client/src/hooks/useStatistics.test.ts)
+- [ ] Testes E2E para página Statistics
+
+### 2.9 Linting e Formatação
 - [ ] Configurar ESLint (.eslintrc.json)
 - [ ] Configurar Prettier (.prettierrc.json)
 - [ ] Integrar em pre-commit hooks (.husky/pre-commit)
