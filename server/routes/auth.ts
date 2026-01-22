@@ -11,6 +11,7 @@ import {
 } from '../core/auth.js';
 import {
   getUserByEmail,
+  getUserById,
   createUser,
   updateLastLogin,
   createAuditLog,
@@ -181,16 +182,7 @@ router.post('/refresh', async (req: Request, res: Response) => {
     }
 
     // Buscar usuário
-    const user = await getUserByEmail(
-      (await new Promise((resolve, reject) => {
-        const sql = 'SELECT email FROM users WHERE id = ?';
-        const db = require('../core/database.js').getDatabase();
-        db.get(sql, [payload.userId], (err: any, row: any) => {
-          if (err) reject(err);
-          else resolve(row?.email || null);
-        });
-      })) || ''
-    );
+    const user = await getUserById(payload.userId);
 
     if (!user) {
       res.status(401).json({ error: 'Usuário não encontrado' });
