@@ -4,7 +4,7 @@ import { fileURLToPath } from 'url';
 import { initializeDatabase } from '../server/core/database.js';
 import { setupRoutes } from '../server/core/routes.js';
 import cookieParser from 'cookie-parser';
-import telegramService from '../server/services/telegram.service.js';
+import { telegramService } from '../server/services/telegram.service.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

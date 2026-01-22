@@ -25,3 +25,5 @@ yarn-error.log*
 # Relatórios de Análise (Opcional, mas bom manter limpo)
 analise_projeto.md
 relatorio_*.md
+.vercel
+.env*.local
