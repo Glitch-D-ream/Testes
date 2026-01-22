@@ -10,6 +10,7 @@ import PoliticianProfile from './pages/PoliticianProfile';
 import './index.css';
 
 function App() {
+  // Force rebuild: 2026-01-22 07:45:00 UTC
   return (
     <Router>
       <div className="min-h-screen bg-background text-foreground">
