@@ -11,43 +11,37 @@ app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 app.use(cookieParser());
 
-// CORS simplificado para produção
+// CORS simplificado
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
   res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, x-xsrf-token');
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.header('Access-Control-Allow-Credentials', 'true');
-  
-  if (req.method === 'OPTIONS') {
-    res.sendStatus(200);
-  } else {
-    next();
-  }
-});
-
-// Inicialização síncrona das rotas
-setupRoutes(app);
-
-// Inicialização assíncrona do banco e webhook (Lazy)
-let isInitialized = false;
-app.use(async (req, res, next) => {
-  if (!isInitialized) {
-    try {
-      await initializeDatabase();
-      
-      if (process.env.TELEGRAM_BOT_TOKEN && process.env.WEBHOOK_DOMAIN) {
-        telegramWebhookService.setWebhook().catch(err => 
-          console.error('Erro ao configurar webhook do Telegram:', err)
-        );
-      }
-      
-      isInitialized = true;
-    } catch (error) {
-      console.error('Erro na inicialização lazy:', error);
-    }
-  }
+  if (req.method === 'OPTIONS') return res.sendStatus(200);
   next();
 });
 
-// Exportar para o Vercel
-export default app;
+// Inicialização lazy do banco e webhook
+let isInitialized = false;
+async function ensureInitialized() {
+  if (!isInitialized) {
+    try {
+      await initializeDatabase();
+      if (process.env.TELEGRAM_BOT_TOKEN && process.env.WEBHOOK_DOMAIN) {
+        await telegramWebhookService.setWebhook();
+      }
+      isInitialized = true;
+    } catch (error) {
+      console.error('Erro na inicialização:', error);
+    }
+  }
+}
+
+// Configurar rotas do servidor
+setupRoutes(app);
+
+// Handler principal para o Vercel
+export default async (req: any, res: any) => {
+  await ensureInitialized();
+  return app(req, res);
+};
