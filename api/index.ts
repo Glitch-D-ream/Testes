@@ -4,7 +4,7 @@ import { fileURLToPath } from 'url';
 import { initializeDatabase } from '../server/core/database.js';
 import { setupRoutes } from '../server/core/routes.js';
 import cookieParser from 'cookie-parser';
-import { telegramService } from '../server/services/telegram.service.js';
+import { telegramWebhookService } from '../server/services/telegram-webhook.service.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -44,9 +44,11 @@ app.use((req, res, next) => {
     await initializeDatabase();
     setupRoutes(app);
     
-    // Iniciar Bot de Telegram (apenas se não estiver em ambiente serverless ou via webhook)
-    if (process.env.TELEGRAM_BOT_TOKEN) {
-      telegramService.start().catch(err => console.error('Erro ao iniciar Telegram:', err));
+    // Configurar webhook do Telegram automaticamente se as variáveis estiverem definidas
+    if (process.env.TELEGRAM_BOT_TOKEN && process.env.WEBHOOK_DOMAIN) {
+      telegramWebhookService.setWebhook().catch(err => 
+        console.error('Erro ao configurar webhook do Telegram:', err)
+      );
     }
   } catch (error) {
     console.error('[Detector de Promessa Vazia] Erro ao inicializar:', error);

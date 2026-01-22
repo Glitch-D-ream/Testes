@@ -12,6 +12,7 @@ import authRoutes from '../routes/auth.js';
 import analysisRoutes from '../routes/analysis.routes.js';
 import statisticsRoutes from '../routes/statistics.routes.js';
 import adminRoutes from '../routes/admin.routes.js';
+import telegramRoutes from '../routes/telegram.routes.js';
 
 /**
  * Rate limiters
@@ -60,6 +61,9 @@ export function setupRoutes(app: Express): void {
 
   // Rotas administrativas
   app.use('/api/admin', adminRoutes);
+
+  // Rotas do Telegram (webhook)
+  app.use('/api/telegram', telegramRoutes);
 
   /**
    * GET /api/analysis/:id/export
