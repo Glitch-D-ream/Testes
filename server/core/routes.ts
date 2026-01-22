@@ -11,6 +11,7 @@ import statisticsRoutes from '../routes/statistics.routes.js';
 import adminRoutes from '../routes/admin.routes.js';
 import telegramRoutes from '../routes/telegram.routes.js';
 import aiTestRoutes from '../routes/ai-test.routes.js';
+import searchRoutes from '../routes/search.routes.js';
 
 /**
  * Rate limiters
@@ -74,6 +75,9 @@ export function setupRoutes(app: Express): void {
 
   // Rota de teste de IA
   app.use('/api/ai', aiTestRoutes);
+
+  // Rotas de busca
+  app.use('/api/search', searchRoutes);
 
   /**
    * GET /api/health

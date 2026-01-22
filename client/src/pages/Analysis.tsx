@@ -23,7 +23,7 @@ export default function Analysis() {
   useEffect(() => {
     const fetchAnalysis = async () => {
       try {
-        const response = await fetch(`/api/analysis/${id}`);
+        const response = await fetch(`/api/analyze/${id}`);
         if (!response.ok) {
           throw new Error('Análise não encontrada');
         }
@@ -44,7 +44,7 @@ export default function Analysis() {
 
   const handleExport = async () => {
     try {
-      const response = await fetch(`/api/analysis/${id}/export`);
+      const response = await fetch(`/api/analyze/${id}/pdf`);
       if (!response.ok) throw new Error('Erro ao exportar');
       
       const blob = await response.blob();

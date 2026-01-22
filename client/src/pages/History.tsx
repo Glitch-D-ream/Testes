@@ -17,10 +17,10 @@ export default function History() {
   useEffect(() => {
     const fetchHistory = async () => {
       try {
-        const response = await fetch('/api/analyses');
+        const response = await fetch('/api/analyze');
         if (response.ok) {
           const data = await response.json();
-          setAnalyses(data);
+          setAnalyses(data.analyses || []);
         }
       } catch (error) {
         console.error('Erro ao carregar histórico:', error);

@@ -11,7 +11,7 @@ export class AnalysisController {
     try {
       const validation = validate(AnalysisSchema, (req as any).body);
       if (!validation.success) {
-        return (res as any).status(400).json({ error: validation.error });
+        return (res as any).status(400).json({ error: (validation as any).error });
       }
 
       const { text, author, category } = validation.data;

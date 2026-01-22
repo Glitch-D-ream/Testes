@@ -32,11 +32,11 @@ router.post('/register', async (req: Request, res: Response) => {
   try {
     const validation = validate(RegisterSchema, req.body);
     if (!validation.success) {
-      res.status(400).json({ error: validation.error });
+      res.status(400).json({ error: (validation as any).error });
       return;
     }
 
-    const { email, password, name } = validation.data;
+    const { email, password, name } = (validation as any).data;
 
     // Verificar se email já existe
     const existingUser = await getUserByEmail(email);
@@ -87,11 +87,11 @@ router.post('/login', async (req: Request, res: Response) => {
   try {
     const validation = validate(LoginSchema, req.body);
     if (!validation.success) {
-      res.status(400).json({ error: validation.error });
+      res.status(400).json({ error: (validation as any).error });
       return;
     }
 
-    const { email, password } = validation.data;
+    const { email, password } = (validation as any).data;
 
     // Buscar usuário
     const user = await getUserByEmail(email);
@@ -161,11 +161,11 @@ router.post('/refresh', async (req: Request, res: Response) => {
   try {
     const validation = validate(RefreshTokenSchema, req.body);
     if (!validation.success) {
-      res.status(400).json({ error: validation.error });
+      res.status(400).json({ error: (validation as any).error });
       return;
     }
 
-    const { refreshToken } = validation.data;
+    const { refreshToken } = (validation as any).data;
 
     // Verificar refresh token
     const tokenRecord = await getRefreshToken(refreshToken);
@@ -213,7 +213,7 @@ router.post('/refresh', async (req: Request, res: Response) => {
  */
 router.post('/logout', authMiddleware, async (req: Request, res: Response) => {
   try {
-    const userId = req.userId;
+    const userId = (req as any).userId;
 
     // Log de auditoria
     const logId = nanoid();
@@ -243,7 +243,7 @@ router.post('/logout', authMiddleware, async (req: Request, res: Response) => {
 router.get('/me', authMiddleware, async (req: Request, res: Response) => {
   try {
     res.json({
-      user: req.user,
+      user: (req as any).user,
     });
   } catch (error) {
     logError('Erro ao obter usuário', error as Error);

@@ -15,7 +15,10 @@
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
-    "test:e2e:debug": "playwright test --debug"
+    "test:e2e:debug": "playwright test --debug",
+    "db:push": "drizzle-kit push:pg",
+    "db:migrate": "drizzle-kit migrate:pg",
+    "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
@@ -39,7 +42,7 @@
     "@supabase/supabase-js": "^2.91.0",
     "@types/cookie-parser": "^1.4.10",
     "@types/ioredis": "^5.0.0",
-    "autotable": "^1.0.0",
+
     "axios": "^1.12.2",
     "bcryptjs": "^3.0.3",
     "bullmq": "^5.66.6",

@@ -33,7 +33,7 @@ export default function Home() {
 
       const result = await response.json();
       toast.success('Análise realizada com sucesso!');
-      navigate(`/analysis/${result.analysisId}`);
+      navigate(`/analysis/${result.id}`);
     } catch (error) {
       console.error('Erro:', error);
       toast.error('Erro ao processar análise. Tente novamente.');

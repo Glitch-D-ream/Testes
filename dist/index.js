@@ -12,7 +12,6 @@ import path from "path";
 import { fileURLToPath } from "url";
 var __filename = fileURLToPath(import.meta.url);
 var __dirname = path.dirname(__filename);
-var logsDir = path.join(__dirname, "../../logs");
 var logger = winston.createLogger({
   level: process.env.LOG_LEVEL || "info",
   format: winston.format.combine(
@@ -22,12 +21,7 @@ var logger = winston.createLogger({
   ),
   defaultMeta: { service: "detector-promessa-vazia" },
   transports: [
-    new winston.transports.Console({
-      format: winston.format.combine(
-        winston.format.colorize(),
-        winston.format.simple()
-      )
-    })
+    new winston.transports.Console()
   ]
 });
 var logger_default = logger;
@@ -221,19 +215,17 @@ function extractTokenFromHeader(authHeader) {
 function authMiddleware(req, res, next) {
   const token = extractTokenFromHeader(req.headers.authorization);
   if (!token) {
-    res.status(401).json({
+    return res.status(401).json({
       error: "Unauthorized",
       message: "Token n\xE3o fornecido"
     });
-    return;
   }
   const payload = verifyJWT(token);
   if (!payload) {
-    res.status(401).json({
+    return res.status(401).json({
       error: "Unauthorized",
       message: "Token inv\xE1lido ou expirado"
     });
-    return;
   }
   req.user = payload;
   req.userId = payload.userId;
@@ -294,7 +286,7 @@ function csrfProtection(req, res, next) {
 }
 function csrfTokenRoute(req, res) {
   const token = generateCsrfToken(req, res);
-  res.json({ csrfToken: token });
+  return res.json({ csrfToken: token });
 }
 
 // server/routes/auth.ts
@@ -652,7 +644,9 @@ function analyzeSentence(sentence, verb) {
       verbs: [verb],
       nouns,
       numbers
-    }
+    },
+    negated: false,
+    conditional: false
   };
 }
 function extractNumbers(text) {
@@ -1033,23 +1027,40 @@ var AnalysisService = class {
         reasoning: p.reasoning
       }));
     } catch (error) {
-      console.error("Fallback para NLP local devido a erro na IA:", error);
+      logError("Fallback para NLP local devido a erro na IA", error);
       promises = extractPromises(text);
     }
     const analysisId = nanoid4();
     const probabilityScore = await calculateProbability(promises, author, category);
-    await runQuery(
-      `INSERT INTO analyses (id, user_id, text, author, category, extracted_promises, probability_score, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
-      [analysisId, userId, text, author, category, JSON.stringify(promises), probabilityScore]
-    );
-    for (const promise of promises) {
-      const promiseId = nanoid4();
-      await runQuery(
-        `INSERT INTO promises (id, analysis_id, promise_text, category, confidence_score)
-         VALUES (?, ?, ?, ?, ?)`,
-        [promiseId, analysisId, promise.text, promise.category, promise.confidence]
-      );
+    const supabase2 = getSupabase();
+    const { error: analysisError } = await supabase2.from("analyses").insert([{
+      id: analysisId,
+      user_id: userId,
+      text,
+      author,
+      category,
+      extracted_promises: promises,
+      probability_score: probabilityScore
+    }]);
+    if (analysisError) {
+      logError("Erro ao salvar an\xE1lise no Supabase", analysisError);
+      throw analysisError;
+    }
+    if (promises.length > 0) {
+      const promisesToInsert = promises.map((p) => ({
+        id: nanoid4(),
+        analysis_id: analysisId,
+        promise_text: p.text,
+        category: p.category,
+        confidence_score: p.confidence,
+        extracted_entities: p.entities || {},
+        negated: p.negated || false,
+        conditional: p.conditional || false
+      }));
+      const { error: promisesError } = await supabase2.from("promises").insert(promisesToInsert);
+      if (promisesError) {
+        logError("Erro ao salvar promessas no Supabase", promisesError);
+      }
     }
     return {
       id: analysisId,
@@ -1059,33 +1070,26 @@ var AnalysisService = class {
     };
   }
   async getAnalysisById(id) {
-    const analysis = await getQuery(
-      "SELECT * FROM analyses WHERE id = ?",
-      [id]
-    );
-    if (!analysis) return null;
-    const promises = await allQuery(
-      "SELECT * FROM promises WHERE analysis_id = ?",
-      [id]
-    );
+    const supabase2 = getSupabase();
+    const { data: analysis, error: analysisError } = await supabase2.from("analyses").select("*").eq("id", id).single();
+    if (analysisError || !analysis) return null;
+    const { data: promises, error: promisesError } = await supabase2.from("promises").select("*").eq("analysis_id", id);
     return {
       ...analysis,
-      promises,
-      extracted_promises: JSON.parse(analysis.extracted_promises || "[]")
+      promises: promises || [],
+      extracted_promises: analysis.extracted_promises || []
     };
   }
   async listAnalyses(limit = 50, offset = 0) {
-    const analyses = await allQuery(
-      `SELECT id, author, category, probability_score, created_at
-       FROM analyses
-       ORDER BY created_at DESC
-       LIMIT ? OFFSET ?`,
-      [limit, offset]
-    );
-    const total = await getQuery("SELECT COUNT(*) as count FROM analyses");
+    const supabase2 = getSupabase();
+    const { data: analyses, error, count } = await supabase2.from("analyses").select("id, author, category, probability_score, created_at", { count: "exact" }).order("created_at", { ascending: false }).range(offset, offset + limit - 1);
+    if (error) {
+      logError("Erro ao listar an\xE1lises", error);
+      return { analyses: [], total: 0 };
+    }
     return {
-      analyses,
-      total: total.count
+      analyses: analyses || [],
+      total: count || 0
     };
   }
 };
@@ -1161,7 +1165,7 @@ var AnalysisController = class {
         "analysis",
         result.id,
         req.ip || null,
-        req.get("user-agent") || null
+        req.get ? req.get("user-agent") : null
       );
       logInfo("An\xE1lise criada", { analysisId: result.id, userId, promisesCount: result.promisesCount });
       return res.status(201).json(result);
@@ -1239,57 +1243,46 @@ import { Router as Router3 } from "express";
 var StatisticsController = class {
   async getGlobalStats(req, res) {
     try {
-      const totalAnalysesResult = await getQuery("SELECT COUNT(*) as count FROM analyses");
-      const totalAnalyses = totalAnalysesResult?.count || 0;
-      const totalPromisesResult = await getQuery("SELECT COUNT(*) as count FROM promises");
-      const totalPromises = totalPromisesResult?.count || 0;
-      const avgViabilityResult = await getQuery(
-        "SELECT AVG(probability_score) as avg FROM analyses"
-      );
-      const averageViability = avgViabilityResult?.avg || 0;
-      const categoriesResult = await allQuery(
-        "SELECT category, COUNT(*) as count FROM promises GROUP BY category"
-      );
+      const supabase2 = getSupabase();
+      const { count: totalAnalyses, error: err1 } = await supabase2.from("analyses").select("*", { count: "exact", head: true });
+      const { count: totalPromises, error: err2 } = await supabase2.from("promises").select("*", { count: "exact", head: true });
+      const { data: viabilityData, error: err3 } = await supabase2.from("analyses").select("probability_score");
+      const averageViability = viabilityData && viabilityData.length > 0 ? viabilityData.reduce((acc, curr) => acc + (curr.probability_score || 0), 0) / viabilityData.length : 0;
+      const { data: categoriesData, error: err4 } = await supabase2.from("promises").select("category");
       const categoriesDistribution = {};
-      categoriesResult.forEach((row) => {
-        categoriesDistribution[row.category || "Geral"] = row.count;
+      categoriesData?.forEach((row) => {
+        const cat = row.category || "Geral";
+        categoriesDistribution[cat] = (categoriesDistribution[cat] || 0) + 1;
       });
-      const viabilityResult = await allQuery(
-        `SELECT p.category, AVG(a.probability_score) as avg_viability
-         FROM promises p
-         JOIN analyses a ON p.analysis_id = a.id
-         GROUP BY p.category`
-      );
-      const viabilityByCategory = {};
-      viabilityResult.forEach((row) => {
-        viabilityByCategory[row.category || "Geral"] = row.avg_viability || 0;
+      const thirtyDaysAgo = /* @__PURE__ */ new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      const { data: trendsData, error: err5 } = await supabase2.from("analyses").select("created_at, probability_score").gte("created_at", thirtyDaysAgo.toISOString()).order("created_at", { ascending: true });
+      const trendsMap = /* @__PURE__ */ new Map();
+      trendsData?.forEach((item) => {
+        const date = new Date(item.created_at).toISOString().split("T")[0];
+        if (!trendsMap.has(date)) {
+          trendsMap.set(date, { date, viability: 0, count: 0, sum: 0 });
+        }
+        const entry = trendsMap.get(date);
+        entry.count++;
+        entry.sum += item.probability_score || 0;
+        entry.viability = entry.sum / entry.count * 100;
       });
-      const trendsResult = await allQuery(
-        `SELECT 
-           DATE(created_at) as date,
-           AVG(probability_score) as viability,
-           COUNT(*) as count
-         FROM analyses
-         WHERE created_at >= NOW() - INTERVAL '30 days'
-         GROUP BY DATE(created_at)
-         ORDER BY date ASC`
-      );
-      const trends = trendsResult.map((row) => ({
-        date: row.date,
-        viability: (row.viability || 0) * 100,
-        count: row.count
-      }));
-      res.json({
-        totalAnalyses,
-        totalPromises,
+      const trends = Array.from(trendsMap.values());
+      if (err1 || err2 || err3 || err4 || err5) {
+        logError("Erro em uma das queries de estat\xEDsticas", err1 || err2 || err3 || err4 || err5);
+      }
+      return res.json({
+        totalAnalyses: totalAnalyses || 0,
+        totalPromises: totalPromises || 0,
         averageViability,
         categoriesDistribution,
-        viabilityByCategory,
+        viabilityByCategory: {},
         trends
       });
     } catch (error) {
       logError("Erro ao buscar estat\xEDsticas globais", error);
-      res.status(500).json({ error: "Erro ao buscar estat\xEDsticas" });
+      return res.status(500).json({ error: "Erro ao buscar estat\xEDsticas" });
     }
   }
 };
@@ -1820,6 +1813,148 @@ router6.get("/test", async (req, res) => {
 });
 var ai_test_routes_default = router6;
 
+// server/routes/search.routes.ts
+import { Router as Router7 } from "express";
+
+// server/services/search.service.ts
+var SearchService = class {
+  /**
+   * Busca políticos por nome, partido ou região
+   */
+  async searchPoliticians(query) {
+    logInfo(`[Search] Buscando pol\xEDticos: "${query}"`);
+    try {
+      const sql = `
+        SELECT id, name, party, office, region, photo_url as photoUrl, bio, credibility_score as credibilityScore
+        FROM politicians
+        WHERE name LIKE ? OR party LIKE ? OR region LIKE ?
+        LIMIT 20
+      `;
+      const searchTerm = `%${query}%`;
+      const results = await allQuery(sql, [searchTerm, searchTerm, searchTerm]);
+      return results || [];
+    } catch (error) {
+      console.error("[Search] Erro ao buscar pol\xEDticos:", error);
+      return [];
+    }
+  }
+  /**
+   * Busca promessas por texto ou categoria
+   */
+  async searchPromises(query) {
+    logInfo(`[Search] Buscando promessas: "${query}"`);
+    try {
+      const sql = `
+        SELECT p.id, p.promise_text as text, p.category, p.confidence_score as confidence, 
+               a.author, a.created_at as createdAt
+        FROM promises p
+        JOIN analyses a ON p.analysis_id = a.id
+        WHERE p.promise_text LIKE ? OR p.category LIKE ?
+        LIMIT 20
+      `;
+      const searchTerm = `%${query}%`;
+      const results = await allQuery(sql, [searchTerm, searchTerm]);
+      return results || [];
+    } catch (error) {
+      console.error("[Search] Erro ao buscar promessas:", error);
+      return [];
+    }
+  }
+  /**
+   * Busca global (Políticos + Promessas)
+   */
+  async globalSearch(query) {
+    const [foundPoliticians, foundPromises] = await Promise.all([
+      this.searchPoliticians(query),
+      this.searchPromises(query)
+    ]);
+    return {
+      politicians: foundPoliticians,
+      promises: foundPromises
+    };
+  }
+};
+var searchService = new SearchService();
+
+// server/services/import.service.ts
+import axios3 from "axios";
+import { nanoid as nanoid6 } from "nanoid";
+var ImportService = class {
+  /**
+   * Busca um político na API da Câmara e importa se não existir
+   */
+  async importFromCamara(name) {
+    logInfo(`[Import] Buscando "${name}" na API da C\xE2mara...`);
+    try {
+      const response = await axios3.get(`https://dadosabertos.camara.leg.br/api/v2/deputados?nome=${encodeURIComponent(name)}`);
+      const results = response.data.dados;
+      if (!results || results.length === 0) {
+        return null;
+      }
+      const camaraData = results[0];
+      const existing = await getQuery("SELECT id FROM politicians WHERE tse_id = ?", [camaraData.id.toString()]);
+      if (existing) {
+        logInfo(`[Import] Pol\xEDtico ${camaraData.nome} j\xE1 existe no banco.`);
+        return existing.id;
+      }
+      const id = nanoid6();
+      await runQuery(
+        "INSERT INTO politicians (id, name, party, office, region, tse_id, photo_url, bio, credibility_score) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        [
+          id,
+          camaraData.nome,
+          camaraData.siglaPartido,
+          "Deputado Federal",
+          camaraData.siglaUf,
+          camaraData.id.toString(),
+          camaraData.urlFoto,
+          `Deputado Federal em exerc\xEDcio (Legislatura ${camaraData.idLegislatura}). Dados importados da C\xE2mara dos Deputados.`,
+          50
+          // Score inicial neutro
+        ]
+      );
+      logInfo(`[Import] \u2705 ${camaraData.nome} importado com sucesso!`);
+      return id;
+    } catch (error) {
+      logError("[Import] Erro ao importar da C\xE2mara", error);
+      return null;
+    }
+  }
+};
+var importService = new ImportService();
+
+// server/routes/search.routes.ts
+var router7 = Router7();
+router7.get("/", async (req, res) => {
+  try {
+    const query = req.query.q;
+    if (!query || query.length < 2) {
+      return res.status(400).json({ error: "Termo de busca muito curto" });
+    }
+    const results = await searchService.globalSearch(query);
+    res.json(results);
+  } catch (error) {
+    logError("Erro na busca global", error);
+    res.status(500).json({ error: "Erro interno ao realizar busca" });
+  }
+});
+router7.get("/politicians", async (req, res) => {
+  try {
+    const query = req.query.q;
+    if (!query) return res.json([]);
+    let results = await searchService.searchPoliticians(query);
+    if (results.length === 0 && query.length > 3) {
+      await importService.importFromCamara(query);
+      results = await searchService.searchPoliticians(query);
+    }
+    res.json(results);
+  } catch (error) {
+    logError("Erro na busca de pol\xEDticos", error);
+    res.status(500).json({ error: "Erro interno ao buscar pol\xEDticos" });
+  }
+});
+var search_routes_default = router7;
+
 // server/core/routes.ts
 var analysisLimiter2 = rateLimit2({
   windowMs: 60 * 60 * 1e3,
@@ -1852,6 +1987,7 @@ function setupRoutes(app2) {
   app2.use("/api/admin", admin_routes_default);
   app2.use("/api/telegram", telegram_routes_default);
   app2.use("/api/ai", ai_test_routes_default);
+  app2.use("/api/search", search_routes_default);
   app2.get("/api/health", (req, res) => {
     res.json({
       status: "ok",

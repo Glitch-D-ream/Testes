@@ -14,7 +14,7 @@ export interface AuditReport {
     executionRate: number;
   };
   politicalConsistency: {
-    votedAgainstTheme: boolean;
+    votedAgainst: boolean;
     relevantVotes: any[];
   };
   verdict: 'REALISTA' | 'DUVIDOSA' | 'VAZIA';
@@ -40,9 +40,9 @@ export class DeepAuditor {
     let verdict: 'REALISTA' | 'DUVIDOSA' | 'VAZIA' = 'DUVIDOSA';
     let score = viability.confidence * 100;
 
-    if (score < 40 || consistency.votedAgainstTheme) {
+    if (score < 40 || consistency.votedAgainst) {
       verdict = 'VAZIA';
-    } else if (score > 75 && !consistency.votedAgainstTheme) {
+    } else if (score > 75 && !consistency.votedAgainst) {
       verdict = 'REALISTA';
     }
 
