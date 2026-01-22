@@ -12,12 +12,13 @@ const router = Router();
 router.post('/sync', authMiddleware, async (req: Request, res: Response) => {
   try {
     // Apenas administradores podem disparar a sincronização
-    if (req.userRole !== 'admin') {
+    const user = (req as any).user;
+    if (!user || user.role !== 'admin') {
       res.status(403).json({ error: 'Acesso negado. Apenas administradores podem realizar esta ação.' });
       return;
     }
 
-    logInfo('[Admin] Sincronização manual disparada por: ' + req.userId);
+    logInfo('[Admin] Sincronização manual disparada por: ' + (req as any).userId);
     
     // Executar em background para não travar a requisição
     syncAllPublicData().catch(err => logError('[Admin] Erro na sincronização em background', err));
@@ -38,7 +39,8 @@ router.post('/sync', authMiddleware, async (req: Request, res: Response) => {
  */
 router.get('/sync/status', authMiddleware, async (req: Request, res: Response) => {
   try {
-    if (req.userRole !== 'admin') {
+    const user = (req as any).user;
+    if (!user || user.role !== 'admin') {
       res.status(403).json({ error: 'Acesso negado.' });
       return;
     }

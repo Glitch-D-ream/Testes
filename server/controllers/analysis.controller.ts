@@ -7,7 +7,7 @@ import { createAuditLog } from '../core/database.js';
 import { nanoid } from 'nanoid';
 
 export class AnalysisController {
-  async create(req: Request, res: Response) {
+  async create(req: Request, res: Response): Promise<any> {
     try {
       const validation = validate(AnalysisSchema, req.body);
       if (!validation.success) {
@@ -15,9 +15,15 @@ export class AnalysisController {
       }
 
       const { text, author, category } = validation.data;
-      const userId = req.userId || null;
+      const userId = (req as any).userId || null;
 
-      const result = await analysisService.createAnalysis(userId, text, author, category);
+      // Garantir que author e category sejam strings (Zod já valida, mas TS precisa de confirmação)
+      const result = await analysisService.createAnalysis(
+        userId, 
+        text, 
+        author || 'Autor Desconhecido', 
+        category || 'GERAL'
+      );
 
       // Log de auditoria
       await createAuditLog(
@@ -32,14 +38,14 @@ export class AnalysisController {
 
       logInfo('Análise criada', { analysisId: result.id, userId, promisesCount: result.promisesCount });
 
-      res.status(201).json(result);
+      return res.status(201).json(result);
     } catch (error) {
       logError('Erro ao criar análise', error as Error);
-      res.status(500).json({ error: 'Erro ao criar análise' });
+      return res.status(500).json({ error: 'Erro ao criar análise' });
     }
   }
 
-  async getById(req: Request, res: Response) {
+  async getById(req: Request, res: Response): Promise<any> {
     try {
       const { id } = req.params;
       const analysis = await analysisService.getAnalysisById(id);
@@ -48,42 +54,42 @@ export class AnalysisController {
         return res.status(404).json({ error: 'Análise não encontrada' });
       }
 
-      res.json(analysis);
+      return res.json(analysis);
     } catch (error) {
       logError('Erro ao obter análise', error as Error);
-      res.status(500).json({ error: 'Erro ao obter análise' });
+      return res.status(500).json({ error: 'Erro ao obter análise' });
     }
   }
 
-  async list(req: Request, res: Response) {
+  async list(req: Request, res: Response): Promise<any> {
     try {
       const limit = Math.min(parseInt(req.query.limit as string) || 50, 100);
       const offset = parseInt(req.query.offset as string) || 0;
 
       const result = await analysisService.listAnalyses(limit, offset);
 
-      res.json({
+      return res.json({
         ...result,
         limit,
         offset,
       });
     } catch (error) {
       logError('Erro ao listar análises', error as Error);
-      res.status(500).json({ error: 'Erro ao listar análises' });
+      return res.status(500).json({ error: 'Erro ao listar análises' });
     }
   }
 
-  async exportPDF(req: Request, res: Response) {
+  async exportPDF(req: Request, res: Response): Promise<any> {
     try {
       const { id } = req.params;
       const pdfBuffer = await exportService.generateAnalysisPDF(id);
 
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', `attachment; filename="analise-${id}.pdf"`);
-      res.send(pdfBuffer);
+      return res.send(pdfBuffer);
     } catch (error) {
       logError('Erro ao exportar PDF', error as Error);
-      res.status(500).json({ error: 'Erro ao gerar relatório PDF' });
+      return res.status(500).json({ error: 'Erro ao gerar relatório PDF' });
     }
   }
 }

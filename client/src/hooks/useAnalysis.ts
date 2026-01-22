@@ -1,10 +1,14 @@
 import { useState, useCallback } from 'react';
 
-interface AnalysisResult {
+export interface AnalysisResult {
   id: string;
+  text: string;
+  author: string;
+  category: string;
   probabilityScore: number;
   promisesCount: number;
   promises: any[];
+  createdAt?: string;
 }
 
 interface UseAnalysisOptions {

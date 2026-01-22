@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { useAnalysis } from '../hooks/useAnalysis';
-import { useFormValidation } from '../hooks/useFormValidation';
 
 interface AnalysisFormProps {
   onSuccess?: (analysisId: string) => void;
@@ -11,6 +10,7 @@ export function AnalysisFormImproved({ onSuccess }: AnalysisFormProps) {
   const [author, setAuthor] = useState('');
   const [category, setCategory] = useState('GERAL');
   const [submitted, setSubmitted] = useState(false);
+  const [localErrors, setLocalErrors] = useState<{ [key: string]: string }>({});
 
   const { loading, error, submit } = useAnalysis({
     onSuccess: (data) => {
@@ -20,29 +20,27 @@ export function AnalysisFormImproved({ onSuccess }: AnalysisFormProps) {
       setText('');
       setAuthor('');
       setCategory('GERAL');
+      setLocalErrors({});
     },
   });
 
-  const { errors, validate } = useFormValidation({
-    text: {
-      required: 'Texto é obrigatório',
-      minLength: { value: 10, message: 'Texto deve ter no mínimo 10 caracteres' },
-      maxLength: { value: 5000, message: 'Texto não pode exceder 5000 caracteres' },
-    },
-    author: {
-      required: 'Autor é obrigatório',
-      minLength: { value: 3, message: 'Autor deve ter no mínimo 3 caracteres' },
-    },
-    category: {
-      required: 'Categoria é obrigatória',
-    },
-  });
+  const validate = () => {
+    const errors: { [key: string]: string } = {};
+    if (!text.trim()) errors.text = 'Texto é obrigatório';
+    else if (text.length < 10) errors.text = 'Texto deve ter no mínimo 10 caracteres';
+    else if (text.length > 5000) errors.text = 'Texto não pode exceder 5000 caracteres';
+
+    if (!author.trim()) errors.author = 'Autor é obrigatório';
+    else if (author.length < 3) errors.author = 'Autor deve ter no mínimo 3 caracteres';
+
+    setLocalErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    const validationErrors = validate({ text, author, category });
-    if (Object.keys(validationErrors).length > 0) {
+    if (!validate()) {
       return;
     }
 
@@ -71,7 +69,7 @@ export function AnalysisFormImproved({ onSuccess }: AnalysisFormProps) {
           className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
           disabled={loading}
         />
-        {errors.author && <p className="mt-1 text-sm text-red-600">{errors.author}</p>}
+        {localErrors.author && <p className="mt-1 text-sm text-red-600">{localErrors.author}</p>}
       </div>
 
       <div>
@@ -97,7 +95,7 @@ export function AnalysisFormImproved({ onSuccess }: AnalysisFormProps) {
           <option value="AGRICULTURE">Agricultura</option>
           <option value="CULTURE">Cultura</option>
         </select>
-        {errors.category && <p className="mt-1 text-sm text-red-600">{errors.category}</p>}
+        {localErrors.category && <p className="mt-1 text-sm text-red-600">{localErrors.category}</p>}
       </div>
 
       <div>
@@ -119,7 +117,7 @@ export function AnalysisFormImproved({ onSuccess }: AnalysisFormProps) {
             style={{ width: `${Math.min(textPercentage, 100)}%` }}
           />
         </div>
-        {errors.text && <p className="mt-1 text-sm text-red-600">{errors.text}</p>}
+        {localErrors.text && <p className="mt-1 text-sm text-red-600">{localErrors.text}</p>}
       </div>
 
       {error && (

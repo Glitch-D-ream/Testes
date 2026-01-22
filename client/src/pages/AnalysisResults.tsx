@@ -78,7 +78,7 @@ export function AnalysisResults() {
 
   const promises = data.promises || [];
   const averageConfidence = promises.length > 0
-    ? (promises.reduce((sum: number, p: any) => sum + (p.confidence_score || 0), 0) / promises.length) * 100
+    ? (promises.reduce((sum: number, p: any) => sum + (p.confidence_score || p.confidence || 0), 0) / promises.length) * 100
     : 0;
 
   return (
@@ -124,7 +124,7 @@ export function AnalysisResults() {
             <div className="bg-purple-50 rounded-lg p-4">
               <p className="text-sm text-gray-600">Score de Viabilidade</p>
               <p className="text-3xl font-bold text-purple-600">
-                {((data.probability_score || 0) * 100).toFixed(1)}%
+                {((data.probabilityScore || 0) * 100).toFixed(1)}%
               </p>
             </div>
           </div>
@@ -147,9 +147,9 @@ export function AnalysisResults() {
               {promises.map((promise: any, index: number) => (
                 <PromiseCard
                   key={index}
-                  text={promise.promise_text}
+                  text={promise.promise_text || promise.text}
                   category={promise.category || 'Geral'}
-                  confidence={promise.confidence_score || 0}
+                  confidence={promise.confidence_score || promise.confidence || 0}
                   negated={promise.negated || false}
                   conditional={promise.conditional || false}
                   reasoning={promise.reasoning}
