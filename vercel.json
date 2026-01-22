@@ -5,12 +5,13 @@
   "framework": "vite",
   "buildCommand": "vite build",
   "outputDirectory": "client/dist",
-  "crons": [
-    {
-      "path": "/api/sync",
-      "schedule": "0 3 * * *"
+  "functions": {
+    "api/index.ts": {
+      "runtime": "vercel-node@latest",
+      "memory": 1024,
+      "maxDuration": 10
     }
-  ],
+  },
   "rewrites": [
     {
       "source": "/api/(.*)",
