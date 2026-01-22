@@ -1,5 +1,6 @@
 
 import { getBudgetData, validateBudgetViability, mapPromiseToSiconfiCategory } from '../integrations/siconfi.js';
+import { votingService } from '../services/voting.service.js';
 import { logInfo, logError } from '../core/logger.js';
 import axios from 'axios';
 
@@ -32,9 +33,8 @@ export class DeepAuditor {
     const budgetInfo = await getBudgetData(siconfiCat, 2024, 'FEDERAL');
     const viability = await validateBudgetViability(siconfiCat, 0, 2024);
 
-    // 2. Consistência Política (API da Câmara - Simulado para o Nikolas)
-    // Aqui buscaríamos se o deputado votou contra verbas para a área da promessa
-    const consistency = await this.checkPoliticalConsistency(politicianId, category);
+    // 2. Consistência Política (API da Câmara - REAL)
+    const consistency = await votingService.checkInconsistency(politicianId, category);
 
     // 3. Lógica de Veredito
     let verdict: 'REALISTA' | 'DUVIDOSA' | 'VAZIA' = 'DUVIDOSA';
@@ -63,21 +63,7 @@ export class DeepAuditor {
     };
   }
 
-  private async checkPoliticalConsistency(politicianId: string, category: string) {
-    // Simulação de busca na API da Câmara
-    // Ex: Nikolas Ferreira (ID 209787)
-    // Se a categoria for Educação e ele votou contra o Fundeb, por exemplo.
-    const mockVotes = [
-      { tema: 'Educação', voto: 'Não', data: '2023-05-10', descricao: 'Votação sobre verbas do Fundeb' }
-    ];
-
-    const votedAgainst = category.toLowerCase().includes('educação') && mockVotes.some(v => v.voto === 'Não');
-
-    return {
-      votedAgainstTheme: votedAgainst,
-      relevantVotes: mockVotes
-    };
-  }
+  // O método checkPoliticalConsistency foi substituído pelo votingService.checkInconsistency real
 
   private generateExplanation(verdict: string, category: string, viability: any, consistency: any): string {
     if (verdict === 'VAZIA') {
