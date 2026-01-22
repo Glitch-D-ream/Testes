@@ -1,10 +1,10 @@
 import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { initializeDatabase } from './core/database.js';
-import { setupRoutes } from './core/routes.js';
+import { initializeDatabase } from '../server/core/database.js';
+import { setupRoutes } from '../server/core/routes.js';
 import cookieParser from 'cookie-parser';
-import { telegramWebhookService } from './services/telegram-webhook.service.js';
+import { telegramWebhookService } from '../server/services/telegram-webhook.service.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -18,7 +18,7 @@ app.use(express.urlencoded({ limit: '50mb', extended: true }));
 app.use(cookieParser());
 
 // Configuração de CORS
-app.use((req, res, next) => {
+app.use((req: any, res: any, next: any) => {
   const allowedOrigins = process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : [];
   const origin = req.headers.origin;
   
@@ -50,17 +50,16 @@ app.use(express.static(clientBuildPath));
     await initializeDatabase();
 
     // Configurar rotas da API
-    setupRoutes(app);
+    setupRoutes(app as any);
 
     // Servir index.html para rotas não encontradas (SPA)
-    app.get('*', (req, res) => {
+    app.get('*', (req: any, res: any) => {
       res.sendFile(path.join(clientBuildPath, 'index.html'));
     });
 
     // Iniciar servidor
     app.listen(PORT, () => {
       console.log(`[Detector de Promessa Vazia] Servidor iniciado em http://localhost:${PORT}`);
-      console.log(`[Detector de Promessa Vazia] Ambiente: ${process.env.NODE_ENV || 'development'}`);
       
       // Configurar webhook do Telegram se as variáveis estiverem definidas
       if (process.env.TELEGRAM_BOT_TOKEN && process.env.WEBHOOK_DOMAIN) {
@@ -74,3 +73,5 @@ app.use(express.static(clientBuildPath));
     process.exit(1);
   }
 })();
+
+export default app;
