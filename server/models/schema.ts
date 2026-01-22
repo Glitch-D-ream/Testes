@@ -12,11 +12,26 @@ export const users = pgTable('users', {
   isActive: boolean('is_active').default(true),
 });
 
+export const politicians = pgTable('politicians', {
+  id: text('id').primaryKey(),
+  name: varchar('name', { length: 255 }).notNull(),
+  party: varchar('party', { length: 50 }),
+  office: varchar('office', { length: 100 }), // Cargo atual
+  region: varchar('region', { length: 100 }), // Estado ou Cidade
+  tseId: varchar('tse_id', { length: 50 }),
+  photoUrl: text('photo_url'),
+  bio: text('bio'),
+  credibilityScore: real('credibility_score').default(0),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+});
+
 export const analyses = pgTable('analyses', {
   id: text('id').primaryKey(),
   userId: text('user_id').references(() => users.id),
+  politicianId: text('politician_id').references(() => politicians.id),
   text: text('text').notNull(),
-  author: text('author'),
+  author: text('author'), // Mantido para compatibilidade ou autores não cadastrados
   category: text('category'),
   extractedPromises: jsonb('extracted_promises'),
   probabilityScore: real('probability_score'),
@@ -64,4 +79,15 @@ export const publicDataCache = pgTable('public_data_cache', {
   dataContent: jsonb('data_content').notNull(),
   lastUpdated: timestamp('last_updated').defaultNow(),
   expiryDate: timestamp('expiry_date'),
+});
+
+export const evidenceStorage = pgTable('evidence_storage', {
+  id: text('id').primaryKey(),
+  politicianId: text('politician_id').references(() => politicians.id),
+  analysisId: text('analysis_id').references(() => analyses.id),
+  telegramFileId: text('telegram_file_id').notNull(), // O ID do arquivo no Telegram
+  telegramMessageId: text('telegram_message_id'),
+  fileType: varchar('file_type', { length: 50 }), // 'image', 'pdf', 'video'
+  description: text('description'),
+  createdAt: timestamp('created_at').defaultNow(),
 });
