@@ -65,7 +65,7 @@ export class AIService {
   private async analyzeWithGemini(text: string): Promise<AIAnalysisResult> {
     logInfo('Tentando análise com Gemini 1.5 Flash...');
     const model = genAI.getGenerativeModel({ 
-      model: "gemini-2.5-flash",
+      model: "gemini-1.5-flash",
       generationConfig: { responseMimeType: "application/json" }
     });
 
