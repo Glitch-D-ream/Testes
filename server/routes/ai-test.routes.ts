@@ -5,7 +5,7 @@ import { logInfo, logError } from '../core/logger.js';
 const router = Router();
 
 router.get('/test', async (req: Request, res: Response) => {
-  const sampleText = "Prometo construir 10 escolas e reduzir impostos.";
+  const sampleText = "Prometo construir 10 escolas e reduzir impostos municipais em 20% até o final do mandato.";
   const results: any = {};
 
   logInfo('Iniciando teste de IAs via endpoint...');
