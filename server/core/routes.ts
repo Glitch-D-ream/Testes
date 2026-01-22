@@ -11,6 +11,7 @@ import { logInfo, logError } from './logger.js';
 import authRoutes from '../routes/auth.js';
 import analysisRoutes from '../routes/analysis.routes.js';
 import statisticsRoutes from '../routes/statistics.routes.js';
+import adminRoutes from '../routes/admin.routes.js';
 
 /**
  * Rate limiters
@@ -56,6 +57,9 @@ export function setupRoutes(app: Express): void {
 
   // Rotas de estatísticas
   app.use('/api/statistics', statisticsRoutes);
+
+  // Rotas administrativas
+  app.use('/api/admin', adminRoutes);
 
   /**
    * GET /api/analysis/:id/export
