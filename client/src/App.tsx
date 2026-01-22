@@ -5,6 +5,8 @@ import Home from './pages/Home';
 import Analysis from './pages/Analysis';
 import History from './pages/History';
 import Methodology from './pages/Methodology';
+import PoliticianSearch from './pages/PoliticianSearch';
+import PoliticianProfile from './pages/PoliticianProfile';
 import './index.css';
 
 function App() {
@@ -16,6 +18,8 @@ function App() {
           <Route path="/analysis/:id" element={<Analysis />} />
           <Route path="/history" element={<History />} />
           <Route path="/methodology" element={<Methodology />} />
+          <Route path="/search" element={<PoliticianSearch />} />
+          <Route path="/politician/:id" element={<PoliticianProfile />} />
         </Routes>
         <Toaster />
       </div>

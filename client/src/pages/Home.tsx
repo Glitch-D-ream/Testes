@@ -71,6 +71,16 @@ export default function Home() {
             <div className="flex items-center gap-4">
               <nav className="flex gap-4">
                 <a
+                  href="/search"
+                  className={`px-4 py-2 font-medium transition-colors ${
+                    theme === 'dark'
+                      ? 'text-gray-300 hover:text-white'
+                      : 'text-slate-700 hover:text-slate-900'
+                  }`}
+                >
+                  Buscar Político
+                </a>
+                <a
                   href="/history"
                   className={`px-4 py-2 font-medium transition-colors ${
                     theme === 'dark'
