@@ -71,9 +71,6 @@ importers:
       '@types/ioredis':
         specifier: ^5.0.0
         version: 5.0.0
-      '@types/pg':
-        specifier: ^8.16.0
-        version: 8.16.0
       autotable:
         specifier: ^1.0.0
         version: 1.0.0
@@ -225,6 +222,9 @@ importers:
       '@types/node-cron':
         specifier: ^3.0.11
         version: 3.0.11
+      '@types/pg':
+        specifier: ^8.16.0
+        version: 8.16.0
       '@types/react':
         specifier: ^19.2.1
         version: 19.2.1
