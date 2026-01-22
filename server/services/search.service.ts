@@ -1,38 +1,56 @@
 
-import { db } from '../core/database.js';
-import { politicians, analyses, promises } from '../models/schema.js';
-import { ilike, or, sql } from 'drizzle-orm';
+import { allQuery } from '../core/database.js';
+import { logInfo } from '../core/logger.js';
 
 export class SearchService {
   /**
    * Busca políticos por nome, partido ou região
    */
   async searchPoliticians(query: string) {
-    return await db.select()
-      .from(politicians)
-      .where(
-        or(
-          ilike(politicians.name, `%${query}%`),
-          ilike(politicians.party, `%${query}%`),
-          ilike(politicians.region, `%${query}%`)
-        )
-      )
-      .limit(10);
+    logInfo(`[Search] Buscando políticos: "${query}"`);
+    
+    try {
+      const sql = `
+        SELECT id, name, party, office, region, photo_url as photoUrl, bio, credibility_score as credibilityScore
+        FROM politicians
+        WHERE name LIKE ? OR party LIKE ? OR region LIKE ?
+        LIMIT 20
+      `;
+      
+      const searchTerm = `%${query}%`;
+      const results = await allQuery(sql, [searchTerm, searchTerm, searchTerm]);
+      
+      return results || [];
+    } catch (error) {
+      console.error('[Search] Erro ao buscar políticos:', error);
+      return [];
+    }
   }
 
   /**
-   * Busca promessas por palavra-chave ou categoria
+   * Busca promessas por texto ou categoria
    */
   async searchPromises(query: string) {
-    return await db.select()
-      .from(promises)
-      .where(
-        or(
-          ilike(promises.promiseText, `%${query}%`),
-          ilike(promises.category, `%${query}%`)
-        )
-      )
-      .limit(20);
+    logInfo(`[Search] Buscando promessas: "${query}"`);
+    
+    try {
+      const sql = `
+        SELECT p.id, p.promise_text as text, p.category, p.confidence_score as confidence, 
+               a.author, a.created_at as createdAt
+        FROM promises p
+        JOIN analyses a ON p.analysis_id = a.id
+        WHERE p.promise_text LIKE ? OR p.category LIKE ?
+        LIMIT 20
+      `;
+      
+      const searchTerm = `%${query}%`;
+      const results = await allQuery(sql, [searchTerm, searchTerm]);
+      
+      return results || [];
+    } catch (error) {
+      console.error('[Search] Erro ao buscar promessas:', error);
+      return [];
+    }
   }
 
   /**

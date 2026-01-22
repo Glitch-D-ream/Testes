@@ -1,7 +1,6 @@
 
 import { Telegraf } from 'telegraf';
-import { db } from '../core/database.js';
-import { evidenceStorage } from '../models/schema.js';
+import { runQuery } from '../core/database.js';
 import { nanoid } from 'nanoid';
 
 export class TelegramStorageService {
@@ -11,12 +10,11 @@ export class TelegramStorageService {
   constructor() {
     const token = process.env.TELEGRAM_BOT_TOKEN || '';
     this.bot = new Telegraf(token);
-    this.chatId = process.env.TELEGRAM_CHAT_ID || ''; // Canal ou Chat privado para storage
+    this.chatId = process.env.TELEGRAM_CHAT_ID || '';
   }
 
   /**
-   * Simula o registro de uma prova enviada ao Telegram
-   * Na prática, o bot receberia o arquivo e geraria o file_id
+   * Registra uma prova no banco de dados vinculada ao Telegram
    */
   async registerEvidence(params: {
     politicianId: string;
@@ -27,12 +25,15 @@ export class TelegramStorageService {
   }) {
     const id = nanoid();
     
-    // No mundo real, poderíamos usar this.bot.telegram.getFile(params.fileId) 
-    // para validar ou processar, mas aqui guardamos a referência.
-    
-    // Nota: Como estamos usando SQLite no sandbox via raw queries em alguns scripts,
-    // aqui mostramos a lógica que seria usada com o Drizzle.
-    console.log(`[TelegramStorage] Vinculando prova ${params.fileId} ao político ${params.politicianId}`);
+    try {
+      await runQuery(
+        'INSERT INTO evidence_storage (id, politician_id, analysis_id, telegram_file_id, file_type, description) VALUES (?, ?, ?, ?, ?, ?)',
+        [id, params.politicianId, params.analysisId || null, params.fileId, params.fileType, params.description]
+      );
+      console.log(`[TelegramStorage] Prova ${params.fileId} vinculada ao político ${params.politicianId}`);
+    } catch (error) {
+      console.error('[TelegramStorage] Erro ao registrar evidência:', error);
+    }
     
     return {
       id,
@@ -45,8 +46,6 @@ export class TelegramStorageService {
    * Gera um link de visualização (via bot ou proxy)
    */
   getEvidenceUrl(fileId: string) {
-    // O Telegram não gera URLs diretas permanentes para arquivos via file_id sem o bot
-    // Então o app teria um endpoint: /api/evidence/:fileId que usaria o bot.telegram.getFileLink()
     return `https://t.me/seu_bot_proxy?file_id=${fileId}`;
   }
 }

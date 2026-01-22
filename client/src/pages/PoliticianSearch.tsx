@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, AlertCircle, CheckCircle, Clock } from 'lucide-react';
+import { Search, AlertCircle } from 'lucide-react';
 import { useTheme } from '../hooks/useTheme';
+import { usePoliticianSearch } from '../hooks/usePoliticianSearch';
 
 interface Politician {
   id: string;
@@ -17,25 +18,18 @@ export default function PoliticianSearch() {
   const navigate = useNavigate();
   const { theme } = useTheme();
   const [searchQuery, setSearchQuery] = useState('');
-  const [results, setResults] = useState<Politician[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
+  const { results, isLoading, error, search } = usePoliticianSearch();
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!searchQuery.trim()) return;
 
-    setIsLoading(true);
     setHasSearched(true);
     try {
-      const response = await fetch(`/api/search/politicians?q=${encodeURIComponent(searchQuery)}`);
-      const data = await response.json();
-      setResults(data);
-    } catch (error) {
-      console.error('Erro na busca:', error);
-      setResults([]);
-    } finally {
-      setIsLoading(false);
+      await search(searchQuery);
+    } catch (err) {
+      console.error('Erro na busca:', err);
     }
   };
 
@@ -62,16 +56,16 @@ export default function PoliticianSearch() {
         theme === 'dark'
           ? 'bg-gray-800 border-gray-700'
           : 'bg-white border-slate-200'
-      } shadow-sm border-b transition-colors`}>
+      } shadow-sm border-b transition-colors sticky top-0 z-50`}>
         <div className="max-w-6xl mx-auto px-4 py-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className={`text-3xl font-bold ${
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex-1">
+              <h1 className={`text-2xl md:text-3xl font-bold ${
                 theme === 'dark' ? 'text-white' : 'text-slate-900'
               }`}>
                 Buscar Político
               </h1>
-              <p className={`mt-1 ${
+              <p className={`mt-1 text-sm md:text-base ${
                 theme === 'dark' ? 'text-gray-400' : 'text-slate-600'
               }`}>
                 Consulte o dossiê de promessas e viabilidade
@@ -79,7 +73,7 @@ export default function PoliticianSearch() {
             </div>
             <button
               onClick={() => navigate('/')}
-              className={`px-4 py-2 font-medium transition-colors ${
+              className={`px-4 py-2 font-medium transition-colors whitespace-nowrap ${
                 theme === 'dark'
                   ? 'text-gray-300 hover:text-white'
                   : 'text-slate-700 hover:text-slate-900'
@@ -92,13 +86,13 @@ export default function PoliticianSearch() {
       </header>
 
       {/* Main Content */}
-      <main className="max-w-4xl mx-auto px-4 py-12">
+      <main className="max-w-4xl mx-auto px-4 py-8 md:py-12">
         {/* Search Form */}
-        <form onSubmit={handleSearch} className="mb-12">
-          <div className={`rounded-lg shadow-lg p-8 ${
+        <form onSubmit={handleSearch} className="mb-8 md:mb-12">
+          <div className={`rounded-lg shadow-lg p-6 md:p-8 ${
             theme === 'dark' ? 'bg-gray-800' : 'bg-white'
           }`}>
-            <div className="flex gap-4">
+            <div className="flex flex-col md:flex-row gap-4">
               <div className="flex-1 relative">
                 <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
                 <input
@@ -116,13 +110,27 @@ export default function PoliticianSearch() {
               <button
                 type="submit"
                 disabled={isLoading}
-                className="px-8 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                className="px-6 md:px-8 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors whitespace-nowrap"
               >
                 {isLoading ? 'Buscando...' : 'Buscar'}
               </button>
             </div>
           </div>
         </form>
+
+        {/* Error Message */}
+        {error && (
+          <div className={`rounded-lg p-6 mb-8 ${
+            theme === 'dark' ? 'bg-red-900 bg-opacity-20' : 'bg-red-50'
+          } border ${theme === 'dark' ? 'border-red-700' : 'border-red-200'}`}>
+            <div className="flex items-center gap-3">
+              <AlertCircle className={theme === 'dark' ? 'text-red-400' : 'text-red-600'} />
+              <p className={theme === 'dark' ? 'text-red-300' : 'text-red-800'}>
+                {error}
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Results */}
         <div className="space-y-6">
@@ -139,7 +147,7 @@ export default function PoliticianSearch() {
             </div>
           )}
 
-          {results.map((politician) => (
+          {results.map((politician: Politician) => (
             <div
               key={politician.id}
               onClick={() => navigate(`/politician/${politician.id}`)}
@@ -147,18 +155,21 @@ export default function PoliticianSearch() {
                 theme === 'dark' ? 'bg-gray-800' : 'bg-white'
               }`}
             >
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <div className="flex items-center gap-4 mb-4">
+              <div className="flex flex-col md:flex-row items-start justify-between gap-4">
+                <div className="flex-1 w-full">
+                  <div className="flex items-start gap-4 mb-4">
                     {politician.photoUrl && (
                       <img
                         src={politician.photoUrl}
                         alt={politician.name}
-                        className="w-16 h-16 rounded-full object-cover"
+                        className="w-16 h-16 rounded-full object-cover flex-shrink-0"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).style.display = 'none';
+                        }}
                       />
                     )}
-                    <div>
-                      <h2 className={`text-2xl font-bold ${
+                    <div className="flex-1 min-w-0">
+                      <h2 className={`text-xl md:text-2xl font-bold truncate ${
                         theme === 'dark' ? 'text-white' : 'text-slate-900'
                       }`}>
                         {politician.name}
@@ -172,9 +183,9 @@ export default function PoliticianSearch() {
                   </div>
 
                   {/* Credibility Score */}
-                  <div className="flex items-center gap-6">
+                  <div className="flex items-center gap-4 flex-wrap">
                     <div className="flex items-center gap-2">
-                      <span className={`text-3xl font-bold ${getVerdictColor(politician.credibilityScore)}`}>
+                      <span className={`text-2xl md:text-3xl font-bold ${getVerdictColor(politician.credibilityScore)}`}>
                         {Math.round(politician.credibilityScore)}%
                       </span>
                       <span className={`text-sm font-medium ${getVerdictColor(politician.credibilityScore)}`}>
@@ -185,7 +196,7 @@ export default function PoliticianSearch() {
                 </div>
 
                 {/* Status Badge */}
-                <div className={`px-4 py-2 rounded-full text-sm font-medium ${
+                <div className={`px-4 py-2 rounded-full text-sm font-medium flex-shrink-0 ${
                   politician.credibilityScore >= 75
                     ? 'bg-green-100 text-green-800'
                     : politician.credibilityScore >= 50

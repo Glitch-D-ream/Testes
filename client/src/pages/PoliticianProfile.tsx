@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, AlertTriangle, CheckCircle, Clock, TrendingDown, TrendingUp } from 'lucide-react';
+import { ArrowLeft, AlertTriangle, CheckCircle, Clock } from 'lucide-react';
 import { useTheme } from '../hooks/useTheme';
 
 interface AuditReport {
@@ -158,7 +158,7 @@ export default function PoliticianProfile() {
         theme === 'dark'
           ? 'bg-gray-800 border-gray-700'
           : 'bg-white border-slate-200'
-      } shadow-sm border-b transition-colors`}>
+      } shadow-sm border-b transition-colors sticky top-0 z-50`}>
         <div className="max-w-6xl mx-auto px-4 py-6">
           <button
             onClick={() => navigate(-1)}
@@ -171,27 +171,30 @@ export default function PoliticianProfile() {
             <ArrowLeft size={20} />
             Voltar
           </button>
-          <div className="flex items-start gap-6">
+          <div className="flex flex-col md:flex-row items-start gap-6">
             {politician.photoUrl && (
               <img
                 src={politician.photoUrl}
                 alt={politician.name}
-                className="w-24 h-24 rounded-full object-cover"
+                className="w-20 h-20 md:w-24 md:h-24 rounded-full object-cover"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).style.display = 'none';
+                }}
               />
             )}
-            <div className="flex-1">
-              <h1 className={`text-4xl font-bold ${
+            <div className="flex-1 min-w-0">
+              <h1 className={`text-2xl md:text-4xl font-bold break-words ${
                 theme === 'dark' ? 'text-white' : 'text-slate-900'
               }`}>
                 {politician.name}
               </h1>
-              <p className={`mt-2 text-lg ${
+              <p className={`mt-2 text-base md:text-lg ${
                 theme === 'dark' ? 'text-gray-400' : 'text-slate-600'
               }`}>
                 {politician.office} • {politician.party} • {politician.region}
               </p>
               {politician.bio && (
-                <p className={`mt-3 ${
+                <p className={`mt-3 text-sm md:text-base ${
                   theme === 'dark' ? 'text-gray-300' : 'text-slate-700'
                 }`}>
                   {politician.bio}
@@ -200,7 +203,7 @@ export default function PoliticianProfile() {
             </div>
 
             {/* Credibility Score Card */}
-            <div className={`rounded-lg p-6 text-center ${
+            <div className={`rounded-lg p-6 text-center flex-shrink-0 ${
               theme === 'dark' ? 'bg-gray-700' : 'bg-white'
             }`}>
               <p className={`text-sm font-medium mb-2 ${
@@ -208,7 +211,7 @@ export default function PoliticianProfile() {
               }`}>
                 Score de Credibilidade
               </p>
-              <p className={`text-4xl font-bold ${
+              <p className={`text-3xl md:text-4xl font-bold ${
                 politician.credibilityScore >= 75 ? 'text-green-500' :
                 politician.credibilityScore >= 50 ? 'text-yellow-500' :
                 'text-red-500'
@@ -221,10 +224,10 @@ export default function PoliticianProfile() {
       </header>
 
       {/* Main Content */}
-      <main className="max-w-6xl mx-auto px-4 py-12">
+      <main className="max-w-6xl mx-auto px-4 py-8 md:py-12">
         <div className="space-y-8">
           {/* Summary Stats */}
-          <div className="grid grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className={`rounded-lg p-6 ${
               theme === 'dark' ? 'bg-gray-800' : 'bg-white'
             }`}>
@@ -280,22 +283,24 @@ export default function PoliticianProfile() {
                   getVerdictColor(audit.verdict)
                 }`}
               >
-                <div className="flex items-start gap-4 mb-4">
-                  {getVerdictIcon(audit.verdict)}
-                  <div className="flex-1">
-                    <h3 className="text-xl font-bold mb-2">
+                <div className="flex flex-col md:flex-row items-start gap-4 mb-4">
+                  <div className="flex-shrink-0">
+                    {getVerdictIcon(audit.verdict)}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-lg md:text-xl font-bold mb-2 break-words">
                       {audit.promise}
                     </h3>
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-4 flex-wrap">
                       <span className="px-3 py-1 bg-opacity-20 bg-current rounded-full text-sm font-medium">
                         {audit.category}
                       </span>
-                      <span className="text-lg font-bold">
+                      <span className="text-base md:text-lg font-bold">
                         Viabilidade: {audit.viabilityScore}%
                       </span>
                     </div>
                   </div>
-                  <div className="text-right">
+                  <div className="text-right flex-shrink-0">
                     <p className="text-sm font-medium opacity-75 mb-2">Veredito</p>
                     <p className="text-2xl font-bold">
                       {audit.verdict === 'REALISTA' ? '✓' : audit.verdict === 'DUVIDOSA' ? '?' : '✗'}
@@ -311,7 +316,7 @@ export default function PoliticianProfile() {
                 </div>
 
                 {/* Budget Context */}
-                <div className="mt-4 grid grid-cols-3 gap-4 text-sm">
+                <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
                   <div>
                     <p className="opacity-75 mb-1">Orçamento Total</p>
                     <p className="font-bold">
@@ -337,7 +342,7 @@ export default function PoliticianProfile() {
                   <div className="mt-4 p-4 bg-red-100 bg-opacity-20 border border-red-300 border-opacity-30 rounded-lg">
                     <p className="text-sm font-bold mb-2">⚠️ Inconsistência Detectada</p>
                     {audit.politicalConsistency.relevantVotes.map((vote, idx) => (
-                      <p key={idx} className="text-sm opacity-90">
+                      <p key={idx} className="text-sm opacity-90 break-words">
                         [{vote.data}] Votou "{vote.voto}" em {vote.tema}: {vote.descricao}
                       </p>
                     ))}
