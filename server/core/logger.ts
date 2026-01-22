@@ -19,33 +19,14 @@ const logger = winston.createLogger({
   ),
   defaultMeta: { service: 'detector-promessa-vazia' },
   transports: [
-    // Arquivo de erros
-    new winston.transports.File({
-      filename: path.join(logsDir, 'error.log'),
-      level: 'error',
-      maxsize: 10485760, // 10MB
-      maxFiles: 5,
-    }),
-    // Arquivo de logs gerais
-    new winston.transports.File({
-      filename: path.join(logsDir, 'combined.log'),
-      maxsize: 10485760, // 10MB
-      maxFiles: 5,
-    }),
-  ],
-});
-
-// Adicionar console em desenvolvimento
-if (process.env.NODE_ENV !== 'production') {
-  logger.add(
     new winston.transports.Console({
       format: winston.format.combine(
         winston.format.colorize(),
         winston.format.simple()
       ),
     })
-  );
-}
+  ],
+});
 
 export default logger;
 
