@@ -131,6 +131,7 @@ export function allQuery(sql: string, params: any[] = []): Promise<any[]> {
   });
 }
 
+// ===== Funções de Usuário =====
 export async function getUserById(userId: string) {
   return getQuery('SELECT id, email, name, role, created_at, last_login FROM users WHERE id = ?', [userId]);
 }
@@ -144,6 +145,33 @@ export async function createUser(id: string, email: string, passwordHash: string
   return getUserById(id);
 }
 
+export async function updateLastLogin(userId: string) {
+  await runQuery('UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = ?', [userId]);
+}
+
+// ===== Funções de Auditoria =====
 export async function createAuditLog(id: string, userId: string | null, action: string, resourceType: string | null, resourceId: string | null, ipAddress: string | null, userAgent: string | null) {
   await runQuery('INSERT INTO audit_logs (id, user_id, action, resource_type, resource_id, ip_address, user_agent) VALUES (?, ?, ?, ?, ?, ?, ?)', [id, userId, action, resourceType, resourceId, ipAddress, userAgent]);
+}
+
+// ===== Funções de Refresh Token =====
+export async function createRefreshToken(id: string, userId: string, token: string, expiresAt: string) {
+  await runQuery('INSERT INTO refresh_tokens (id, user_id, token, expires_at) VALUES (?, ?, ?, ?)', [id, userId, token, expiresAt]);
+}
+
+export async function getRefreshToken(token: string) {
+  return getQuery('SELECT id, user_id, token, expires_at FROM refresh_tokens WHERE token = ? AND expires_at > CURRENT_TIMESTAMP', [token]);
+}
+
+export async function deleteRefreshToken(token: string) {
+  await runQuery('DELETE FROM refresh_tokens WHERE token = ?', [token]);
+}
+
+// ===== Funções de Consentimento LGPD =====
+export async function createConsent(id: string, userId: string, dataProcessing: boolean, privacyPolicy: boolean) {
+  await runQuery('INSERT INTO consents (id, user_id, data_processing, privacy_policy) VALUES (?, ?, ?, ?)', [id, userId, dataProcessing ? 1 : 0, privacyPolicy ? 1 : 0]);
+}
+
+export async function getConsent(userId: string) {
+  return getQuery('SELECT id, user_id, data_processing, privacy_policy, created_at FROM consents WHERE user_id = ?', [userId]);
 }
