@@ -1,0 +1,177 @@
+import { useEffect, useState } from 'react';
+import { useParams } from 'react-router-dom';
+import { Download, Share2 } from 'lucide-react';
+import { PromiseCard } from '../components/PromiseCard';
+import { useAnalysis } from '../hooks/useAnalysis';
+
+export function AnalysisResults() {
+  const { id } = useParams<{ id: string }>();
+  const { loading, error, data, getById } = useAnalysis();
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    if (id) {
+      getById(id);
+    }
+  }, [id, getById]);
+
+  const handleDownloadPDF = async () => {
+    if (!id) return;
+    try {
+      const response = await fetch(`/api/analyze/${id}/pdf`);
+      if (!response.ok) throw new Error('Erro ao baixar PDF');
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `analise-${id}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (err) {
+      console.error('Erro ao baixar PDF:', err);
+      alert('Erro ao baixar o relatório PDF');
+    }
+  };
+
+  const handleShare = () => {
+    const url = window.location.href;
+    navigator.clipboard.writeText(url);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Carregando análise...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-4xl mx-auto">
+          <div className="rounded-md bg-red-50 p-4">
+            <p className="text-sm text-red-800">{error.message}</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!data) {
+    return (
+      <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-4xl mx-auto text-center">
+          <p className="text-gray-500">Análise não encontrada</p>
+        </div>
+      </div>
+    );
+  }
+
+  const promises = data.promises || [];
+  const averageConfidence = promises.length > 0
+    ? (promises.reduce((sum: number, p: any) => sum + (p.confidence_score || 0), 0) / promises.length) * 100
+    : 0;
+
+  return (
+    <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-4xl mx-auto">
+        {/* Cabeçalho */}
+        <div className="bg-white rounded-lg shadow-md p-8 mb-8">
+          <div className="flex items-start justify-between mb-6">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900 mb-2">Resultado da Análise</h1>
+              <p className="text-gray-600">
+                {data.author ? `Autor: ${data.author}` : 'Análise de promessa política'}
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={handleDownloadPDF}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition"
+              >
+                <Download className="w-4 h-4" />
+                PDF
+              </button>
+              <button
+                onClick={handleShare}
+                className="flex items-center gap-2 px-4 py-2 bg-gray-200 text-gray-900 rounded-md hover:bg-gray-300 transition"
+              >
+                <Share2 className="w-4 h-4" />
+                {copied ? 'Copiado!' : 'Compartilhar'}
+              </button>
+            </div>
+          </div>
+
+          {/* Resumo */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="bg-blue-50 rounded-lg p-4">
+              <p className="text-sm text-gray-600">Promessas Identificadas</p>
+              <p className="text-3xl font-bold text-blue-600">{promises.length}</p>
+            </div>
+            <div className="bg-green-50 rounded-lg p-4">
+              <p className="text-sm text-gray-600">Confiança Média</p>
+              <p className="text-3xl font-bold text-green-600">{averageConfidence.toFixed(1)}%</p>
+            </div>
+            <div className="bg-purple-50 rounded-lg p-4">
+              <p className="text-sm text-gray-600">Score de Viabilidade</p>
+              <p className="text-3xl font-bold text-purple-600">
+                {((data.probability_score || 0) * 100).toFixed(1)}%
+              </p>
+            </div>
+          </div>
+
+          {/* Texto Original */}
+          <div className="mt-8 pt-8 border-t border-gray-200">
+            <h3 className="text-lg font-semibold text-gray-900 mb-3">Texto Analisado</h3>
+            <p className="text-gray-700 leading-relaxed bg-gray-50 p-4 rounded-lg">
+              {data.text}
+            </p>
+          </div>
+        </div>
+
+        {/* Promessas */}
+        <div className="bg-white rounded-lg shadow-md p-8">
+          <h2 className="text-2xl font-bold text-gray-900 mb-6">Promessas Identificadas</h2>
+
+          {promises.length > 0 ? (
+            <div className="space-y-4">
+              {promises.map((promise: any, index: number) => (
+                <PromiseCard
+                  key={index}
+                  text={promise.promise_text}
+                  category={promise.category || 'Geral'}
+                  confidence={promise.confidence_score || 0}
+                  negated={promise.negated || false}
+                  conditional={promise.conditional || false}
+                  reasoning={promise.reasoning}
+                />
+              ))}
+            </div>
+          ) : (
+            <p className="text-gray-500 text-center py-8">Nenhuma promessa identificada neste texto.</p>
+          )}
+        </div>
+
+        {/* Metodologia */}
+        <div className="bg-blue-50 rounded-lg border border-blue-200 p-8 mt-8">
+          <h3 className="text-lg font-semibold text-blue-900 mb-3">Sobre Esta Análise</h3>
+          <p className="text-blue-800 text-sm leading-relaxed">
+            Esta análise utiliza Processamento de Linguagem Natural avançado e Inteligência Artificial para
+            identificar promessas políticas, avaliar sua viabilidade baseada em dados orçamentários públicos
+            (SICONFI, Portal da Transparência) e histórico político (TSE). O resultado é uma probabilidade
+            estimada de cumprimento, não uma acusação ou julgamento de caráter.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
