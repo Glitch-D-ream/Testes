@@ -11,7 +11,7 @@ export class AnalysisController {
     try {
       const validation = validate(AnalysisSchema, req.body);
       if (!validation.success) {
-        return res.status(400).json({ error: validation.error });
+        return (res as any).status(400).json({ error: validation.error });
       }
 
       const { text, author, category } = validation.data;
@@ -38,10 +38,10 @@ export class AnalysisController {
 
       logInfo('Análise criada', { analysisId: result.id, userId, promisesCount: result.promisesCount });
 
-      return res.status(201).json(result);
+      return (res as any).status(201).json(result);
     } catch (error) {
       logError('Erro ao criar análise', error as Error);
-      return res.status(500).json({ error: 'Erro ao criar análise' });
+      return (res as any).status(500).json({ error: 'Erro ao criar análise' });
     }
   }
 
@@ -51,13 +51,13 @@ export class AnalysisController {
       const analysis = await analysisService.getAnalysisById(id);
 
       if (!analysis) {
-        return res.status(404).json({ error: 'Análise não encontrada' });
+        return (res as any).status(404).json({ error: 'Análise não encontrada' });
       }
 
       return res.json(analysis);
     } catch (error) {
       logError('Erro ao obter análise', error as Error);
-      return res.status(500).json({ error: 'Erro ao obter análise' });
+      return (res as any).status(500).json({ error: 'Erro ao obter análise' });
     }
   }
 
@@ -75,7 +75,7 @@ export class AnalysisController {
       });
     } catch (error) {
       logError('Erro ao listar análises', error as Error);
-      return res.status(500).json({ error: 'Erro ao listar análises' });
+      return (res as any).status(500).json({ error: 'Erro ao listar análises' });
     }
   }
 
@@ -89,7 +89,7 @@ export class AnalysisController {
       return res.send(pdfBuffer);
     } catch (error) {
       logError('Erro ao exportar PDF', error as Error);
-      return res.status(500).json({ error: 'Erro ao gerar relatório PDF' });
+      return (res as any).status(500).json({ error: 'Erro ao gerar relatório PDF' });
     }
   }
 }
