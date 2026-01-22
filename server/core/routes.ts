@@ -10,6 +10,7 @@ import analysisRoutes from '../routes/analysis.routes.js';
 import statisticsRoutes from '../routes/statistics.routes.js';
 import adminRoutes from '../routes/admin.routes.js';
 import telegramRoutes from '../routes/telegram.routes.js';
+import aiTestRoutes from '../routes/ai-test.routes.js';
 
 /**
  * Rate limiters
@@ -70,6 +71,9 @@ export function setupRoutes(app: Express): void {
 
   // Rotas do Telegram (webhook)
   app.use('/api/telegram', telegramRoutes);
+
+  // Rota de teste de IA
+  app.use('/api/ai', aiTestRoutes);
 
   /**
    * GET /api/health
