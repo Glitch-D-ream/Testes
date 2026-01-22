@@ -20,9 +20,7 @@ import telegramRoutes from '../routes/telegram.routes.js';
 const analysisLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hora
   max: (req: Request) => {
-    // Usuários autenticados: 50 por dia
-    // Usuários anônimos: 10 por hora
-    return req.user ? 50 : 10;
+    return (req as any).user ? 50 : 10;
   },
   message: 'Muitas análises. Tente novamente mais tarde.',
   standardHeaders: true,
@@ -44,8 +42,15 @@ export function setupRoutes(app: Express): void {
   // Middleware global
   app.use(requestLoggerMiddleware);
   
-  // Proteção CSRF global para rotas de API (exceto GET)
-  app.use('/api', csrfProtection);
+  // Proteção CSRF para rotas de API (exceto GET e Telegram)
+  // O Telegram não envia tokens CSRF, então precisamos ignorar suas rotas
+  app.use((req: Request, res: Response, next: any) => {
+    // Ignorar CSRF para rotas do Telegram e métodos seguros
+    if (req.path.startsWith('/api/telegram') || ['GET', 'HEAD', 'OPTIONS'].includes(req.method)) {
+      return next();
+    }
+    csrfProtection(req, res, next);
+  });
   
   // Rota para obter token CSRF
   app.get('/api/csrf-token', csrfTokenRoute);
@@ -72,7 +77,6 @@ export function setupRoutes(app: Express): void {
   app.get('/api/analysis/:id/export', optionalAuthMiddleware, async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
-
       const analysis = await getQuery(
         'SELECT * FROM analyses WHERE id = ?',
         [id]
@@ -119,7 +123,7 @@ export function setupRoutes(app: Express): void {
       const logId = nanoid();
       await createAuditLog(
         logId,
-        req.userId || null,
+        (req as any).userId || null,
         'ANALYSIS_EXPORTED',
         'analysis',
         id,
@@ -138,8 +142,7 @@ export function setupRoutes(app: Express): void {
    */
   app.delete('/api/user/data', authMiddleware, async (req: Request, res: Response) => {
     try {
-      const userId = req.userId;
-
+      const userId = (req as any).userId;
       if (!userId) {
         res.status(401).json({ error: 'Não autenticado' });
         return;
@@ -170,7 +173,6 @@ export function setupRoutes(app: Express): void {
       );
 
       logInfo('Dados do usuário deletados', { userId });
-
       res.json({ message: 'Dados deletados com sucesso' });
     } catch (error) {
       logError('Erro ao deletar dados do usuário', error as Error);
@@ -184,8 +186,7 @@ export function setupRoutes(app: Express): void {
    */
   app.get('/api/user/data/export', authMiddleware, async (req: Request, res: Response) => {
     try {
-      const userId = req.userId;
-
+      const userId = (req as any).userId;
       if (!userId) {
         res.status(401).json({ error: 'Não autenticado' });
         return;
