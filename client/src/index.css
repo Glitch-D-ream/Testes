@@ -1,56 +1,34 @@
 @import "tailwindcss";
 
-@layer base {
-  :root {
-    --background: 0 0% 100%;
-    --foreground: 0 0% 3.6%;
-    --card: 0 0% 100%;
-    --card-foreground: 0 0% 3.6%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 3.6%;
-    --muted: 0 0% 96.1%;
-    --muted-foreground: 0 0% 45.1%;
-    --accent: 0 0% 9.0%;
-    --accent-foreground: 0 0% 100%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 100%;
-    --border: 0 0% 89.8%;
-    --input: 0 0% 89.8%;
-    --primary: 217.2 91.2% 59.8%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-  }
-
-  .dark {
-    --background: 0 0% 3.6%;
-    --foreground: 0 0% 98.2%;
-    --card: 0 0% 3.6%;
-    --card-foreground: 0 0% 98.2%;
-    --popover: 0 0% 3.6%;
-    --popover-foreground: 0 0% 98.2%;
-    --muted: 0 0% 14.9%;
-    --muted-foreground: 0 0% 63.9%;
-    --accent: 0 0% 98.2%;
-    --accent-foreground: 0 0% 9.0%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 98.2%;
-    --border: 0 0% 14.9%;
-    --input: 0 0% 14.9%;
-    --primary: 217.2 91.2% 59.8%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-  }
+@theme {
+  --color-background: hsl(0 0% 100%);
+  --color-foreground: hsl(0 0% 3.6%);
+  --color-card: hsl(0 0% 100%);
+  --color-card-foreground: hsl(0 0% 3.6%);
+  --color-popover: hsl(0 0% 100%);
+  --color-popover-foreground: hsl(0 0% 3.6%);
+  --color-muted: hsl(0 0% 96.1%);
+  --color-muted-foreground: hsl(0 0% 45.1%);
+  --color-accent: hsl(0 0% 9.0%);
+  --color-accent-foreground: hsl(0 0% 100%);
+  --color-destructive: hsl(0 84.2% 60.2%);
+  --color-destructive-foreground: hsl(0 0% 100%);
+  --color-border: hsl(0 0% 89.8%);
+  --color-input: hsl(0 0% 89.8%);
+  --color-primary: hsl(217.2 91.2% 59.8%);
+  --color-primary-foreground: hsl(210 40% 98%);
+  --color-secondary: hsl(217.2 32.6% 17.5%);
+  --color-secondary-foreground: hsl(210 40% 98%);
 }
 
 @layer base {
   * {
-    @apply border-border;
+    border-color: var(--color-border);
   }
 
   body {
-    @apply bg-background text-foreground;
+    background-color: var(--color-background);
+    color: var(--color-foreground);
   }
 }
 
@@ -66,14 +44,14 @@ html {
 }
 
 ::-webkit-scrollbar-track {
-  background: hsl(var(--background));
+  background: var(--color-background);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: hsl(var(--muted));
+  background: var(--color-muted);
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: hsl(var(--muted-foreground));
+  background: var(--color-muted-foreground);
 }

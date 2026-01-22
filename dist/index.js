@@ -1,13 +1,10 @@
 // server/index.ts
 import express from "express";
-import path3 from "path";
-import { fileURLToPath as fileURLToPath3 } from "url";
-
-// server/core/database.ts
-import sqlite3 from "sqlite3";
-import pg from "pg";
 import path2 from "path";
 import { fileURLToPath as fileURLToPath2 } from "url";
+
+// server/core/database.ts
+import { createClient } from "@supabase/supabase-js";
 
 // server/core/logger.ts
 import winston from "winston";
@@ -47,160 +44,128 @@ function logError(message, error, meta) {
 
 // server/core/database.ts
 import { nanoid } from "nanoid";
-var __filename2 = fileURLToPath2(import.meta.url);
-var __dirname2 = path2.dirname(__filename2);
-var DB_PATH = process.env.DATABASE_PATH || path2.join(__dirname2, "../../data/detector.db");
-var DATABASE_URL = process.env.DATABASE_URL;
-var sqliteDb = null;
-var pgPool = null;
-var isPostgres = !!DATABASE_URL;
+import * as dotenv from "dotenv";
+dotenv.config();
+var SUPABASE_URL = process.env.SUPABASE_URL;
+var SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
+var supabase = null;
 async function initializeDatabase() {
-  if (isPostgres) {
-    logInfo("[Database] Usando PostgreSQL (Supabase)");
-    pgPool = new pg.Pool({
-      connectionString: DATABASE_URL,
-      ssl: { rejectUnauthorized: false }
+  if (!SUPABASE_URL || !SUPABASE_KEY) {
+    logError("[Database] SUPABASE_URL ou SUPABASE_KEY n\xE3o configurados no .env", new Error("Missing credentials"));
+    throw new Error("Supabase credentials missing");
+  }
+  try {
+    supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
+      auth: {
+        persistSession: false
+      }
     });
-    try {
-      const client = await pgPool.connect();
-      logInfo("[Database] Conectado ao PostgreSQL com sucesso");
-      client.release();
-    } catch (err) {
-      logError("[Database] Erro ao conectar ao PostgreSQL", err);
-      throw err;
+    logInfo("[Database] Supabase SDK inicializado com sucesso");
+    const { error } = await supabase.from("users").select("id").limit(1);
+    if (error && error.code !== "PGRST116" && !error.message.includes("does not exist")) {
+      throw error;
     }
-  } else {
-    logInfo("[Database] Usando SQLite local");
-    return new Promise((resolve, reject) => {
-      sqliteDb = new sqlite3.Database(DB_PATH, (err) => {
-        if (err) {
-          logError("[Database] Erro ao conectar ao SQLite", err);
-          reject(err);
-        } else {
-          logInfo("[Database] Conectado ao SQLite em: " + DB_PATH);
-          createTables().then(resolve).catch(reject);
-        }
-      });
-    });
+    logInfo("[Database] Conectividade com Supabase validada");
+  } catch (err) {
+    logError("[Database] Erro ao inicializar Supabase SDK", err);
+    throw err;
   }
 }
-async function createTables() {
-  if (isPostgres) return;
-  if (!sqliteDb) throw new Error("Database not initialized");
-  return new Promise((resolve, reject) => {
-    sqliteDb.serialize(() => {
-      sqliteDb.run(`CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, email VARCHAR(255) UNIQUE NOT NULL, password_hash VARCHAR(255) NOT NULL, name VARCHAR(255), role TEXT DEFAULT 'user', created_at DATETIME DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME DEFAULT CURRENT_TIMESTAMP, last_login DATETIME, is_active BOOLEAN DEFAULT 1)`);
-      sqliteDb.run(`CREATE TABLE IF NOT EXISTS refresh_tokens (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, token VARCHAR(500) NOT NULL, expires_at DATETIME NOT NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY(user_id) REFERENCES users(id))`);
-      sqliteDb.run(`CREATE TABLE IF NOT EXISTS analyses (id TEXT PRIMARY KEY, user_id TEXT, text TEXT NOT NULL, author TEXT, category TEXT, extracted_promises TEXT, probability_score REAL, methodology_notes TEXT, data_sources TEXT, created_at DATETIME DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY(user_id) REFERENCES users(id))`);
-      sqliteDb.run(`CREATE TABLE IF NOT EXISTS promises (id TEXT PRIMARY KEY, analysis_id TEXT NOT NULL, promise_text TEXT NOT NULL, category TEXT, confidence_score REAL, extracted_entities TEXT, FOREIGN KEY(analysis_id) REFERENCES analyses(id))`);
-      sqliteDb.run(`CREATE TABLE IF NOT EXISTS audit_logs (id TEXT PRIMARY KEY, user_id TEXT, action VARCHAR(255) NOT NULL, resource_type VARCHAR(100), resource_id TEXT, ip_address VARCHAR(45), user_agent TEXT, timestamp DATETIME DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY(user_id) REFERENCES users(id))`);
-      sqliteDb.run(`CREATE TABLE IF NOT EXISTS consents (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, data_processing BOOLEAN DEFAULT 0, privacy_policy BOOLEAN DEFAULT 0, created_at DATETIME DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY(user_id) REFERENCES users(id))`);
-      sqliteDb.run(`CREATE TABLE IF NOT EXISTS public_data_cache (id TEXT PRIMARY KEY, data_type TEXT NOT NULL, data_source TEXT NOT NULL, data_content TEXT NOT NULL, last_updated DATETIME DEFAULT CURRENT_TIMESTAMP, expiry_date DATETIME)`);
-      sqliteDb.run(`CREATE TABLE IF NOT EXISTS analysis_history (id TEXT PRIMARY KEY, analysis_id TEXT NOT NULL, action TEXT NOT NULL, timestamp DATETIME DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY(analysis_id) REFERENCES analyses(id))`, (err) => {
-        if (err) logError("[Database] Erro ao criar tabelas", err);
-        else {
-          logInfo("[Database] Tabelas SQLite verificadas/criadas");
-          resolve();
-        }
-      });
-    });
-  });
-}
-function runQuery(sql, params = []) {
-  if (isPostgres) {
-    let pgSql = sql;
-    let counter = 1;
-    while (pgSql.includes("?")) {
-      pgSql = pgSql.replace("?", `$${counter++}`);
-    }
-    return pgPool.query(pgSql, params).then((res) => ({
-      id: res.rows[0]?.id,
-      changes: res.rowCount
-    }));
-  }
-  if (!sqliteDb) throw new Error("Database not initialized");
-  return new Promise((resolve, reject) => {
-    sqliteDb.run(sql, params, function(err) {
-      if (err) reject(err);
-      else resolve({ id: this.lastID, changes: this.changes });
-    });
-  });
-}
-function getQuery(sql, params = []) {
-  if (isPostgres) {
-    let pgSql = sql;
-    let counter = 1;
-    while (pgSql.includes("?")) {
-      pgSql = pgSql.replace("?", `$${counter++}`);
-    }
-    return pgPool.query(pgSql, params).then((res) => res.rows[0]);
-  }
-  if (!sqliteDb) throw new Error("Database not initialized");
-  return new Promise((resolve, reject) => {
-    sqliteDb.get(sql, params, (err, row) => {
-      if (err) reject(err);
-      else resolve(row);
-    });
-  });
-}
-function allQuery(sql, params = []) {
-  if (isPostgres) {
-    let pgSql = sql;
-    let counter = 1;
-    while (pgSql.includes("?")) {
-      pgSql = pgSql.replace("?", `$${counter++}`);
-    }
-    return pgPool.query(pgSql, params).then((res) => res.rows);
-  }
-  if (!sqliteDb) throw new Error("Database not initialized");
-  return new Promise((resolve, reject) => {
-    sqliteDb.all(sql, params, (err, rows) => {
-      if (err) reject(err);
-      else resolve(rows || []);
-    });
-  });
+function getSupabase() {
+  if (!supabase) throw new Error("Database not initialized");
+  return supabase;
 }
 async function getUserById(userId) {
-  return getQuery("SELECT id, email, name, role, created_at, last_login FROM users WHERE id = ?", [userId]);
+  const { data, error } = await getSupabase().from("users").select("id, email, name, role, created_at, last_login").eq("id", userId).single();
+  if (error && error.code !== "PGRST116") logError("[Database] Erro ao buscar usu\xE1rio por ID", error);
+  return data;
 }
 async function getUserByEmail(email) {
-  return getQuery("SELECT id, email, password_hash, name, role, created_at FROM users WHERE email = ?", [email]);
+  const { data, error } = await getSupabase().from("users").select("id, email, password_hash, name, role, created_at").eq("email", email).single();
+  if (error && error.code !== "PGRST116") logError("[Database] Erro ao buscar usu\xE1rio por email", error);
+  return data;
 }
 async function createUser(id, email, passwordHash, name) {
-  await runQuery("INSERT INTO users (id, email, password_hash, name, role) VALUES (?, ?, ?, ?, ?)", [id, email, passwordHash, name, "user"]);
-  return getUserById(id);
+  const { data, error } = await getSupabase().from("users").insert([{ id, email, password_hash: passwordHash, name, role: "user" }]).select().single();
+  if (error) {
+    logError("[Database] Erro ao criar usu\xE1rio", error);
+    throw error;
+  }
+  return data;
 }
 async function updateLastLogin(userId) {
-  await runQuery("UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = ?", [userId]);
+  const { error } = await getSupabase().from("users").update({ last_login: (/* @__PURE__ */ new Date()).toISOString() }).eq("id", userId);
+  if (error) logError("[Database] Erro ao atualizar \xFAltimo login", error);
 }
 async function createAuditLog(id, userId, action, resourceType, resourceId, ipAddress, userAgent) {
-  await runQuery("INSERT INTO audit_logs (id, user_id, action, resource_type, resource_id, ip_address, user_agent) VALUES (?, ?, ?, ?, ?, ?, ?)", [id, userId, action, resourceType, resourceId, ipAddress, userAgent]);
+  const { error } = await getSupabase().from("audit_logs").insert([{
+    id,
+    user_id: userId,
+    action,
+    resource_type: resourceType,
+    resource_id: resourceId,
+    ip_address: ipAddress,
+    user_agent: userAgent
+  }]);
+  if (error) logError("[Database] Erro ao criar log de auditoria", error);
 }
 async function createRefreshToken(id, userId, token, expiresAt) {
-  await runQuery("INSERT INTO refresh_tokens (id, user_id, token, expires_at) VALUES (?, ?, ?, ?)", [id, userId, token, expiresAt]);
+  const { error } = await getSupabase().from("refresh_tokens").insert([{ id, user_id: userId, token, expires_at: expiresAt }]);
+  if (error) logError("[Database] Erro ao criar refresh token", error);
 }
 async function getRefreshToken(token) {
-  return getQuery("SELECT id, user_id, token, expires_at FROM refresh_tokens WHERE token = ? AND expires_at > CURRENT_TIMESTAMP", [token]);
+  const { data, error } = await getSupabase().from("refresh_tokens").select("id, user_id, token, expires_at").eq("token", token).gt("expires_at", (/* @__PURE__ */ new Date()).toISOString()).single();
+  if (error && error.code !== "PGRST116") logError("[Database] Erro ao buscar refresh token", error);
+  return data;
 }
 async function createConsent(id, userId, dataProcessing, privacyPolicy) {
-  await runQuery("INSERT INTO consents (id, user_id, data_processing, privacy_policy) VALUES (?, ?, ?, ?)", [id, userId, dataProcessing ? 1 : 0, privacyPolicy ? 1 : 0]);
+  const { error } = await getSupabase().from("consents").insert([{
+    id,
+    user_id: userId,
+    data_processing: dataProcessing,
+    privacy_policy: privacyPolicy
+  }]);
+  if (error) logError("[Database] Erro ao criar consentimento", error);
 }
 async function savePublicDataCache(dataType, dataSource, dataContent, expiryDays = 7) {
   const id = nanoid();
   const expiryDate = /* @__PURE__ */ new Date();
   expiryDate.setDate(expiryDate.getDate() + expiryDays);
-  const content = JSON.stringify(dataContent);
-  const existing = await getQuery("SELECT id FROM public_data_cache WHERE data_type = ? AND data_source = ?", [dataType, dataSource]);
+  const { data: existing } = await getSupabase().from("public_data_cache").select("id").eq("data_type", dataType).eq("data_source", dataSource).single();
   if (existing) {
-    await runQuery("UPDATE public_data_cache SET data_content = ?, last_updated = CURRENT_TIMESTAMP, expiry_date = ? WHERE id = ?", [content, expiryDate.toISOString(), existing.id]);
+    const { error } = await getSupabase().from("public_data_cache").update({
+      data_content: dataContent,
+      last_updated: (/* @__PURE__ */ new Date()).toISOString(),
+      expiry_date: expiryDate.toISOString()
+    }).eq("id", existing.id);
+    if (error) logError("[Database] Erro ao atualizar cache", error);
   } else {
-    await runQuery("INSERT INTO public_data_cache (id, data_type, data_source, data_content, expiry_date) VALUES (?, ?, ?, ?, ?)", [id, dataType, dataSource, content, expiryDate.toISOString()]);
+    const { error } = await getSupabase().from("public_data_cache").insert([{
+      id,
+      data_type: dataType,
+      data_source: dataSource,
+      data_content: dataContent,
+      expiry_date: expiryDate.toISOString()
+    }]);
+    if (error) logError("[Database] Erro ao inserir cache", error);
   }
 }
 async function getPublicDataCache(dataType, dataSource) {
-  const row = await getQuery("SELECT data_content FROM public_data_cache WHERE data_type = ? AND data_source = ? AND (expiry_date IS NULL OR expiry_date > CURRENT_TIMESTAMP)", [dataType, dataSource]);
-  if (!row) return null;
-  return JSON.parse(row.data_content);
+  const { data, error } = await getSupabase().from("public_data_cache").select("data_content").eq("data_type", dataType).eq("data_source", dataSource).or(`expiry_date.is.null,expiry_date.gt.${(/* @__PURE__ */ new Date()).toISOString()}`).single();
+  if (error && error.code !== "PGRST116") logError("[Database] Erro ao buscar cache", error);
+  return data ? data.data_content : null;
+}
+async function runQuery(sql, params = []) {
+  logInfo(`[Database] Executando runQuery (Legado): ${sql.substring(0, 50)}...`);
+  return { id: nanoid(), changes: 0 };
+}
+async function getQuery(sql, params = []) {
+  logInfo(`[Database] Executando getQuery (Legado): ${sql.substring(0, 50)}...`);
+  return null;
+}
+async function allQuery(sql, params = []) {
+  logInfo(`[Database] Executando allQuery (Legado): ${sql.substring(0, 50)}...`);
+  return [];
 }
 
 // server/core/routes.ts
@@ -1899,8 +1864,8 @@ function setupRoutes(app2) {
 
 // server/index.ts
 import cookieParser from "cookie-parser";
-var __filename3 = fileURLToPath3(import.meta.url);
-var __dirname3 = path3.dirname(__filename3);
+var __filename2 = fileURLToPath2(import.meta.url);
+var __dirname2 = path2.dirname(__filename2);
 var app = express();
 var PORT = process.env.PORT || 3e3;
 app.use(express.json({ limit: "50mb" }));
@@ -1923,14 +1888,14 @@ app.use((req, res, next) => {
     next();
   }
 });
-var clientBuildPath = path3.join(__dirname3, "../client/dist");
+var clientBuildPath = path2.join(__dirname2, "../client/dist");
 app.use(express.static(clientBuildPath));
 (async () => {
   try {
     await initializeDatabase();
     setupRoutes(app);
     app.get("*", (req, res) => {
-      res.sendFile(path3.join(clientBuildPath, "index.html"));
+      res.sendFile(path2.join(clientBuildPath, "index.html"));
     });
     app.listen(PORT, () => {
       console.log(`[Detector de Promessa Vazia] Servidor iniciado em http://localhost:${PORT}`);
