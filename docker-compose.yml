@@ -12,10 +12,11 @@ services:
     environment:
       NODE_ENV: production
       PORT: 3000
-      DATABASE_URL: mysql://detector:detector_password@db:3306/detector_promessa_vazia
+      DATABASE_URL: postgresql://detector:detector_password@db:5432/detector_promessa_vazia
       JWT_SECRET: ${JWT_SECRET:-sua-chave-secreta-muito-segura-min-32-caracteres}
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000}
       LOG_LEVEL: info
+      REDIS_URL: redis://redis:6379
     depends_on:
       db:
         condition: service_healthy
@@ -32,25 +33,23 @@ services:
       retries: 3
       start_period: 5s
 
-  # Banco de Dados MySQL
+  # Banco de Dados PostgreSQL
   db:
-    image: mysql:8.0-alpine
+    image: postgres:15-alpine
     container_name: detector-db
     environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root_password}
-      MYSQL_DATABASE: detector_promessa_vazia
-      MYSQL_USER: detector
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-detector_password}
+      POSTGRES_USER: detector
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-detector_password}
+      POSTGRES_DB: detector_promessa_vazia
     ports:
-      - "3306:3306"
+      - "5432:5432"
     volumes:
-      - db_data:/var/lib/mysql
-      - ./scripts/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - db_data:/var/lib/postgresql/data
     restart: unless-stopped
     networks:
       - detector-network
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      test: ["CMD-SHELL", "pg_isready -U detector -d detector_promessa_vazia"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -71,13 +70,8 @@ services:
     restart: unless-stopped
     networks:
       - detector-network
-    healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/health"]
-      interval: 30s
-      timeout: 3s
-      retries: 3
 
-  # Redis (Cache) - Opcional
+  # Redis (Cache)
   redis:
     image: redis:7-alpine
     container_name: detector-redis

@@ -3,6 +3,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { initializeDatabase } from './core/database.js';
 import { setupRoutes } from './core/routes.js';
+import cookieParser from 'cookie-parser';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -13,12 +14,23 @@ const PORT = process.env.PORT || 3000;
 // Middleware
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
+app.use(cookieParser());
 
-// CORS para desenvolvimento
+// Configuração de CORS
 app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
+  const allowedOrigins = process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : [];
+  const origin = req.headers.origin;
+  
+  if (process.env.NODE_ENV !== 'production') {
+    res.header('Access-Control-Allow-Origin', '*');
+  } else if (origin && allowedOrigins.includes(origin)) {
+    res.header('Access-Control-Allow-Origin', origin);
+  }
+  
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, x-xsrf-token');
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  
   if (req.method === 'OPTIONS') {
     res.sendStatus(200);
   } else {
@@ -48,6 +60,9 @@ app.use(express.static(clientBuildPath));
     app.listen(PORT, () => {
       console.log(`[Detector de Promessa Vazia] Servidor iniciado em http://localhost:${PORT}`);
       console.log(`[Detector de Promessa Vazia] Ambiente: ${process.env.NODE_ENV || 'development'}`);
+      
+      // Iniciar Bot de Telegram
+      telegramService.start();
     });
   } catch (error) {
     console.error('[Detector de Promessa Vazia] Erro ao inicializar:', error);

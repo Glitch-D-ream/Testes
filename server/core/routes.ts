@@ -2,12 +2,15 @@ import { Express, Request, Response } from 'express';
 import rateLimit from 'express-rate-limit';
 import { nanoid } from 'nanoid';
 import { authMiddleware, optionalAuthMiddleware, requestLoggerMiddleware } from './middleware.js';
+import { csrfProtection, csrfTokenRoute } from './csrf.js';
 import { validate, AnalysisSchema } from './schemas.js';
 import { allQuery, runQuery, getQuery, createAuditLog } from './database.js';
 import { extractPromises } from '../modules/nlp.js';
 import { calculateProbability } from '../modules/probability.js';
 import { logInfo, logError } from './logger.js';
 import authRoutes from '../routes/auth.js';
+import analysisRoutes from '../routes/analysis.routes.js';
+import statisticsRoutes from '../routes/statistics.routes.js';
 
 /**
  * Rate limiters
@@ -38,139 +41,21 @@ const loginLimiter = rateLimit({
 export function setupRoutes(app: Express): void {
   // Middleware global
   app.use(requestLoggerMiddleware);
+  
+  // Proteção CSRF global para rotas de API (exceto GET)
+  app.use('/api', csrfProtection);
+  
+  // Rota para obter token CSRF
+  app.get('/api/csrf-token', csrfTokenRoute);
 
   // Rotas de autenticação
   app.use('/api/auth', loginLimiter, authRoutes);
 
-  /**
-   * POST /api/analyze
-   * Submete um texto para análise
-   */
-  app.post('/api/analyze', optionalAuthMiddleware, analysisLimiter, async (req: Request, res: Response) => {
-    try {
-      const validation = validate(AnalysisSchema, req.body);
-      if (!validation.success) {
-        res.status(400).json({ error: validation.error });
-        return;
-      }
+  // Rotas de análise
+  app.use('/api/analyze', analysisRoutes);
 
-      const { text, author, category } = validation.data;
-      const analysisId = nanoid();
-      const userId = req.userId || null;
-
-      // Extrair promessas
-      const promises = extractPromises(text);
-
-      // Calcular probabilidade
-      const probabilityScore = calculateProbability(promises, category);
-
-      // Salvar análise
-      await runQuery(
-        `INSERT INTO analyses (id, user_id, text, author, category, extracted_promises, probability_score, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
-        [analysisId, userId, text, author, category, JSON.stringify(promises), probabilityScore]
-      );
-
-      // Salvar promessas individuais
-      for (const promise of promises) {
-        const promiseId = nanoid();
-        await runQuery(
-          `INSERT INTO promises (id, analysis_id, promise_text, category, confidence_score)
-           VALUES (?, ?, ?, ?, ?)`,
-          [promiseId, analysisId, promise.text, promise.category, promise.confidence]
-        );
-      }
-
-      // Log de auditoria
-      const logId = nanoid();
-      await createAuditLog(
-        logId,
-        userId,
-        'ANALYSIS_CREATED',
-        'analysis',
-        analysisId,
-        req.ip || null,
-        req.get('user-agent') || null
-      );
-
-      logInfo('Análise criada', { analysisId, userId, promisesCount: promises.length });
-
-      res.status(201).json({
-        id: analysisId,
-        probabilityScore,
-        promisesCount: promises.length,
-        promises,
-      });
-    } catch (error) {
-      logError('Erro ao criar análise', error as Error);
-      res.status(500).json({ error: 'Erro ao criar análise' });
-    }
-  });
-
-  /**
-   * GET /api/analysis/:id
-   * Obtém uma análise específica
-   */
-  app.get('/api/analysis/:id', optionalAuthMiddleware, async (req: Request, res: Response) => {
-    try {
-      const { id } = req.params;
-
-      const analysis = await getQuery(
-        'SELECT * FROM analyses WHERE id = ?',
-        [id]
-      );
-
-      if (!analysis) {
-        res.status(404).json({ error: 'Análise não encontrada' });
-        return;
-      }
-
-      const promises = await allQuery(
-        'SELECT * FROM promises WHERE analysis_id = ?',
-        [id]
-      );
-
-      res.json({
-        ...analysis,
-        promises,
-        extracted_promises: JSON.parse(analysis.extracted_promises || '[]'),
-      });
-    } catch (error) {
-      logError('Erro ao obter análise', error as Error);
-      res.status(500).json({ error: 'Erro ao obter análise' });
-    }
-  });
-
-  /**
-   * GET /api/analyses
-   * Lista análises (últimas 50)
-   */
-  app.get('/api/analyses', optionalAuthMiddleware, async (req: Request, res: Response) => {
-    try {
-      const limit = Math.min(parseInt(req.query.limit as string) || 50, 100);
-      const offset = parseInt(req.query.offset as string) || 0;
-
-      const analyses = await allQuery(
-        `SELECT id, author, category, probability_score, created_at
-         FROM analyses
-         ORDER BY created_at DESC
-         LIMIT ? OFFSET ?`,
-        [limit, offset]
-      );
-
-      const total = await getQuery('SELECT COUNT(*) as count FROM analyses');
-
-      res.json({
-        analyses,
-        total: total.count,
-        limit,
-        offset,
-      });
-    } catch (error) {
-      logError('Erro ao listar análises', error as Error);
-      res.status(500).json({ error: 'Erro ao listar análises' });
-    }
-  });
+  // Rotas de estatísticas
+  app.use('/api/statistics', statisticsRoutes);
 
   /**
    * GET /api/analysis/:id/export
