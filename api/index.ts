@@ -37,17 +37,16 @@ async function ensureInitialized() {
   }
 }
 
-// Configurar rotas do servidor
+// Configurar rotas do servidor (elas esperam o prefixo /api)
 setupRoutes(app);
 
 // Handler principal para o Vercel
-// O Vercel passa a URL completa, o Express precisa lidar com o prefixo /api
 export default async (req: any, res: any) => {
   await ensureInitialized();
   
-  // Se a URL não começar com /api, o Express pode não encontrar as rotas
-  // Mas o vercel.json já faz o rewrite de /api/(.*) para /api/index.ts
-  // Então o req.url que chega aqui pode ser apenas /health ou /telegram/status
+  // O Vercel passa a URL completa (ex: /api/health)
+  // O Express montou as rotas com o prefixo /api (ex: app.get('/api/health', ...))
+  // Então o roteamento deve funcionar naturalmente.
   
   return app(req, res);
 };
