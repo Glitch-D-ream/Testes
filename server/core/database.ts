@@ -3,6 +3,7 @@ import pg from 'pg';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { logInfo, logError } from './logger.js';
+import { nanoid } from 'nanoid';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -174,4 +175,26 @@ export async function createConsent(id: string, userId: string, dataProcessing: 
 
 export async function getConsent(userId: string) {
   return getQuery('SELECT id, user_id, data_processing, privacy_policy, created_at FROM consents WHERE user_id = ?', [userId]);
+}
+
+// ===== Funções de Cache de Dados Públicos =====
+export async function savePublicDataCache(dataType: string, dataSource: string, dataContent: any, expiryDays: number = 7) {
+  const id = nanoid();
+  const expiryDate = new Date();
+  expiryDate.setDate(expiryDate.getDate() + expiryDays);
+  const content = JSON.stringify(dataContent);
+  
+  const existing = await getQuery('SELECT id FROM public_data_cache WHERE data_type = ? AND data_source = ?', [dataType, dataSource]);
+  
+  if (existing) {
+    await runQuery('UPDATE public_data_cache SET data_content = ?, last_updated = CURRENT_TIMESTAMP, expiry_date = ? WHERE id = ?', [content, expiryDate.toISOString(), existing.id]);
+  } else {
+    await runQuery('INSERT INTO public_data_cache (id, data_type, data_source, data_content, expiry_date) VALUES (?, ?, ?, ?, ?)', [id, dataType, dataSource, content, expiryDate.toISOString()]);
+  }
+}
+
+export async function getPublicDataCache(dataType: string, dataSource: string) {
+  const row = await getQuery('SELECT data_content FROM public_data_cache WHERE data_type = ? AND data_source = ? AND (expiry_date IS NULL OR expiry_date > CURRENT_TIMESTAMP)', [dataType, dataSource]);
+  if (!row) return null;
+  return JSON.parse(row.data_content);
 }

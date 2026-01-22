@@ -1,5 +1,5 @@
 import { nanoid } from 'nanoid';
-import { runQuery, getQuery, allQuery, createAuditLog } from '../core/database.js';
+import { runQuery, getQuery, allQuery } from '../core/database.js';
 import { extractPromises } from '../modules/nlp.js';
 import { calculateProbability } from '../modules/probability.js';
 import { aiService } from './ai.service.js';
@@ -26,8 +26,8 @@ export class AnalysisService {
     }
     const analysisId = nanoid();
 
-    // Calcular probabilidade
-    const probabilityScore = calculateProbability(promises, category);
+    // Calcular probabilidade (Agora é assíncrono devido à integração com dados reais)
+    const probabilityScore = await calculateProbability(promises, author, category);
 
     // Salvar análise
     await runQuery(
