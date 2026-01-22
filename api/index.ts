@@ -25,11 +25,10 @@ app.use((req, res, next) => {
   }
 });
 
-// Inicialização síncrona das rotas (Vercel prefere assim)
+// Inicialização síncrona das rotas
 setupRoutes(app);
 
-// Inicialização assíncrona do banco e webhook
-// No Vercel, isso roda na primeira requisição (cold start)
+// Inicialização assíncrona do banco e webhook (Lazy)
 let isInitialized = false;
 app.use(async (req, res, next) => {
   if (!isInitialized) {
@@ -50,4 +49,5 @@ app.use(async (req, res, next) => {
   next();
 });
 
+// Exportar para o Vercel
 export default app;

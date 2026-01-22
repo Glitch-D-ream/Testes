@@ -5,17 +5,10 @@
   "framework": "vite",
   "buildCommand": "vite build",
   "outputDirectory": "client/dist",
-  "functions": {
-    "api/index.ts": {
-      "runtime": "vercel-node@latest",
-      "memory": 1024,
-      "maxDuration": 10
-    }
-  },
   "rewrites": [
     {
       "source": "/api/(.*)",
-      "destination": "/api/index.ts"
+      "destination": "/api/index"
     },
     {
       "source": "/(.*)",
