@@ -16,7 +16,7 @@ RUN pnpm install --frozen-lockfile
 COPY . .
 
 # Build
-RUN pnpm build
+RUN mkdir -p dist && pnpm build
 
 # Runtime stage
 FROM node:22-alpine
