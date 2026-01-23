@@ -81,3 +81,14 @@ data/
 # Configurações de teste
 vitest.config.ts
 playwright.config.ts
+
+# Ignorar subpastas da API para evitar limite de funções no plano Hobby
+api/controllers/
+api/core/
+api/integrations/
+api/jobs/
+api/models/
+api/modules/
+api/routes/
+api/services/
+server/
