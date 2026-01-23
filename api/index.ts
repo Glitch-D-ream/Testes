@@ -1,16 +1,9 @@
 import express from 'express';
-import path from 'path';
-import { fileURLToPath } from 'url';
 import { initializeDatabase } from '../server/core/database.js';
 import { setupRoutes } from '../server/core/routes.js';
 import cookieParser from 'cookie-parser';
-import { telegramWebhookService } from '../server/services/telegram-webhook.service.js';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 const app = express();
-const PORT = process.env.PORT || 3000;
 
 // Middleware
 app.use(express.json({ limit: '50mb' }));
@@ -39,39 +32,24 @@ app.use((req: any, res: any, next: any) => {
   }
 });
 
-// Servir arquivos estáticos do cliente
-const clientBuildPath = path.join(__dirname, '../client/dist');
-app.use(express.static(clientBuildPath));
-
-// Inicializar aplicação
-(async () => {
+// Inicializar aplicação de forma assíncrona para Serverless
+let isInitialized = false;
+const initPromise = (async () => {
+  if (isInitialized) return;
   try {
-    // Inicializar banco de dados
     await initializeDatabase();
-
-    // Configurar rotas da API
     setupRoutes(app as any);
-
-    // Servir index.html para rotas não encontradas (SPA)
-    app.get('*', (req: any, res: any) => {
-      res.sendFile(path.join(clientBuildPath, 'index.html'));
-    });
-
-    // Iniciar servidor
-    app.listen(PORT, () => {
-      console.log(`[Detector de Promessa Vazia] Servidor iniciado em http://localhost:${PORT}`);
-      
-      // Configurar webhook do Telegram se as variáveis estiverem definidas
-      if (process.env.TELEGRAM_BOT_TOKEN && process.env.WEBHOOK_DOMAIN) {
-        telegramWebhookService.setWebhook().catch(err => 
-          console.error('Erro ao configurar webhook do Telegram:', err)
-        );
-      }
-    });
+    isInitialized = true;
+    console.log('[Detector de Promessa Vazia] API Inicializada');
   } catch (error) {
     console.error('[Detector de Promessa Vazia] Erro ao inicializar:', error);
-    process.exit(1);
   }
 })();
+
+// Middleware para garantir inicialização
+app.use(async (req, res, next) => {
+  await initPromise;
+  next();
+});
 
 export default app;

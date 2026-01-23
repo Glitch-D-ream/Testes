@@ -8,27 +8,12 @@
 # Documentação
 *.md
 docs/
-README.md
-CONTRIBUTING.md
-DEPLOYMENT.md
-ARCHITECTURE.md
-API.md
-METHODOLOGY.md
-QUICK_START.md
-TELEGRAM_BOT_SETUP.md
-LEGAL_DISCLAIMER.md
-PLANO_MESTRE_EVOLUCAO.md
-NLP_METHODOLOGY.md
-OBSERVABILITY.md
-DEPLOY_GUIDE_FREE.md
 
 # Testes
 e2e/
 k6/
 *.test.ts
 *.spec.ts
-vitest.config.ts
-playwright.config.ts
 
 # Desenvolvimento
 .env
@@ -36,16 +21,9 @@ playwright.config.ts
 .env.local
 .env.*.local
 
-# Dependências desnecessárias
+# Dependências (Vercel instala as suas)
 node_modules/
 .pnpm-store/
-pnpm-lock.yaml
-
-# Build artifacts
-dist/
-build/
-.next/
-out/
 
 # IDE
 .vscode/
@@ -58,10 +36,6 @@ out/
 # Logs
 logs/
 *.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
 
 # Temporários
 tmp/
@@ -69,26 +43,5 @@ temp/
 cache/
 .cache/
 
-# Patches
-patches/
-
-# Scripts
-scripts/
-
 # Data
 data/
-
-# Configurações de teste
-vitest.config.ts
-playwright.config.ts
-
-# Ignorar subpastas da API para evitar limite de funções no plano Hobby
-api/controllers/
-api/core/
-api/integrations/
-api/jobs/
-api/models/
-api/modules/
-api/routes/
-api/services/
-server/
