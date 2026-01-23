@@ -32,6 +32,7 @@
     "@types/express": "^5.0.0",
     "@types/jsonwebtoken": "^9.0.8",
     "@types/node": "^22.10.10",
+    "supabase": "^2.72.8",
     "typescript": "^5.7.3"
   }
 }
