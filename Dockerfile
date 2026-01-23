@@ -7,16 +7,20 @@ WORKDIR /app
 RUN npm install -g pnpm
 
 # Copiar arquivos de dependência
-COPY package.json pnpm-lock.yaml ./
+COPY package.json ./
+COPY pnpm-lock.yaml* ./
 
 # Instalar dependências
-RUN pnpm install --frozen-lockfile
+RUN pnpm install
 
 # Copiar código
 COPY . .
 
-# Build
-RUN mkdir -p dist && pnpm build
+# Garantir que o diretório drizzle exista
+RUN mkdir -p drizzle
+
+# Build (Gera dist/index.js e client/dist/)
+RUN pnpm build
 
 # Runtime stage
 FROM node:22-alpine
@@ -27,21 +31,25 @@ WORKDIR /app
 RUN npm install -g pnpm pm2
 
 # Copiar arquivos de dependência
-COPY package.json pnpm-lock.yaml ./
+COPY package.json ./
+COPY pnpm-lock.yaml* ./
 
 # Instalar apenas dependências de produção
-RUN pnpm install --prod --frozen-lockfile
+RUN pnpm install --prod
 
-# Copiar build e schema do builder
+# Copiar build do servidor
 COPY --from=builder /app/dist ./dist
+# Copiar build do frontend (necessário para o express.static)
+COPY --from=builder /app/client/dist ./client/dist
+# Copiar drizzle se existir
 COPY --from=builder /app/drizzle ./drizzle
 
 # Expor porta
 EXPOSE 3000
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD node -e "require('http').get('http://localhost:3000', (r) => {if (r.statusCode !== 200) throw new Error(r.statusCode)})"
+# Variáveis de ambiente padrão
+ENV NODE_ENV=production
+ENV PORT=3000
 
 # Start application
 CMD ["pm2-runtime", "start", "dist/index.js"]
