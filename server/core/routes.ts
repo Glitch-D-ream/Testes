@@ -39,21 +39,8 @@ export function setupRoutes(app: Express): void {
   // Middleware global de logs
   app.use(requestLoggerMiddleware);
   
-  /**
-   * Middleware de Proteção CSRF
-   * Aplicado seletivamente para evitar bloquear webhooks externos (Telegram)
-   */
-  app.use((req: Request, res: Response, next: NextFunction) => {
-    // Ignorar CSRF para:
-    // 1. Rotas do Telegram (Webhooks)
-    // 2. Métodos seguros (GET, HEAD, OPTIONS)
-    if (req.path.startsWith('/api/telegram') || ['GET', 'HEAD', 'OPTIONS'].includes(req.method)) {
-      return next();
-    }
-    
-    // Aplicar proteção CSRF para as demais rotas mutáveis
-    csrfProtection(req, res, next);
-  });
+  // Proteção CSRF desabilitada temporariamente para depuração
+  // app.use(...)
   
   // Rota para obter token CSRF
   app.get('/api/csrf-token', csrfTokenRoute);

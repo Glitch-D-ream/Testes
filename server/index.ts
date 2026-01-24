@@ -65,21 +65,21 @@ app.use(express.static(clientBuildPath));
     console.log('[Detector de Promessa Vazia] Configurando rotas...');
     setupRoutes(app);
 
+    // Rota de teste direto para verificar se o Express responde
+    app.get('/ping', (req, res) => res.send('pong'));
+
     // Servir index.html para rotas não encontradas (SPA)
     app.get('*', (req, res) => {
-      console.log(`[Detector de Promessa Vazia] Rota não encontrada: ${req.path}. Servindo index.html`);
       res.sendFile(path.join(clientBuildPath, 'index.html'), (err) => {
         if (err) {
-          console.error('[Detector de Promessa Vazia] Erro ao enviar index.html:', err);
-          res.status(500).send('Erro ao carregar a aplicação.');
+          res.status(500).send('Erro ao carregar o frontend. Verifique se o build foi concluído.');
         }
       });
     });
 
-    // Iniciar servidor
-    const server = app.listen(PORT, '0.0.0.0', () => {
-      console.log(`[Detector de Promessa Vazia] Servidor iniciado com sucesso.`);
-      console.log(`[Detector de Promessa Vazia] URL Local: http://0.0.0.0:${PORT}`);
+    // Iniciar servidor - Removendo o host '0.0.0.0' explícito para deixar o Express decidir
+    const server = app.listen(PORT, () => {
+      console.log(`[Detector de Promessa Vazia] Servidor ouvindo na porta: ${PORT}`);
       
       // Configurar webhook do Telegram se as variáveis estiverem definidas
       if (process.env.TELEGRAM_BOT_TOKEN && process.env.WEBHOOK_DOMAIN) {
