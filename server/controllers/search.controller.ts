@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { getSupabase } from '../core/database.js';
-import { logError } from '../core/logger.js';
+import { logError, logInfo } from '../core/logger.js';
+import { searchService } from '../services/search.service.js';
 
 export class SearchController {
   async searchPoliticians(req: Request, res: Response) {
@@ -46,6 +47,31 @@ export class SearchController {
     } catch (error) {
       logError('Erro na busca de políticos', error as Error);
       return res.status(500).json({ error: 'Erro ao realizar busca' });
+    }
+  }
+
+  /**
+   * Realiza busca na web e análise automática
+   */
+  async autoAnalyze(req: Request, res: Response) {
+    try {
+      const { name } = req.body;
+      if (!name) {
+        return res.status(400).json({ error: 'Nome do político é obrigatório' });
+      }
+
+      logInfo(`[Controller] Iniciando análise automática para: ${name}`);
+      const userId = (req as any).userId || null;
+      
+      const result = await searchService.autoAnalyzePolitician(name, userId);
+      
+      return res.status(201).json(result);
+    } catch (error) {
+      logError('Erro na análise automática', error as Error);
+      return res.status(500).json({ 
+        error: 'Erro ao realizar análise automática',
+        message: (error as Error).message 
+      });
     }
   }
 }
