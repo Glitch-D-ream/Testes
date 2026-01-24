@@ -52,6 +52,9 @@ export const promises = pgTable('promises', {
   extractedEntities: jsonb('extracted_entities'),
   negated: boolean('negated').default(false),
   conditional: boolean('conditional').default(false),
+  evidenceSnippet: text('evidence_snippet'), // O parágrafo original
+  sourceUrl: text('source_url'), // Link direto da notícia
+  sourceName: varchar('source_name', { length: 100 }), // Ex: G1, Folha
 });
 
 export const auditLogs = pgTable('audit_logs', {

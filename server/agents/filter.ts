@@ -84,7 +84,11 @@ export class FilterAgent {
             ...sources[res.id],
             relevanceScore: res.score,
             isPromise: true,
-            justification: res.reason
+            justification: res.reason,
+            // Garantir que metadados de evidência sejam passados
+            content: sources[res.id].content,
+            url: sources[res.id].url,
+            source: sources[res.id].source
           });
         }
       }

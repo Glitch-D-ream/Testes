@@ -1,12 +1,12 @@
 import React from 'react';
 import { 
   Target, 
-  AlertCircle, 
-  CheckCircle2, 
-  HelpCircle, 
   TrendingUp, 
   TrendingDown,
-  Info
+  Info,
+  Link as LinkIcon,
+  Quote,
+  HelpCircle
 } from 'lucide-react';
 
 interface PromiseCardProps {
@@ -16,6 +16,9 @@ interface PromiseCardProps {
   negated: boolean;
   conditional: boolean;
   reasoning?: string;
+  evidenceSnippet?: string;
+  sourceName?: string;
+  sourceUrl?: string;
 }
 
 export function PromiseCard({
@@ -25,6 +28,9 @@ export function PromiseCard({
   negated,
   conditional,
   reasoning,
+  evidenceSnippet,
+  sourceName,
+  sourceUrl,
 }: PromiseCardProps) {
   const isHighConfidence = confidence >= 0.7;
   const isMediumConfidence = confidence >= 0.4;
@@ -63,6 +69,36 @@ export function PromiseCard({
             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Confiança IA</p>
           </div>
         </div>
+
+        {/* Snippet de Evidência (A "Prova") */}
+        {evidenceSnippet && (
+          <div className="mt-4 p-4 bg-blue-50/50 dark:bg-blue-900/10 rounded-xl border border-blue-100/50 dark:border-blue-800/30 relative overflow-hidden">
+            <Quote className="absolute -right-2 -bottom-2 text-blue-200/30 dark:text-blue-800/20" size={64} />
+            <div className="flex gap-3 relative z-10">
+              <div className="mt-1">
+                <Quote size={16} className="text-blue-500" />
+              </div>
+              <div className="space-y-1">
+                <p className="text-[10px] font-bold text-blue-400 uppercase tracking-wider">Evidência Textual (Fonte Original)</p>
+                <p className="text-sm text-slate-700 dark:text-slate-300 italic leading-relaxed">
+                  "...{evidenceSnippet.length > 250 ? evidenceSnippet.substring(0, 250) + '...' : evidenceSnippet}..."
+                </p>
+                {sourceName && (
+                  <div className="flex items-center gap-2 mt-2">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase">Origem:</span>
+                    {sourceUrl ? (
+                      <a href={sourceUrl} target="_blank" rel="noopener noreferrer" className="text-[10px] font-bold text-blue-600 hover:underline flex items-center gap-1">
+                        <LinkIcon size={10} /> {sourceName}
+                      </a>
+                    ) : (
+                      <span className="text-[10px] font-bold text-slate-500">{sourceName}</span>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
 
         {reasoning && (
           <div className="mt-4 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-100 dark:border-slate-800">

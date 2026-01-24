@@ -161,6 +161,9 @@ export function AnalysisResults() {
                   negated={promise.negated || false}
                   conditional={promise.conditional || false}
                   reasoning={promise.reasoning}
+                  evidenceSnippet={promise.evidence_snippet}
+                  sourceName={promise.source_name}
+                  sourceUrl={promise.source_url}
                 />
               ))}
             </div>

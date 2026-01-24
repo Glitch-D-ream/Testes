@@ -101,14 +101,23 @@ export class BrainAgent {
     const supabase = getSupabase();
 
     const aiAnalysis = await aiService.analyzeText(text);
-    const promises = aiAnalysis.promises.map(p => ({
-      text: p.text,
-      confidence: p.confidence,
-      category: p.category,
-      negated: p.negated,
-      conditional: p.conditional,
-      reasoning: p.reasoning
-    }));
+    const promises = aiAnalysis.promises.map(p => {
+      // Tentar encontrar a fonte original no texto de contexto para cada promessa
+      // Isso é uma heurística: buscamos qual fonte mencionada no texto contém a promessa
+      const sourceMatch = text.split('\n\n').find(block => block.includes(p.text.substring(0, 20)));
+      const sourceName = sourceMatch?.match(/\[Fonte: (.*?)\]/)?.[1] || 'Fonte Desconhecida';
+      
+      return {
+        text: p.text,
+        confidence: p.confidence,
+        category: p.category,
+        negated: p.negated,
+        conditional: p.conditional,
+        reasoning: p.reasoning,
+        evidenceSnippet: sourceMatch || text.substring(0, 500),
+        sourceName: sourceName
+      };
+    });
 
     const probabilityScore = await calculateProbability(promises, author, category);
 
@@ -137,7 +146,9 @@ export class BrainAgent {
         confidence_score: p.confidence,
         extracted_entities: (p as any).entities || {},
         negated: p.negated || false,
-        conditional: p.conditional || false
+        conditional: p.conditional || false,
+        evidence_snippet: (p as any).evidenceSnippet,
+        source_name: (p as any).sourceName
       }));
       await supabase.from('promises').insert(promisesToInsert);
     }
