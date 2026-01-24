@@ -175,3 +175,20 @@ export function mapPromiseToSiconfiCategory(promiseCategory: string): string {
   };
   return mapping[promiseCategory] || 'ADMINISTRACAO';
 }
+
+/**
+ * Sincronizar dados do SICONFI para múltiplas categorias
+ */
+export async function syncSiconfiData(categories: string[]): Promise<void> {
+  logger.info('[SICONFI] Iniciando sincronização de categorias');
+  const currentYear = new Date().getFullYear();
+  
+  for (const category of categories) {
+    try {
+      await getBudgetData(category, currentYear - 1, 'FEDERAL');
+    } catch (error) {
+      logger.error(`[SICONFI] Falha ao sincronizar categoria ${category}: ${error}`);
+    }
+  }
+  logger.info('[SICONFI] Sincronização concluída');
+}
