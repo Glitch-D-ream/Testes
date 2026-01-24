@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { Download, Share2, Image as ImageIcon } from 'lucide-react';
 import { PromiseCard } from '../components/PromiseCard';
+import { ViabilityThermometer } from '../components/ViabilityThermometer';
 import { useAnalysis } from '../hooks/useAnalysis';
 
 export function AnalysisResults() {
@@ -122,21 +123,18 @@ export function AnalysisResults() {
           </div>
 
           {/* Resumo */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="bg-blue-50 rounded-lg p-4">
-              <p className="text-sm text-gray-600">Promessas Identificadas</p>
-              <p className="text-3xl font-bold text-blue-600">{promises.length}</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+            <div className="space-y-4">
+              <div className="bg-blue-50 rounded-lg p-4 flex justify-between items-center">
+                <p className="text-sm font-medium text-gray-600">Promessas Identificadas</p>
+                <p className="text-2xl font-bold text-blue-600">{promises.length}</p>
+              </div>
+              <div className="bg-green-50 rounded-lg p-4 flex justify-between items-center">
+                <p className="text-sm font-medium text-gray-600">Confiança da IA</p>
+                <p className="text-2xl font-bold text-green-600">{averageConfidence.toFixed(1)}%</p>
+              </div>
             </div>
-            <div className="bg-green-50 rounded-lg p-4">
-              <p className="text-sm text-gray-600">Confiança Média</p>
-              <p className="text-3xl font-bold text-green-600">{averageConfidence.toFixed(1)}%</p>
-            </div>
-            <div className="bg-purple-50 rounded-lg p-4">
-              <p className="text-sm text-gray-600">Score de Viabilidade</p>
-              <p className="text-3xl font-bold text-purple-600">
-                {((data.probabilityScore || 0) * 100).toFixed(1)}%
-              </p>
-            </div>
+            <ViabilityThermometer score={data.probabilityScore || 0} />
           </div>
 
           {/* Texto Original */}
