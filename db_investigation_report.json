@@ -1,0 +1,59 @@
+{
+  "users": {
+    "count": 0,
+    "is_mocked": false
+  },
+  "politicians": {
+    "count": 0,
+    "is_mocked": false
+  },
+  "analyses": {
+    "count": 1,
+    "is_mocked": false,
+    "indicators": [],
+    "sample": {
+      "id": "SFBoMybpBJ_XnRWqIrj42",
+      "user_id": null,
+      "text": "Italo fatais",
+      "author": "Autor Desconhecido",
+      "category": "GERAL",
+      "extracted_promises": "[]",
+      "probability_score": 0,
+      "methodology_notes": null,
+      "data_sources": null,
+      "created_at": "2026-01-24T19:35:29.230146+00:00",
+      "updated_at": "2026-01-24T19:35:29.230146+00:00"
+    }
+  },
+  "promises": {
+    "count": 0,
+    "is_mocked": false
+  },
+  "audit_logs": {
+    "count": 1,
+    "is_mocked": false,
+    "indicators": [],
+    "sample": {
+      "id": "hdEvbu8AYNx55NZirNRD3",
+      "user_id": null,
+      "action": "ANALYSIS_CREATED",
+      "resource_type": "analysis",
+      "resource_id": "SFBoMybpBJ_XnRWqIrj42",
+      "ip_address": "100.64.0.2",
+      "user_agent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36",
+      "timestamp": "2026-01-24T19:35:29.667701+00:00"
+    }
+  },
+  "consents": {
+    "count": 0,
+    "is_mocked": false
+  },
+  "public_data_cache": {
+    "count": 0,
+    "is_mocked": false
+  },
+  "evidence_storage": {
+    "count": 0,
+    "is_mocked": false
+  }
+}

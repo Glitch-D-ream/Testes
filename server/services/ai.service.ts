@@ -1,13 +1,12 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import Groq from 'groq-sdk';
 import OpenAI from 'openai';
+import axios from 'axios';
 import { logInfo, logError } from '../core/logger.js';
 
-// Configuração dos Provedores Gratuitos
+// Configuração dos Provedores
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY || '' });
-
-// DeepSeek é compatível com a API da OpenAI
 const deepseek = new OpenAI({
   baseURL: 'https://api.deepseek.com',
   apiKey: process.env.DEEPSEEK_API_KEY || '',
@@ -60,23 +59,45 @@ export class AIService {
   }
 
   /**
-   * Tenta análise com Gemini (Provedor Primário - Melhor Português)
+   * Provedor de Código Aberto (Pollinations AI) - Gratuito e sem necessidade de chave complexa
    */
+  private async analyzeWithOpenSource(text: string): Promise<AIAnalysisResult> {
+    logInfo('Tentando análise com Provedor Open Source (Pollinations/Llama 3)...');
+    
+    try {
+      const response = await axios.post('https://text.pollinations.ai/', {
+        messages: [
+          { role: 'system', content: 'Você é um assistente que responde apenas em JSON válido.' },
+          { role: 'user', content: this.promptTemplate(text) }
+        ],
+        model: 'openai', // Pollinations usa 'openai' como alias para modelos de alta qualidade
+        jsonMode: true
+      }, { timeout: 30000 });
+
+      let content = response.data;
+      if (typeof content === 'string') {
+        // Limpar possíveis markdown blocks
+        content = content.replace(/```json\n?|\n?```/g, '').trim();
+        return JSON.parse(content) as AIAnalysisResult;
+      }
+      return content as AIAnalysisResult;
+    } catch (error) {
+      logError('Falha no Provedor Open Source', error as Error);
+      throw error;
+    }
+  }
+
   private async analyzeWithGemini(text: string): Promise<AIAnalysisResult> {
     logInfo('Tentando análise com Gemini 1.5 Flash...');
     const model = genAI.getGenerativeModel({ 
       model: "gemini-1.5-flash",
       generationConfig: { responseMimeType: "application/json" }
     });
-
     const result = await model.generateContent(this.promptTemplate(text));
     const response = await result.response;
     return JSON.parse(response.text()) as AIAnalysisResult;
   }
 
-  /**
-   * Tenta análise com DeepSeek (Provedor de Alta Qualidade e Baixo Custo)
-   */
   private async analyzeWithDeepSeek(text: string): Promise<AIAnalysisResult> {
     logInfo('Tentando análise com DeepSeek-V3.2...');
     const response = await deepseek.chat.completions.create({
@@ -84,15 +105,11 @@ export class AIService {
       messages: [{ role: 'user', content: this.promptTemplate(text) }],
       response_format: { type: 'json_object' },
     });
-
     const content = response.choices[0]?.message?.content;
     if (!content) throw new Error('Resposta vazia do DeepSeek');
     return JSON.parse(content) as AIAnalysisResult;
   }
 
-  /**
-   * Tenta análise com Groq/Llama 3 (Provedor de Fallback Ultra-rápido)
-   */
   private async analyzeWithGroq(text: string): Promise<AIAnalysisResult> {
     logInfo('Tentando análise com Groq (Llama 3.3 70B)...');
     const completion = await groq.chat.completions.create({
@@ -100,44 +117,46 @@ export class AIService {
       model: 'llama-3.3-70b-versatile',
       response_format: { type: 'json_object' },
     });
-
     const content = completion.choices[0]?.message?.content;
     if (!content) throw new Error('Resposta vazia do Groq');
     return JSON.parse(content) as AIAnalysisResult;
   }
 
-  /**
-   * Método principal com lógica de Fallback entre provedores gratuitos
-   */
   async analyzeText(text: string): Promise<AIAnalysisResult> {
-    // 1. Tentar Gemini primeiro (melhor para português e contexto longo)
-    if (process.env.GEMINI_API_KEY) {
+    // 1. Tentar Gemini
+    if (process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY.length > 10) {
       try {
         return await this.analyzeWithGemini(text);
       } catch (error) {
-        logError('Falha no Gemini, tentando DeepSeek...', error as Error);
+        logError('Falha no Gemini, tentando próximo...', error as Error);
       }
     }
 
-    // 2. Tentar DeepSeek (excelente raciocínio e créditos gratuitos iniciais)
-    if (process.env.DEEPSEEK_API_KEY) {
+    // 2. Tentar DeepSeek
+    if (process.env.DEEPSEEK_API_KEY && process.env.DEEPSEEK_API_KEY.length > 10) {
       try {
         return await this.analyzeWithDeepSeek(text);
       } catch (error) {
-        logError('Falha no DeepSeek, tentando Groq...', error as Error);
+        logError('Falha no DeepSeek, tentando próximo...', error as Error);
       }
     }
 
-    // 3. Tentar Groq como fallback final (ultra-rápido)
-    if (process.env.GROQ_API_KEY) {
+    // 3. Tentar Groq
+    if (process.env.GROQ_API_KEY && process.env.GROQ_API_KEY.length > 10) {
       try {
         return await this.analyzeWithGroq(text);
       } catch (error) {
-        logError('Falha no Groq...', error as Error);
+        logError('Falha no Groq, tentando próximo...', error as Error);
       }
     }
 
-    throw new Error('Nenhum provedor de IA gratuito disponível ou configurado corretamente.');
+    // 4. Fallback Final: Provedor Open Source (Sempre disponível)
+    try {
+      return await this.analyzeWithOpenSource(text);
+    } catch (error) {
+      logError('Falha em todos os provedores de IA', error as Error);
+      throw new Error('Não foi possível realizar a análise de IA no momento.');
+    }
   }
 }
 

@@ -88,7 +88,7 @@ export class ExportService {
       type: 'jpeg',
       quality: 90,
       puppeteerArgs: {
-        executablePath: '/usr/bin/chromium-browser',
+        executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
         args: ['--no-sandbox', '--disable-setuid-sandbox']
       }
     });
