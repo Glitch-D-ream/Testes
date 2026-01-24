@@ -1,6 +1,9 @@
 import axios from 'axios';
+import { OpenAI } from 'openai';
 import { logInfo, logError } from '../core/logger.js';
 import { saveScoutHistory, checkUrlExists } from '../core/database.js';
+
+const openai = new OpenAI();
 
 export interface RawSource {
   title: string;
@@ -77,36 +80,70 @@ export class ScoutAgent {
   }
 
   private async fetchFromWeb(query: string): Promise<RawSource[]> {
-    const prompt = `Aja como um buscador de notícias. Liste as 5 notícias ou falas reais mais recentes do político "${query}" sobre promessas ou planos. 
-    Retorne apenas um array JSON: [{"title": "string", "url": "string", "content": "string", "source": "string", "date": "string"}]
-    Dê preferência a links de grandes portais como G1, Folha, Estadão.`;
+    const prompt = `Aja como um buscador de notícias em tempo real. Liste as 5 notícias, discursos ou falas reais mais recentes do político "${query}" que contenham promessas, planos de governo ou declarações de intenção.
+    
+    IMPORTANTE: Retorne APENAS um array JSON puro, sem explicações, no seguinte formato:
+    [
+      {
+        "title": "Título da notícia",
+        "url": "URL válida da fonte (ex: g1.globo.com/...)",
+        "content": "Resumo ou trecho da fala/promessa",
+        "source": "Nome do portal (ex: G1, Folha, CNN)",
+        "date": "Data aproximada"
+      }
+    ]
+    
+    Dê prioridade absoluta a fontes confiáveis da whitelist: G1, Folha de S.Paulo, Estadão, CNN Brasil, Metrópoles, Poder360.`;
 
     try {
-      const response = await axios.post('https://text.pollinations.ai/', {
-        messages: [
-          { role: 'system', content: 'Você é um buscador de notícias políticas brasileiras. Responda apenas JSON.' },
-          { role: 'user', content: prompt }
-        ],
-        model: 'openai',
-        jsonMode: true
-      }, { timeout: 30000 });
+      let content: any;
+      try {
+        const response = await axios.post('https://text.pollinations.ai/', {
+          messages: [
+            { role: 'system', content: 'Você é um buscador de notícias políticas brasileiras. Responda apenas JSON.' },
+            { role: 'user', content: prompt }
+          ],
+          model: 'openai',
+          jsonMode: true
+        }, { timeout: 20000 });
 
-      let data = response.data;
-      if (typeof data === 'string') {
-        data = JSON.parse(data.replace(/```json\n?|\n?```/g, '').trim());
+        let data = response.data;
+        content = typeof data === 'string' ? data : data.choices?.[0]?.message?.content || data;
+      } catch (pollError) {
+        logInfo('[Scout] Pollinations falhou ou atingiu limite. Usando OpenAI Fallback...');
+        const completion = await openai.chat.completions.create({
+          messages: [
+            { role: 'system', content: 'Você é um buscador de notícias políticas brasileiras. Responda apenas JSON.' },
+            { role: 'user', content: prompt }
+          ],
+          model: 'gpt-4.1-mini',
+          response_format: { type: 'json_object' }
+        });
+        content = completion.choices[0].message.content;
       }
       
-      return (data as any[]).map(item => ({
-        title: item.title,
-        url: item.url,
-        content: item.content || item.snippet || '',
-        source: item.source || 'Web Search',
-        publishedAt: item.date,
+      if (typeof content === 'string') {
+        try {
+          content = JSON.parse(content.replace(/```json\n?|\n?```/g, '').trim());
+        } catch (e) {
+          logError('[Scout] Erro ao parsear JSON da busca web', e as Error);
+          return [];
+        }
+      }
+      
+      const results = Array.isArray(content) ? content : (content.news || content.results || content.noticias || []);
+      
+      return (results as any[]).map(item => ({
+        title: item.title || item.titulo,
+        url: item.url || item.link,
+        content: item.content || item.snippet || item.resumo || '',
+        source: item.source || item.fonte || 'Web Search',
+        publishedAt: item.date || item.data,
         type: 'news',
         confidence: 'medium'
       }));
     } catch (error) {
-      logError('[Scout] Falha ao buscar na Web', error as Error);
+      logError('[Scout] Falha crítica na busca Web', error as Error);
       return [];
     }
   }
@@ -114,8 +151,7 @@ export class ScoutAgent {
   private async fetchFromRSS(query: string): Promise<RawSource[]> {
     const feeds = [
       { name: 'G1 Política', url: 'https://g1.globo.com/rss/g1/politica/' },
-      { name: 'Folha Poder', url: 'https://feeds.folha.uol.com.br/poder/rss091.xml' },
-      { name: 'R7 Brasília', url: 'https://noticias.r7.com/brasilia/feed.xml' }
+      { name: 'Folha Poder', url: 'https://feeds.folha.uol.com.br/poder/rss091.xml' }
     ];
 
     const results: RawSource[] = [];
