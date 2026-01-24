@@ -61,24 +61,44 @@ async function calculateFactors(
 }
 
 function calculateSpecificity(promise: any): number {
-  let score = 0.3;
-  if (promise.entities?.numbers?.length > 0) score += 0.2;
-  if (promise.text.match(/\b(até|em|durante|próximo|ano|mês|semana|dia)\b/i)) score += 0.2;
-  if (promise.text.length > 100) score += 0.1;
+  let score = 0.2;
+  // Presença de números (valores, quantidades)
+  if (promise.text.match(/\d+/)) score += 0.2;
+  // Datas ou prazos
+  if (promise.text.match(/\b(até|em|durante|próximo|ano|mês|semana|dia|202\d)\b/i)) score += 0.2;
+  // Verbos de ação concreta
+  if (promise.text.match(/\b(construir|entregar|criar|reduzir|aumentar|reformar|implementar)\b/i)) score += 0.2;
+  // Extensão do texto (detalhamento)
+  if (promise.text.length > 120) score += 0.2;
+  
   return Math.min(score, 1);
 }
 
 function calculateTimelineFeasibility(promise: any): number {
-  let score = 0.6;
-  const timelineMatch = promise.text.match(/(\d+)\s*(dias?|semanas?|meses?|anos?)/i);
+  let score = 0.5;
+  const text = promise.text.toLowerCase();
+  
+  // Prazos muito curtos para obras complexas
+  if (text.match(/\b(hospital|escola|ponte|estrada|rodovia|aeroporto)\b/) && text.match(/\b(meses|dias|1 ano)\b/)) {
+    score -= 0.3;
+  }
+  
+  // Prazos eleitorais (4 anos)
+  if (text.match(/\b(4 anos|mandato|até o fim)\b/)) {
+    score += 0.2;
+  }
+
+  const timelineMatch = text.match(/(\d+)\s*(dias?|semanas?|meses?|anos?)/i);
   if (timelineMatch) {
     const value = parseInt(timelineMatch[1]);
     const unit = timelineMatch[2].toLowerCase();
     let days = unit.includes('dia') ? value : unit.includes('semana') ? value * 7 : unit.includes('mês') ? value * 30 : value * 365;
-    if (days < 30) score -= 0.2;
-    else if (days > 1825) score -= 0.15;
+    
+    if (days < 30) score -= 0.1;
+    else if (days > 1460) score -= 0.2; // Mais de um mandato
     else score += 0.1;
   }
+  
   return Math.min(Math.max(score, 0), 1);
 }
 
