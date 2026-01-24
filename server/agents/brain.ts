@@ -2,6 +2,8 @@ import { FilteredSource } from './filter.js';
 import { logInfo, logError } from '../core/logger.js';
 import { getSupabase } from '../core/database.js';
 import { validateBudgetViability, mapPromiseToSiconfiCategory } from '../integrations/siconfi.js';
+import { getDeputadoId, getVotacoesDeputado, analisarIncoerencia } from '../integrations/camara.js';
+import { getSenadorCodigo, getVotacoesSenador } from '../integrations/senado.js';
 
 export class BrainAgent {
   /**
@@ -119,9 +121,39 @@ export class BrainAgent {
         reasoning: p.reasoning,
         evidenceSnippet: sourceMatch || text.substring(0, 500),
         sourceName: sourceName,
-        newsTitle: newsTitle // Novo campo para o título da notícia
+        newsTitle: newsTitle,
+        legislativeIncoherence: null as string | null,
+        legislativeSourceUrl: null as string | null
       };
     });
+
+    // --- Detector de Incoerência (Diz vs Faz) ---
+    if (author) {
+      try {
+        const deputadoId = await getDeputadoId(author);
+        if (deputadoId) {
+          const votacoes = await getVotacoesDeputado(deputadoId);
+          for (const p of promises) {
+            for (const v of votacoes) {
+              const analise = analisarIncoerencia(p.text, v);
+              if (analise.incoerente) {
+                p.legislativeIncoherence = analise.justificativa;
+                p.legislativeSourceUrl = `https://www.camara.leg.br/proposicoesWeb/fichadetramitacao?idProposicao=${v.idVotacao}`;
+                break;
+              }
+            }
+          }
+        } else {
+          const senadorCodigo = await getSenadorCodigo(author);
+          if (senadorCodigo) {
+            const votacoes = await getVotacoesSenador(senadorCodigo);
+            // Lógica similar para senador pode ser expandida aqui
+          }
+        }
+      } catch (err) {
+        logError('[BrainAgent] Erro no Detector de Incoerência', err as Error);
+      }
+    }
 
     const probabilityScore = await calculateProbability(promises, author, category);
 
@@ -153,7 +185,9 @@ export class BrainAgent {
         conditional: p.conditional || false,
         evidence_snippet: (p as any).evidenceSnippet,
         source_name: (p as any).sourceName,
-        news_title: (p as any).newsTitle // Salvar o título da notícia
+        news_title: (p as any).newsTitle,
+        legislative_incoherence: (p as any).legislativeIncoherence,
+        legislative_source_url: (p as any).legislativeSourceUrl
       }));
       await supabase.from('promises').insert(promisesToInsert);
     }

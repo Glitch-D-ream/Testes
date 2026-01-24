@@ -56,6 +56,8 @@ export const promises = pgTable('promises', {
   sourceUrl: text('source_url'), // Link direto da notícia
   sourceName: varchar('source_name', { length: 100 }), // Ex: G1, Folha
   newsTitle: text('news_title'), // Título da notícia original
+  legislativeIncoherence: text('legislative_incoherence'), // Detalhes de incoerência (Diz vs Faz)
+  legislativeSourceUrl: text('legislative_source_url'), // Link para a votação oficial
 });
 
 export const auditLogs = pgTable('audit_logs', {

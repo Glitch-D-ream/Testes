@@ -82,6 +82,8 @@ export default function TopicCard({ category, promises }: TopicCardProps) {
                 evidenceSnippet={promise.evidence_snippet}
                 sourceName={promise.source_name}
                 sourceUrl={promise.source_url}
+                legislativeIncoherence={promise.legislative_incoherence}
+                legislativeSourceUrl={promise.legislative_source_url}
               />
             </div>
           ))}

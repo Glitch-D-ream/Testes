@@ -7,7 +7,9 @@ import {
   Link as LinkIcon,
   Quote,
   HelpCircle,
-  Flag
+  Flag,
+  Scale,
+  ExternalLink
 } from 'lucide-react';
 import AuditModal from './AuditModal';
 
@@ -21,6 +23,8 @@ interface PromiseCardProps {
   evidenceSnippet?: string;
   sourceName?: string;
   sourceUrl?: string;
+  legislativeIncoherence?: string;
+  legislativeSourceUrl?: string;
 }
 
 export function PromiseCard({
@@ -33,6 +37,8 @@ export function PromiseCard({
   evidenceSnippet,
   sourceName,
   sourceUrl,
+  legislativeIncoherence,
+  legislativeSourceUrl,
   id, // Adicionado ID para auditoria
 }: PromiseCardProps & { id?: string }) {
   const [isAuditModalOpen, setIsAuditModalOpen] = useState(false);
@@ -122,6 +128,36 @@ export function PromiseCard({
                 <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
                   {reasoning}
                 </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Alerta de Incoerência Legislativa (Diz vs Faz) */}
+        {legislativeIncoherence && (
+          <div className="mt-4 p-4 bg-rose-50 dark:bg-rose-900/20 border border-rose-100 dark:border-rose-800/50 rounded-xl">
+            <div className="flex items-start gap-3">
+              <div className="mt-1 p-2 bg-rose-100 dark:bg-rose-900/40 text-rose-600 dark:text-rose-400 rounded-lg">
+                <Scale size={18} />
+              </div>
+              <div className="flex-1">
+                <h4 className="text-sm font-bold text-rose-900 dark:text-rose-100 flex items-center gap-2">
+                  Alerta de Incoerência (Diz vs Faz)
+                  <span className="px-2 py-0.5 bg-rose-200 dark:bg-rose-800 text-[10px] rounded-full">OFICIAL</span>
+                </h4>
+                <p className="mt-1 text-xs text-rose-700 dark:text-rose-300 leading-relaxed">
+                  {legislativeIncoherence}
+                </p>
+                {legislativeSourceUrl && (
+                  <a 
+                    href={legislativeSourceUrl} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="mt-2 inline-flex items-center gap-1 text-[10px] font-bold text-rose-600 dark:text-rose-400 hover:underline"
+                  >
+                    Ver votação oficial na Câmara <ExternalLink size={10} />
+                  </a>
+                )}
               </div>
             </div>
           </div>
