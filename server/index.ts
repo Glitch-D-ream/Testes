@@ -50,32 +50,52 @@ app.use(express.static(clientBuildPath));
 
 // Inicializar aplicação
 (async () => {
+  console.log('[Detector de Promessa Vazia] Iniciando processo de inicialização...');
+  console.log(`[Detector de Promessa Vazia] NODE_ENV: ${process.env.NODE_ENV}`);
+  console.log(`[Detector de Promessa Vazia] PORT: ${PORT}`);
+  console.log(`[Detector de Promessa Vazia] Client Build Path: ${clientBuildPath}`);
+
   try {
     // Inicializar banco de dados
+    console.log('[Detector de Promessa Vazia] Inicializando banco de dados...');
     await initializeDatabase();
+    console.log('[Detector de Promessa Vazia] Banco de dados inicializado.');
 
     // Configurar rotas da API
+    console.log('[Detector de Promessa Vazia] Configurando rotas...');
     setupRoutes(app);
 
     // Servir index.html para rotas não encontradas (SPA)
     app.get('*', (req, res) => {
-      res.sendFile(path.join(clientBuildPath, 'index.html'));
+      console.log(`[Detector de Promessa Vazia] Rota não encontrada: ${req.path}. Servindo index.html`);
+      res.sendFile(path.join(clientBuildPath, 'index.html'), (err) => {
+        if (err) {
+          console.error('[Detector de Promessa Vazia] Erro ao enviar index.html:', err);
+          res.status(500).send('Erro ao carregar a aplicação.');
+        }
+      });
     });
 
     // Iniciar servidor
-    app.listen(PORT, () => {
-      console.log(`[Detector de Promessa Vazia] Servidor iniciado em http://localhost:${PORT}`);
-      console.log(`[Detector de Promessa Vazia] Ambiente: ${process.env.NODE_ENV || 'development'}`);
+    const server = app.listen(PORT, '0.0.0.0', () => {
+      console.log(`[Detector de Promessa Vazia] Servidor iniciado com sucesso.`);
+      console.log(`[Detector de Promessa Vazia] URL Local: http://0.0.0.0:${PORT}`);
       
       // Configurar webhook do Telegram se as variáveis estiverem definidas
       if (process.env.TELEGRAM_BOT_TOKEN && process.env.WEBHOOK_DOMAIN) {
+        console.log('[Detector de Promessa Vazia] Configurando webhook do Telegram...');
         telegramWebhookService.setWebhook().catch(err => 
           console.error('Erro ao configurar webhook do Telegram:', err)
         );
       }
     });
+
+    server.on('error', (err) => {
+      console.error('[Detector de Promessa Vazia] Erro no servidor HTTP:', err);
+    });
+
   } catch (error) {
-    console.error('[Detector de Promessa Vazia] Erro ao inicializar:', error);
+    console.error('[Detector de Promessa Vazia] Erro FATAL ao inicializar:', error);
     process.exit(1);
   }
 })();
