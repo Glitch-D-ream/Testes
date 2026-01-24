@@ -1,5 +1,5 @@
 import React from 'react';
-import { ShieldAlert, ShieldCheck, ShieldInfo } from 'lucide-react';
+import { ShieldAlert, ShieldCheck, Info } from 'lucide-react';
 
 interface ViabilityThermometerProps {
   score: number;
@@ -30,7 +30,7 @@ export function ViabilityThermometer({ score }: ViabilityThermometerProps) {
       color: 'text-amber-500', 
       bg: 'bg-amber-500', 
       lightBg: 'bg-amber-50 dark:bg-amber-900/10',
-      icon: <ShieldInfo className="text-amber-500" size={24} />,
+      icon: <Info className="text-amber-500" size={24} />,
       desc: 'A viabilidade depende de fatores externos ou mudanças orçamentárias.'
     };
     return { 
