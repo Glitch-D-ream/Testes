@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { 
   Target, 
   TrendingUp, 
@@ -6,8 +6,10 @@ import {
   Info,
   Link as LinkIcon,
   Quote,
-  HelpCircle
+  HelpCircle,
+  Flag
 } from 'lucide-react';
+import AuditModal from './AuditModal';
 
 interface PromiseCardProps {
   text: string;
@@ -31,12 +33,21 @@ export function PromiseCard({
   evidenceSnippet,
   sourceName,
   sourceUrl,
-}: PromiseCardProps) {
+  id, // Adicionado ID para auditoria
+}: PromiseCardProps & { id?: string }) {
+  const [isAuditModalOpen, setIsAuditModalOpen] = useState(false);
   const isHighConfidence = confidence >= 0.7;
   const isMediumConfidence = confidence >= 0.4;
 
   return (
     <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm transition-all hover:shadow-md">
+      {isAuditModalOpen && id && (
+        <AuditModal 
+          promiseId={id} 
+          promiseText={text} 
+          onClose={() => setIsAuditModalOpen(false)} 
+        />
+      )}
       <div className="p-6">
         <div className="flex items-start justify-between gap-4 mb-4">
           <div className="flex-1 space-y-3">
@@ -139,8 +150,16 @@ export function PromiseCard({
           </span>
         </div>
         
-        <div className="flex items-center gap-1 text-[10px] font-bold text-slate-400 uppercase">
-          <Target size={12} /> Verificável
+        <div className="flex items-center gap-4">
+          <button 
+            onClick={() => setIsAuditModalOpen(true)}
+            className="flex items-center gap-1 text-[10px] font-bold text-slate-400 hover:text-blue-600 uppercase transition-colors"
+          >
+            <Flag size={12} /> Contestar/Sugerir
+          </button>
+          <div className="flex items-center gap-1 text-[10px] font-bold text-slate-400 uppercase">
+            <Target size={12} /> Verificável
+          </div>
         </div>
       </div>
     </div>

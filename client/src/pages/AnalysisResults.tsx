@@ -155,6 +155,7 @@ export function AnalysisResults() {
               {promises.map((promise: any, index: number) => (
                 <PromiseCard
                   key={index}
+                  id={promise.id}
                   text={promise.promise_text || promise.text}
                   category={promise.category || 'Geral'}
                   confidence={promise.confidence_score || promise.confidence || 0}

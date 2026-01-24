@@ -97,6 +97,17 @@ export const evidenceStorage = pgTable('evidence_storage', {
   createdAt: timestamp('created_at').defaultNow(),
 });
 
+export const auditContributions = pgTable('audit_contributions', {
+  id: text('id').primaryKey(),
+  promiseId: text('promise_id').references(() => promises.id).notNull(),
+  userId: text('user_id').references(() => users.id),
+  type: varchar('type', { length: 20 }).notNull(), // 'report_error', 'suggest_source'
+  suggestedUrl: text('suggested_url'),
+  description: text('description'),
+  status: varchar('status', { length: 20 }).default('pending'), // 'pending', 'processed', 'rejected'
+  createdAt: timestamp('created_at').defaultNow(),
+});
+
 export const scoutHistory = pgTable('scout_history', {
   id: text('id').primaryKey(),
   url: text('url').unique().notNull(),

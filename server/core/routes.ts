@@ -12,6 +12,7 @@ import adminRoutes from '../routes/admin.routes.js';
 import telegramRoutes from '../routes/telegram.routes.js';
 import aiTestRoutes from '../routes/ai-test.routes.js';
 import searchRoutes from '../routes/search.routes.js';
+import auditRoutes from '../routes/audit.routes.js';
 
 /**
  * Rate limiters
@@ -65,6 +66,9 @@ export function setupRoutes(app: Express): void {
 
   // Rotas de busca
   app.use('/api/search', searchRoutes);
+
+  // Rotas de auditoria
+  app.use('/api/audit', auditRoutes);
 
   /**
    * GET /api/health
