@@ -73,7 +73,7 @@ export class ScoutAgent {
   }
 
   private async fetchFromWeb(query: string): Promise<RawSource[]> {
-    const prompt = `Liste 5 notícias reais e recentes do político brasileiro "${query}" com promessas ou declarações. Retorne APENAS um array JSON: [{"title": "...", "url": "...", "content": "...", "source": "...", "date": "..."}]`;
+    const prompt = `Liste 5 notícias reais e recentes do político brasileiro "${query}" com promessas ou declarações. Priorize fontes oficiais (.gov.br, .leg.br) e grandes portais. Retorne APENAS um array JSON: [{"title": "...", "url": "...", "content": "...", "source": "...", "date": "..."}]`;
 
     let retries = 3;
     const models = ['searchgpt', 'mistral', 'openai'];
@@ -100,14 +100,34 @@ export class ScoutAgent {
         
         const results = Array.isArray(content) ? content : (content.news || content.results || content.noticias || []);
         
-        return (results as any[]).map(item => ({
+        // Validação de Links Ativos (Prova de Vida)
+        const validatedResults = [];
+        for (const item of results) {
+          const itemUrl = item.url || item.link;
+          if (!itemUrl) continue;
+
+          try {
+            logInfo(`[Scout] Validando link: ${itemUrl}`);
+            // Usamos um timeout curto para não travar a análise
+            await axios.head(itemUrl, { timeout: 5000, headers: { 'User-Agent': 'Mozilla/5.0' } });
+            validatedResults.push(item);
+          } catch (linkError) {
+            logError(`[Scout] Link inválido ou inacessível: ${itemUrl}`);
+            // Se for erro de método não permitido (405), ainda podemos considerar o link como existente
+            if ((linkError as any).response?.status === 405) {
+              validatedResults.push(item);
+            }
+          }
+        }
+        
+        return validatedResults.map(item => ({
           title: item.title || item.titulo,
           url: item.url || item.link,
           content: item.content || item.snippet || item.resumo || '',
           source: item.source || item.fonte || 'Web Search',
           publishedAt: item.date || item.data,
           type: 'news',
-          confidence: 'medium'
+          confidence: (item.url || '').includes('.gov.br') || (item.url || '').includes('.leg.br') ? 'high' : 'medium'
         }));
       } catch (error: any) {
         logError(`[Scout] Falha na tentativa ${i + 1} com modelo ${models[i]}`, error as Error);

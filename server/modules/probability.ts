@@ -173,6 +173,12 @@ export async function calculateProbabilityWithDetails(
     score: score, // Retornar entre 0 e 1 para consistência
     factors: avgFactors,
     riskLevel,
-    confidence: 0.85 // Alta confiança devido ao uso de dados reais
+    confidence: 0.85, // Alta confiança devido ao uso de dados reais
+    details: {
+      budgetImpact: budgetFactor,
+      legislativeHistory: historyFactor,
+      aiConfidence: aiFactor,
+      incoherencePenalty: incoherencePenalty
+    }
   };
 }

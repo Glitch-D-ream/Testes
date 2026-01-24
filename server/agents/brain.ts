@@ -140,7 +140,8 @@ ${knowledgeBase}
         text,
         category,
         extracted_promises: promises,
-        probability_score: probabilityScore,
+        probability_score: probabilityScore.score,
+        probability_score_details: probabilityScore.details,
         status: 'completed',
         updated_at: new Date().toISOString()
       })

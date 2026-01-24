@@ -156,9 +156,34 @@ export function AnalysisResults() {
                 Auditado via SICONFI/TSE
               </span>
             </div>
-            <div className="prose prose-slate max-w-none text-gray-700 leading-relaxed bg-gray-50 p-6 rounded-lg border border-gray-100">
+            <div className="prose prose-slate max-w-none text-gray-700 leading-relaxed bg-gray-50 p-6 rounded-lg border border-gray-100 mb-6">
               <ReactMarkdown>{data.text}</ReactMarkdown>
             </div>
+
+            {/* Detalhes Técnicos do Score */}
+            {data.probability_score_details && (
+              <div className="bg-blue-50 rounded-lg p-4 border border-blue-100">
+                <h4 className="text-xs font-bold text-blue-800 uppercase tracking-wider mb-3">Decomposição Técnica do Score</h4>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="text-center">
+                    <p className="text-[10px] text-blue-600 font-medium uppercase">Orçamento</p>
+                    <p className="text-lg font-bold text-blue-900">{(data.probability_score_details.budgetImpact * 100).toFixed(0)}%</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-[10px] text-blue-600 font-medium uppercase">Histórico</p>
+                    <p className="text-lg font-bold text-blue-900">{(data.probability_score_details.legislativeHistory * 100).toFixed(0)}%</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-[10px] text-blue-600 font-medium uppercase">Confiança IA</p>
+                    <p className="text-lg font-bold text-blue-900">{(data.probability_score_details.aiConfidence * 100).toFixed(0)}%</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-[10px] text-red-600 font-medium uppercase">Penalidade</p>
+                    <p className="text-lg font-bold text-red-700">-{((data.probability_score_details.incoherencePenalty || 0) * 100).toFixed(0)}%</p>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
