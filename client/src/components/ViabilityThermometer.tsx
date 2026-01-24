@@ -1,4 +1,5 @@
 import React from 'react';
+import { ShieldAlert, ShieldCheck, ShieldInfo } from 'lucide-react';
 
 interface ViabilityThermometerProps {
   score: number;
@@ -7,48 +8,77 @@ interface ViabilityThermometerProps {
 export function ViabilityThermometer({ score }: ViabilityThermometerProps) {
   const percentage = Math.round(score * 100);
   
-  const getColors = (s: number) => {
-    if (s >= 0.8) return { bar: 'bg-green-500', text: 'text-green-700', bg: 'bg-green-50' };
-    if (s >= 0.6) return { bar: 'bg-blue-500', text: 'text-blue-700', bg: 'bg-blue-50' };
-    if (s >= 0.4) return { bar: 'bg-yellow-500', text: 'text-yellow-700', bg: 'bg-yellow-50' };
-    if (s >= 0.2) return { bar: 'bg-orange-500', text: 'text-orange-700', bg: 'bg-orange-50' };
-    return { bar: 'bg-red-500', text: 'text-red-700', bg: 'bg-red-50' };
+  const getStatus = (s: number) => {
+    if (s >= 0.8) return { 
+      label: 'Altamente Viável', 
+      color: 'text-emerald-500', 
+      bg: 'bg-emerald-500', 
+      lightBg: 'bg-emerald-50 dark:bg-emerald-900/10',
+      icon: <ShieldCheck className="text-emerald-500" size={24} />,
+      desc: 'Esta promessa tem forte base orçamentária e histórico político favorável.'
+    };
+    if (s >= 0.6) return { 
+      label: 'Viável', 
+      color: 'text-blue-500', 
+      bg: 'bg-blue-500', 
+      lightBg: 'bg-blue-50 dark:bg-blue-900/10',
+      icon: <ShieldCheck className="text-blue-500" size={24} />,
+      desc: 'Existem recursos e condições para que esta promessa seja cumprida.'
+    };
+    if (s >= 0.4) return { 
+      label: 'Moderada', 
+      color: 'text-amber-500', 
+      bg: 'bg-amber-500', 
+      lightBg: 'bg-amber-50 dark:bg-amber-900/10',
+      icon: <ShieldInfo className="text-amber-500" size={24} />,
+      desc: 'A viabilidade depende de fatores externos ou mudanças orçamentárias.'
+    };
+    return { 
+      label: 'Baixa Viabilidade', 
+      color: 'text-rose-500', 
+      bg: 'bg-rose-500', 
+      lightBg: 'bg-rose-50 dark:bg-rose-900/10',
+      icon: <ShieldAlert className="text-rose-500" size={24} />,
+      desc: 'Histórico de votação contrário ou falta de recursos orçamentários reais.'
+    };
   };
 
-  const colors = getColors(score);
+  const status = getStatus(score);
 
   return (
-    <div className={`w-full ${colors.bg} rounded-xl p-6 border border-opacity-50 border-gray-200`}>
-      <div className="flex justify-between items-end mb-4">
-        <div>
-          <h4 className="text-sm font-bold uppercase tracking-wider text-gray-500">Termômetro de Viabilidade</h4>
-          <p className={`text-4xl font-black ${colors.text}`}>{percentage}%</p>
+    <div className={`rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm bg-white dark:bg-slate-900`}>
+      <div className="p-6 space-y-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            {status.icon}
+            <div>
+              <h4 className="text-xs font-bold uppercase tracking-widest text-slate-400">Score de Viabilidade</h4>
+              <p className={`text-2xl font-black ${status.color}`}>{status.label}</p>
+            </div>
+          </div>
+          <div className="text-right">
+            <span className="text-4xl font-black tracking-tighter text-slate-900 dark:text-white">
+              {percentage}<span className="text-xl text-slate-400">%</span>
+            </span>
+          </div>
         </div>
-        <div className="text-right">
-          <span className={`text-xs font-bold px-3 py-1 rounded-full uppercase ${colors.bar} text-white`}>
-            {percentage >= 80 ? 'Altamente Viável' : 
-             percentage >= 60 ? 'Viável' : 
-             percentage >= 40 ? 'Moderada' : 
-             percentage >= 20 ? 'Baixa' : 'Muito Baixa'}
-          </span>
+        
+        <div className="relative h-3 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+          <div 
+            className={`absolute top-0 left-0 h-full ${status.bg} transition-all duration-1000 ease-out shadow-[0_0_10px_rgba(0,0,0,0.1)]`}
+            style={{ width: `${percentage}%` }}
+          />
         </div>
+
+        <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed">
+          {status.desc}
+        </p>
       </div>
       
-      <div className="relative h-4 w-full bg-gray-200 rounded-full overflow-hidden shadow-inner">
-        <div 
-          className={`absolute top-0 left-0 h-full ${colors.bar} transition-all duration-1000 ease-out`}
-          style={{ width: `${percentage}%` }}
-        >
-          <div className="absolute top-0 right-0 h-full w-8 bg-white opacity-20 transform skew-x-12"></div>
-        </div>
-      </div>
-      
-      <div className="flex justify-between mt-2 text-[10px] font-bold text-gray-400 uppercase tracking-tighter">
-        <span>Crítico</span>
-        <span>Alerta</span>
-        <span>Neutro</span>
-        <span>Seguro</span>
-        <span>Ideal</span>
+      <div className={`px-6 py-3 border-t border-slate-100 dark:border-slate-800 ${status.lightBg}`}>
+        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 text-center">
+          Baseado em Dados Reais do SICONFI e TSE
+        </p>
       </div>
     </div>
   );

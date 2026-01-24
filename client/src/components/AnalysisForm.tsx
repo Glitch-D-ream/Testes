@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { FormInput } from './FormInput';
 import { FormTextarea } from './FormTextarea';
 import { Button } from './Button';
-import { useFormValidation } from '../hooks/useFormValidation';
+import { Search, User, Tag, Send } from 'lucide-react';
 
 interface AnalysisFormProps {
   onSubmit: (data: {
@@ -30,143 +30,87 @@ export default function AnalysisForm({ onSubmit, isLoading }: AnalysisFormProps)
   const [text, setText] = useState('');
   const [author, setAuthor] = useState('');
   const [category, setCategory] = useState('');
-  const [submitError, setSubmitError] = useState('');
   const [textError, setTextError] = useState('');
-  const [authorError, setAuthorError] = useState('');
-
-  const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const value = e.target.value;
-    setText(value);
-    
-    if (value.length < 10 && value.length > 0) {
-      setTextError('Mínimo de 10 caracteres');
-    } else if (value.length > 5000) {
-      setTextError('Máximo de 5000 caracteres');
-    } else {
-      setTextError('');
-    }
-  };
-
-  const handleAuthorChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    setAuthor(value);
-    
-    if (value.length > 100) {
-      setAuthorError('Máximo de 100 caracteres');
-    } else {
-      setAuthorError('');
-    }
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSubmitError('');
-
-    // Validar campos
     if (text.trim().length < 10) {
-      setTextError('Por favor, insira pelo menos 10 caracteres');
+      setTextError('O texto deve ter pelo menos 10 caracteres para uma análise precisa.');
       return;
     }
-
-    if (text.trim().length > 5000) {
-      setTextError('Texto muito longo (máximo 5000 caracteres)');
-      return;
-    }
-
-    try {
-      await onSubmit({
-        text: text.trim(),
-        author: author.trim() || undefined,
-        category: category || undefined,
-      });
-    } catch (error) {
-      setSubmitError(
-        error instanceof Error ? error.message : 'Erro ao enviar análise'
-      );
-    }
+    setTextError('');
+    await onSubmit({
+      text: text.trim(),
+      author: author.trim() || undefined,
+      category: category || undefined,
+    });
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6 bg-white dark:bg-gray-900 p-6 rounded-lg shadow">
-      {/* Erro geral */}
-      {submitError && (
-        <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
-          <p className="text-red-800 dark:text-red-200 text-sm">{submitError}</p>
-        </div>
-      )}
-
-      {/* Texto para Análise */}
-      <FormTextarea
-        label="Texto para Análise"
-        placeholder="Cole aqui o discurso, post ou texto político para análise..."
-        value={text}
-        onChange={handleTextChange}
-        error={textError}
-        maxLength={5000}
-        required
-      />
-
-      {/* Autor (opcional) */}
-      <FormInput
-        label="Autor/Político (opcional)"
-        placeholder="Nome do autor ou político"
-        value={author}
-        onChange={handleAuthorChange}
-        error={authorError}
-        maxLength={100}
-      />
-
-      {/* Categoria (opcional) */}
-      <div>
-        <label htmlFor="category" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-          Categoria (opcional)
-        </label>
-        <select
-          id="category"
-          value={category}
-          onChange={(e) => setCategory(e.target.value)}
-          className="w-full px-4 py-2 rounded-lg border-2 border-gray-300 dark:border-gray-600 focus:border-blue-500 focus:ring-4 focus:ring-blue-200 dark:focus:ring-blue-900 dark:bg-gray-800 dark:text-white transition-colors"
-        >
-          <option value="">Selecione uma categoria...</option>
-          {CATEGORIES.map((cat) => (
-            <option key={cat.value} value={cat.value}>
-              {cat.label}
-            </option>
-          ))}
-        </select>
+    <form onSubmit={handleSubmit} className="space-y-8">
+      <div className="space-y-2">
+        <FormTextarea
+          label="O que foi prometido?"
+          placeholder="Cole aqui o discurso, post de rede social ou texto do plano de governo..."
+          value={text}
+          onChange={(e) => {
+            setText(e.target.value);
+            if (e.target.value.length >= 10) setTextError('');
+          }}
+          error={textError}
+          maxLength={10000}
+          required
+          className="min-h-[200px] text-lg"
+        />
       </div>
 
-      {/* Botões */}
-      <div className="flex gap-4 pt-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <FormInput
+          label="Quem prometeu?"
+          placeholder="Ex: Deputado Silva ou Prefeito João"
+          value={author}
+          onChange={(e) => setAuthor(e.target.value)}
+          icon={<User size={18} />}
+          helperText="Opcional, mas ajuda no cruzamento de histórico"
+        />
+
+        <div className="space-y-2">
+          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+            Qual a área principal?
+          </label>
+          <div className="relative">
+            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
+              <Tag size={18} />
+            </div>
+            <select
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 rounded-lg border-2 border-slate-300 dark:border-slate-700 dark:bg-slate-800 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all appearance-none outline-none"
+            >
+              <option value="">Detecção automática pela IA</option>
+              {CATEGORIES.map((cat) => (
+                <option key={cat.value} value={cat.value}>
+                  {cat.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div className="pt-4">
         <Button
           type="submit"
           variant="primary"
           size="lg"
-          loading={isLoading}
           fullWidth
+          loading={isLoading}
+          icon={<Send size={18} />}
         >
-          {isLoading ? 'Analisando...' : 'Analisar Promessa'}
+          Iniciar Auditoria Digital
         </Button>
-        <Button
-          type="button"
-          variant="outline"
-          size="lg"
-          onClick={() => {
-            setText('');
-            setAuthor('');
-            setCategory('');
-            setSubmitError('');
-          }}
-          disabled={isLoading}
-        >
-          Limpar
-        </Button>
-      </div>
-
-      {/* Dica */}
-      <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-        <p className="text-sm text-blue-800 dark:text-blue-200">
-          💡 <strong>Dica:</strong> Quanto mais específico o texto, melhor será a análise. Inclua contexto e detalhes sobre a promessa.
+        <p className="text-center text-xs text-slate-400 mt-4">
+          Ao clicar, você concorda que esta análise é baseada em dados públicos e algoritmos de IA.
         </p>
       </div>
     </form>

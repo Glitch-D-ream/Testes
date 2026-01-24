@@ -1,9 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { Moon, Sun } from 'lucide-react';
+import { Moon, Sun, ShieldCheck, Database, Cpu, Search, History, BarChart3, FileText } from 'lucide-react';
 import AnalysisForm from '../components/AnalysisForm';
-import LegalDisclaimer from '../components/LegalDisclaimer';
 import { Button } from '../components/Button';
 import { useTheme } from '../hooks/useTheme';
 
@@ -46,186 +45,139 @@ export default function Home() {
   return (
     <div className={`min-h-screen transition-colors ${
       theme === 'dark' 
-        ? 'bg-gradient-to-br from-gray-900 to-gray-800' 
-        : 'bg-gradient-to-br from-slate-50 to-slate-100'
+        ? 'bg-slate-950 text-slate-100' 
+        : 'bg-slate-50 text-slate-900'
     }`}>
-      {/* Header */}
-      <header className={`${
-        theme === 'dark' 
-          ? 'bg-gray-800 border-gray-700' 
-          : 'bg-white border-slate-200'
-      } shadow-sm border-b transition-colors`}>
-        <div className="max-w-6xl mx-auto px-4 py-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className={`text-3xl font-bold ${
-                theme === 'dark' ? 'text-white' : 'text-slate-900'
-              }`}>
-                Detector de Promessa Vazia
-              </h1>
-              <p className={`mt-1 ${
-                theme === 'dark' ? 'text-gray-400' : 'text-slate-600'
-              }`}>
-                Análise independente de viabilidade de promessas políticas
-              </p>
+      {/* Navigation */}
+      <nav className={`sticky top-0 z-50 border-b backdrop-blur-md ${
+        theme === 'dark' ? 'bg-slate-950/80 border-slate-800' : 'bg-white/80 border-slate-200'
+      }`}>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between h-16 items-center">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
+                <ShieldCheck className="text-white" size={20} />
+              </div>
+              <span className="font-bold text-xl tracking-tight">Detector de Promessas</span>
             </div>
-            <div className="flex items-center gap-4">
-              <nav className="flex gap-4">
-                <a
-                  href="/search"
-                  className={`px-4 py-2 font-medium transition-colors ${
-                    theme === 'dark'
-                      ? 'text-gray-300 hover:text-white'
-                      : 'text-slate-700 hover:text-slate-900'
-                  }`}
-                >
-                  Buscar Político
-                </a>
-                <a
-                  href="/history"
-                  className={`px-4 py-2 font-medium transition-colors ${
-                    theme === 'dark'
-                      ? 'text-gray-300 hover:text-white'
-                      : 'text-slate-700 hover:text-slate-900'
-                  }`}
-                >
-                  Histórico
-                </a>
-                <a
-                  href="/methodology"
-                  className={`px-4 py-2 font-medium transition-colors ${
-                    theme === 'dark'
-                      ? 'text-gray-300 hover:text-white'
-                      : 'text-slate-700 hover:text-slate-900'
-                  }`}
-                >
-                  Metodologia
-                </a>
-                <a
-                  href="/statistics"
-                  className={`px-4 py-2 font-medium transition-colors ${
-                    theme === 'dark'
-                      ? 'text-gray-300 hover:text-white'
-                      : 'text-slate-700 hover:text-slate-900'
-                  }`}
-                >
-                  Estatísticas
-                </a>
-              </nav>
-              
-              {/* Theme Toggle */}
+            
+            <div className="hidden md:flex items-center gap-8">
+              <a href="/search" className="text-sm font-medium hover:text-blue-600 transition-colors flex items-center gap-1">
+                <Search size={16} /> Buscar
+              </a>
+              <a href="/history" className="text-sm font-medium hover:text-blue-600 transition-colors flex items-center gap-1">
+                <History size={16} /> Histórico
+              </a>
+              <a href="/statistics" className="text-sm font-medium hover:text-blue-600 transition-colors flex items-center gap-1">
+                <BarChart3 size={16} /> Estatísticas
+              </a>
+              <a href="/methodology" className="text-sm font-medium hover:text-blue-600 transition-colors flex items-center gap-1">
+                <FileText size={16} /> Metodologia
+              </a>
+              <div className="h-6 w-px bg-slate-200 dark:bg-slate-800 mx-2" />
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={toggleTheme}
-                icon={theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
-                title={`Alternar para modo ${theme === 'dark' ? 'claro' : 'escuro'}`}
+                icon={theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
               />
             </div>
           </div>
         </div>
-      </header>
+      </nav>
 
-      {/* Main Content */}
-      <main className="max-w-6xl mx-auto px-4 py-12">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Form Section */}
-          <div className="lg:col-span-2">
-            <AnalysisForm onSubmit={handleSubmit} isLoading={isLoading} />
+      {/* Hero Section */}
+      <div className="relative overflow-hidden pt-16 pb-24 lg:pt-24 lg:pb-32">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+          <div className="text-center">
+            <h1 className="text-4xl sm:text-6xl font-extrabold tracking-tight mb-6 bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-500">
+              Transparência Real na Política
+            </h1>
+            <p className="max-w-2xl mx-auto text-lg sm:text-xl text-slate-500 dark:text-slate-400 mb-10">
+              Analise discursos e promessas eleitorais com cruzamento automático de dados reais do SICONFI, TSE e Portal da Transparência.
+            </p>
           </div>
 
-          {/* Sidebar */}
-          <aside className="space-y-6">
-            {/* Info Card */}
-            <div className={`rounded-lg shadow p-6 ${
-              theme === 'dark'
-                ? 'bg-gray-800'
-                : 'bg-white'
+          <div className="max-w-4xl mx-auto">
+            <div className={`rounded-2xl shadow-2xl overflow-hidden border ${
+              theme === 'dark' ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'
             }`}>
-              <h3 className={`text-lg font-semibold mb-4 ${
-                theme === 'dark' ? 'text-white' : 'text-slate-900'
-              }`}>
-                Como Funciona
-              </h3>
-              <ul className={`space-y-3 text-sm ${
-                theme === 'dark' ? 'text-gray-300' : 'text-slate-600'
-              }`}>
-                <li className="flex gap-2">
-                  <span className="text-blue-500 font-bold">1.</span>
-                  <span>Cole um discurso, post ou texto político</span>
-                </li>
-                <li className="flex gap-2">
-                  <span className="text-blue-500 font-bold">2.</span>
-                  <span>Nosso sistema analisa usando PLN avançado</span>
-                </li>
-                <li className="flex gap-2">
-                  <span className="text-blue-500 font-bold">3.</span>
-                  <span>Cruzamos com dados públicos (orçamentos, histórico)</span>
-                </li>
-                <li className="flex gap-2">
-                  <span className="text-blue-500 font-bold">4.</span>
-                  <span>Receba probabilidade de cumprimento</span>
-                </li>
-              </ul>
+              <div className="p-1 bg-gradient-to-r from-blue-600 to-indigo-500" />
+              <div className="p-8">
+                <AnalysisForm onSubmit={handleSubmit} isLoading={isLoading} />
+              </div>
             </div>
-
-            {/* Features Card */}
-            <div className={`rounded-lg shadow p-6 ${
-              theme === 'dark'
-                ? 'bg-gray-800'
-                : 'bg-white'
-            }`}>
-              <h3 className={`text-lg font-semibold mb-4 ${
-                theme === 'dark' ? 'text-white' : 'text-slate-900'
-              }`}>
-                Recursos
-              </h3>
-              <ul className={`space-y-2 text-sm ${
-                theme === 'dark' ? 'text-gray-300' : 'text-slate-600'
-              }`}>
-                <li>✓ Análise de 6 categorias</li>
-                <li>✓ Integração com dados públicos</li>
-                <li>✓ Histórico de análises</li>
-                <li>✓ Exportação de resultados</li>
-                <li>✓ Metodologia transparente</li>
-                <li>✓ Conformidade LGPD</li>
-              </ul>
-            </div>
-
-            {/* Legal Disclaimer */}
-            <LegalDisclaimer />
-          </aside>
+          </div>
         </div>
-      </main>
+        
+        {/* Background Decorative Elements */}
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-full -z-0 pointer-events-none opacity-20">
+          <div className="absolute top-1/4 left-1/4 w-64 h-64 bg-blue-400 rounded-full blur-[120px]" />
+          <div className="absolute bottom-1/4 right-1/4 w-64 h-64 bg-indigo-400 rounded-full blur-[120px]" />
+        </div>
+      </div>
+
+      {/* Features Grid */}
+      <section className={`py-24 border-t ${
+        theme === 'dark' ? 'bg-slate-900/50 border-slate-800' : 'bg-slate-50 border-slate-200'
+      }`}>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
+            <div className="flex flex-col items-center text-center">
+              <div className="w-14 h-14 bg-blue-100 dark:bg-blue-900/30 text-blue-600 rounded-2xl flex items-center justify-center mb-6">
+                <Cpu size={28} />
+              </div>
+              <h3 className="text-xl font-bold mb-3">IA Especializada</h3>
+              <p className="text-slate-500 dark:text-slate-400">
+                Extração automática de promessas usando modelos de linguagem treinados em contextos políticos brasileiros.
+              </p>
+            </div>
+            
+            <div className="flex flex-col items-center text-center">
+              <div className="w-14 h-14 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 rounded-2xl flex items-center justify-center mb-6">
+                <Database size={28} />
+              </div>
+              <h3 className="text-xl font-bold mb-3">Dados Governamentais</h3>
+              <p className="text-slate-500 dark:text-slate-400">
+                Cruzamento direto com APIs oficiais do Tesouro Nacional e TSE para validar viabilidade orçamentária e histórica.
+              </p>
+            </div>
+            
+            <div className="flex flex-col items-center text-center">
+              <div className="w-14 h-14 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 rounded-2xl flex items-center justify-center mb-6">
+                <ShieldCheck size={28} />
+              </div>
+              <h3 className="text-xl font-bold mb-3">Auditabilidade</h3>
+              <p className="text-slate-500 dark:text-slate-400">
+                Metodologia aberta e resultados fundamentados em evidências, permitindo que qualquer cidadão audite a análise.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
 
       {/* Footer */}
-      <footer className={`mt-16 py-8 border-t ${
-        theme === 'dark'
-          ? 'bg-gray-800 border-gray-700'
-          : 'bg-white border-slate-200'
+      <footer className={`py-12 border-t ${
+        theme === 'dark' ? 'bg-slate-950 border-slate-800' : 'bg-white border-slate-200'
       }`}>
-        <div className="max-w-6xl mx-auto px-4 text-center">
-          <p className={`text-sm ${
-            theme === 'dark' ? 'text-gray-400' : 'text-slate-600'
-          }`}>
-            © 2026 Detector de Promessa Vazia. Análise independente e transparente.
-          </p>
-          <div className="mt-4 flex justify-center gap-6">
-            <a href="/privacy" className={`text-sm hover:underline ${
-              theme === 'dark' ? 'text-gray-400 hover:text-gray-300' : 'text-slate-600 hover:text-slate-900'
-            }`}>
-              Privacidade
-            </a>
-            <a href="/terms" className={`text-sm hover:underline ${
-              theme === 'dark' ? 'text-gray-400 hover:text-gray-300' : 'text-slate-600 hover:text-slate-900'
-            }`}>
-              Termos
-            </a>
-            <a href="/contact" className={`text-sm hover:underline ${
-              theme === 'dark' ? 'text-gray-400 hover:text-gray-300' : 'text-slate-600 hover:text-slate-900'
-            }`}>
-              Contato
-            </a>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex flex-col md:flex-row justify-between items-center gap-8">
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-6 bg-slate-400 rounded flex items-center justify-center">
+                <ShieldCheck className="text-white" size={14} />
+              </div>
+              <span className="font-bold text-slate-500">Detector de Promessa Vazia</span>
+            </div>
+            
+            <div className="flex gap-8 text-sm text-slate-500">
+              <a href="/privacy" className="hover:text-blue-600 transition-colors">Privacidade</a>
+              <a href="/terms" className="hover:text-blue-600 transition-colors">Termos</a>
+              <a href="/methodology" className="hover:text-blue-600 transition-colors">Metodologia</a>
+            </div>
+            
+            <p className="text-sm text-slate-400">
+              © 2026 — Dados extraídos de fontes públicas oficiais.
+            </p>
           </div>
         </div>
       </footer>

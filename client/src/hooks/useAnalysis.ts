@@ -40,10 +40,15 @@ export function useAnalysis(options?: UseAnalysisOptions) {
           throw new Error('Erro ao submeter análise');
         }
 
-        const result: AnalysisResult = await response.json();
-        setData(result);
-        options?.onSuccess?.(result);
-        return result;
+        const result = await response.json();
+        const normalized = {
+          ...result,
+          probabilityScore: result.probability_score || result.probabilityScore || 0,
+          createdAt: result.created_at || result.createdAt
+        };
+        setData(normalized);
+        options?.onSuccess?.(normalized);
+        return normalized;
       } catch (err) {
         const error = err instanceof Error ? err : new Error('Erro desconhecido');
         setError(error);
@@ -69,10 +74,15 @@ export function useAnalysis(options?: UseAnalysisOptions) {
           throw new Error('Análise não encontrada');
         }
 
-        const result: AnalysisResult = await response.json();
-        setData(result);
-        options?.onSuccess?.(result);
-        return result;
+        const result = await response.json();
+        const normalized = {
+          ...result,
+          probabilityScore: result.probability_score || result.probabilityScore || 0,
+          createdAt: result.created_at || result.createdAt
+        };
+        setData(normalized);
+        options?.onSuccess?.(normalized);
+        return normalized;
       } catch (err) {
         const error = err instanceof Error ? err : new Error('Erro desconhecido');
         setError(error);

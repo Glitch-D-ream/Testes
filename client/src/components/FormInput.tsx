@@ -8,45 +8,45 @@ interface FormInputProps extends InputHTMLAttributes<HTMLInputElement> {
 }
 
 export const FormInput = forwardRef<HTMLInputElement, FormInputProps>(
-  ({ label, error, helperText, icon, className, ...props }, ref) => {
+  ({ label, error, helperText, icon, className = '', ...props }, ref) => {
     return (
-      <div className="w-full">
+      <div className="w-full space-y-2">
         {label && (
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+          <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 ml-1">
             {label}
-            {props.required && <span className="text-red-500 ml-1">*</span>}
+            {props.required && <span className="text-rose-500 ml-1">*</span>}
           </label>
         )}
-        <div className="relative">
+        <div className="relative group">
           {icon && (
-            <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">
+            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-500 transition-colors">
               {icon}
             </div>
           )}
           <input
             ref={ref}
             className={`
-              w-full px-4 py-2 rounded-lg border-2 transition-colors
+              w-full px-4 py-2.5 rounded-xl border-2 transition-all outline-none
               ${icon ? 'pl-10' : ''}
               ${error 
-                ? 'border-red-500 focus:border-red-600 focus:ring-red-200' 
-                : 'border-gray-300 focus:border-blue-500 focus:ring-blue-200'
+                ? 'border-rose-500 focus:ring-rose-500/10' 
+                : 'border-slate-200 dark:border-slate-800 focus:border-blue-500 focus:ring-blue-500/10'
               }
-              focus:outline-none focus:ring-4
-              dark:bg-gray-800 dark:border-gray-600 dark:text-white
-              disabled:bg-gray-100 disabled:cursor-not-allowed
+              dark:bg-slate-900 dark:text-white
+              disabled:bg-slate-100 disabled:cursor-not-allowed
+              focus:ring-4
               ${className}
             `}
             {...props}
           />
         </div>
         {error && (
-          <p className="mt-1 text-sm text-red-600 dark:text-red-400">
-            ⚠️ {error}
+          <p className="mt-1 text-xs font-bold text-rose-500 ml-1">
+            {error}
           </p>
         )}
         {helperText && !error && (
-          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+          <p className="mt-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 ml-1">
             {helperText}
           </p>
         )}
