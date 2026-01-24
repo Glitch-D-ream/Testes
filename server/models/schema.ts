@@ -91,3 +91,15 @@ export const evidenceStorage = pgTable('evidence_storage', {
   description: text('description'),
   createdAt: timestamp('created_at').defaultNow(),
 });
+
+export const scoutHistory = pgTable('scout_history', {
+  id: text('id').primaryKey(),
+  url: text('url').unique().notNull(),
+  title: text('title'),
+  content: text('content'),
+  source: text('source'),
+  politicianName: text('politician_name'),
+  publishedAt: timestamp('published_at'),
+  analyzed: boolean('analyzed').default(false),
+  createdAt: timestamp('created_at').defaultNow(),
+});

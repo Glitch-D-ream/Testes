@@ -220,3 +220,39 @@ export async function getQuery(sql: string, params: any[] = []): Promise<any> {
 export async function allQuery(sql: string, params: any[] = []): Promise<any[]> {
   return [];
 }
+
+// ===== Funções de Scout History =====
+export async function saveScoutHistory(data: {
+  url: string;
+  title: string;
+  content: string;
+  source: string;
+  politicianName: string;
+  publishedAt?: string;
+}) {
+  const id = nanoid();
+  const { error } = await getSupabase()
+    .from('scout_history')
+    .upsert([{
+      id,
+      url: data.url,
+      title: data.title,
+      content: data.content,
+      source: data.source,
+      politician_name: data.politicianName,
+      published_at: data.publishedAt || new Date().toISOString()
+    }], { onConflict: 'url' });
+
+  if (error) logError('[Database] Erro ao salvar histórico do Scout', error as any);
+}
+
+export async function checkUrlExists(url: string): Promise<boolean> {
+  const { data, error } = await getSupabase()
+    .from('scout_history')
+    .select('id')
+    .eq('url', url)
+    .single();
+  
+  if (error && error.code !== 'PGRST116') logError('[Database] Erro ao verificar URL no Scout', error as any);
+  return !!data;
+}
