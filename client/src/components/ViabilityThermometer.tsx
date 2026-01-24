@@ -3,9 +3,15 @@ import { ShieldAlert, ShieldCheck, Info } from 'lucide-react';
 
 interface ViabilityThermometerProps {
   score: number;
+  details?: {
+    budgetImpact: number;
+    legislativeHistory: number;
+    aiConfidence: number;
+    incoherencePenalty?: number;
+  };
 }
 
-export function ViabilityThermometer({ score }: ViabilityThermometerProps) {
+export function ViabilityThermometer({ score, details }: ViabilityThermometerProps) {
   const percentage = Math.round(score * 100);
   
   const getStatus = (s: number) => {
@@ -73,6 +79,31 @@ export function ViabilityThermometer({ score }: ViabilityThermometerProps) {
         <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed">
           {status.desc}
         </p>
+
+        {details && (
+          <div className="pt-4 border-t border-slate-100 dark:border-slate-800">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-[10px] font-bold text-slate-400 uppercase">Saúde Orçamentária</p>
+                <div className="flex items-center gap-2">
+                  <div className="h-1.5 flex-1 bg-slate-100 rounded-full overflow-hidden">
+                    <div className="h-full bg-emerald-500" style={{ width: `${details.budgetImpact * 100}%` }} />
+                  </div>
+                  <span className="text-xs font-bold text-slate-700">{(details.budgetImpact * 100).toFixed(0)}%</span>
+                </div>
+              </div>
+              <div>
+                <p className="text-[10px] font-bold text-slate-400 uppercase">Apoio Legislativo</p>
+                <div className="flex items-center gap-2">
+                  <div className="h-1.5 flex-1 bg-slate-100 rounded-full overflow-hidden">
+                    <div className="h-full bg-blue-500" style={{ width: `${details.legislativeHistory * 100}%` }} />
+                  </div>
+                  <span className="text-xs font-bold text-slate-700">{(details.legislativeHistory * 100).toFixed(0)}%</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
       
       <div className={`px-6 py-3 border-t border-slate-100 dark:border-slate-800 ${status.lightBg}`}>

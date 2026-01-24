@@ -144,7 +144,10 @@ export function AnalysisResults() {
                 <p className="text-2xl font-bold text-green-600">{averageConfidence.toFixed(1)}%</p>
               </div>
             </div>
-            <ViabilityThermometer score={data.probabilityScore || 0} />
+            <ViabilityThermometer 
+              score={data.probabilityScore || 0} 
+              details={data.probability_score_details}
+            />
           </div>
 
           {/* Texto Original */}

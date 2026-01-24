@@ -20,6 +20,11 @@ export class ScoutAgent {
     'camara.leg.br', 'senado.leg.br', 'planalto.gov.br'
   ];
 
+  private readonly blacklistKeywords = [
+    'bbb', 'festa', 'namoro', 'casamento', 'look', 'fofoca', 'celebridade',
+    'horóscopo', 'novela', 'futebol', 'gol', 'campeonato', 'venda', 'oferta'
+  ];
+
   async search(query: string): Promise<RawSource[]> {
     logInfo(`[Scout] Iniciando varredura multicanal para: ${query}`);
     
@@ -72,6 +77,13 @@ export class ScoutAgent {
     }
   }
 
+  private sanitizeText(text: string): string {
+    return text
+      .replace(/<[^>]*>/g, '') // Remover HTML
+      .replace(/\s+/g, ' ')    // Normalizar espaços
+      .trim();
+  }
+
   private async fetchFromWeb(query: string): Promise<RawSource[]> {
     const prompt = `Liste 5 notícias reais e recentes do político brasileiro "${query}" com promessas ou declarações. Priorize fontes oficiais (.gov.br, .leg.br) e grandes portais. Retorne APENAS um array JSON: [{"title": "...", "url": "...", "content": "...", "source": "...", "date": "..."}]`;
 
@@ -100,20 +112,34 @@ export class ScoutAgent {
         
         const results = Array.isArray(content) ? content : (content.news || content.results || content.noticias || []);
         
+        // Filtro de Ruído e Sanitização
+        const filteredResults = (results as any[]).filter(item => {
+          const title = (item.title || item.titulo || '').toLowerCase();
+          const contentText = (item.content || item.snippet || item.resumo || '').toLowerCase();
+          
+          // 1. Verificar palavras proibidas
+          const hasBlacklist = this.blacklistKeywords.some(word => 
+            title.includes(word) || contentText.includes(word)
+          );
+          if (hasBlacklist) return false;
+
+          // 2. Verificar tamanho mínimo (evitar snippets inúteis)
+          if (contentText.length < 50) return false;
+
+          return true;
+        });
+
         // Validação de Links Ativos (Prova de Vida)
         const validatedResults = [];
-        for (const item of results) {
+        for (const item of filteredResults) {
           const itemUrl = item.url || item.link;
           if (!itemUrl) continue;
 
           try {
             logInfo(`[Scout] Validando link: ${itemUrl}`);
-            // Usamos um timeout curto para não travar a análise
             await axios.head(itemUrl, { timeout: 5000, headers: { 'User-Agent': 'Mozilla/5.0' } });
             validatedResults.push(item);
           } catch (linkError) {
-            logError(`[Scout] Link inválido ou inacessível: ${itemUrl}`);
-            // Se for erro de método não permitido (405), ainda podemos considerar o link como existente
             if ((linkError as any).response?.status === 405) {
               validatedResults.push(item);
             }
@@ -123,7 +149,7 @@ export class ScoutAgent {
         return validatedResults.map(item => ({
           title: item.title || item.titulo,
           url: item.url || item.link,
-          content: item.content || item.snippet || item.resumo || '',
+          content: this.sanitizeText(item.content || item.snippet || item.resumo || ''),
           source: item.source || item.fonte || 'Web Search',
           publishedAt: item.date || item.data,
           type: 'news',
@@ -162,7 +188,7 @@ export class ScoutAgent {
             results.push({
               title: item.title,
               url: item.link,
-              content: item.description || item.content || '',
+              content: this.sanitizeText(item.description || item.content || ''),
               source: feed.name,
               publishedAt: item.pubDate,
               type: 'news',

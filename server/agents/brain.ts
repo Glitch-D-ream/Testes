@@ -47,6 +47,11 @@ ${historyContext}
 **Status de Viabilidade:** ${budgetViability.viable ? '✅ VIÁVEL' : '⚠️ DESAFIADOR'}
 **Nível de Confiança dos Dados:** ${Math.round(budgetViability.confidence * 100)}%
 
+## ⚠️ Riscos de Descumprimento (Análise de Cenários)
+*   **Risco Orçamentário:** A dependência de repasses federais ou excesso de gastos obrigatórios pode inviabilizar novos investimentos nesta área.
+*   **Risco Político:** A falta de maioria legislativa ou oposição direta a projetos similares no passado aumenta a dificuldade de execução.
+*   **Risco de Execução:** Promessas sem cronograma claro ou fontes de custeio definidas tendem a ser meramente protocolares.
+
 ## 🔍 Evidências Coletadas e Auditadas
 Abaixo, os registros brutos que fundamentam esta análise, extraídos de fontes públicas e verificadas:
 
