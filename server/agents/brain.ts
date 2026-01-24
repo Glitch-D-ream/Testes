@@ -13,10 +13,13 @@ export class BrainAgent {
     logInfo(`[Brain] Iniciando processamento cognitivo para: ${politicianName}`);
     
     try {
-      // 1. Consolidar conhecimento filtrado
+      // 1. Consolidar conhecimento filtrado com formatação profissional
       const knowledgeBase = sources
-        .map(s => `[Fonte: ${s.source}] Justificativa: ${s.justification}\nConteúdo: ${s.content}`)
-        .join('\n\n');
+        .map(s => {
+          const title = s.title || 'Declaração Identificada';
+          return `### ${title}\n**Fonte:** ${s.source}\n**Contexto:** ${s.justification}\n\n> ${s.content}`;
+        })
+        .join('\n\n---\n\n');
 
       // 2. Buscar Histórico do Político no Banco (Aprendizado)
       const history = await this.getPoliticianHistory(politicianName);
@@ -50,12 +53,16 @@ export class BrainAgent {
       const { analysisService } = await import('../services/analysis.service.js');
       
       const fullContext = `
-        POLÍTICO: ${politicianName}
-        ${historyContext}
-        ${budgetContext}
-        
-        DADOS COLETADOS DAS FONTES:
-        ${knowledgeBase}
+# Relatório de Inteligência: ${politicianName}
+
+## 📊 Panorama Geral
+${historyContext}
+
+## 💰 Viabilidade Financeira
+${budgetContext}
+
+## 🔍 Evidências e Fontes Coletadas
+${knowledgeBase}
       `;
       
       let analysis;

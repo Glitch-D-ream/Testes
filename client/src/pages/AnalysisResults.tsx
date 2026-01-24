@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { Download, Share2, Image as ImageIcon } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
 import TopicCard from '../components/TopicCard';
 import { ViabilityThermometer } from '../components/ViabilityThermometer';
 import { useAnalysis } from '../hooks/useAnalysis';
@@ -149,9 +150,9 @@ export function AnalysisResults() {
           {/* Texto Original */}
           <div className="mt-8 pt-8 border-t border-gray-200">
             <h3 className="text-lg font-semibold text-gray-900 mb-3">Texto Analisado</h3>
-            <p className="text-gray-700 leading-relaxed bg-gray-50 p-4 rounded-lg">
-              {data.text}
-            </p>
+            <div className="prose prose-slate max-w-none text-gray-700 leading-relaxed bg-gray-50 p-6 rounded-lg border border-gray-100">
+              <ReactMarkdown>{data.text}</ReactMarkdown>
+            </div>
           </div>
         </div>
 
