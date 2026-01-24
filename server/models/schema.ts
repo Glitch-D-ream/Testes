@@ -39,6 +39,8 @@ export const analyses = pgTable('analyses', {
   dataSources: jsonb('data_sources'),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
+  status: varchar('status', { length: 20 }).default('completed'), // 'pending', 'processing', 'completed', 'failed'
+  errorMessage: text('error_message'),
 });
 
 export const promises = pgTable('promises', {

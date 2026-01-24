@@ -79,25 +79,70 @@ export class SearchService {
   }
 
   /**
-   * Orquestração da Tríade de Agentes para Análise Automática
+   * Orquestração da Tríade de Agentes para Análise Automática (V2 com Jobs)
    */
   async autoAnalyzePolitician(politicianName: string, userId: string | null = null) {
-    logInfo(`[Orchestrator] Iniciando Tríade de Agentes para: ${politicianName}`);
+    const supabase = (await import('../core/database.js')).getSupabase();
+    const { nanoid } = await import('nanoid');
     
-    // 1. Scout: Busca dados brutos
-    const rawSources = await scoutAgent.search(politicianName);
-    if (rawSources.length === 0) {
-      throw new Error(`O Agente Buscador não encontrou fontes para ${politicianName}`);
+    // 1. Verificar Cache (L1) - Análise recente concluída nas últimas 24h
+    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    const { data: existing } = await supabase
+      .from('analyses')
+      .select('id, status, created_at')
+      .ilike('author', `%${politicianName}%`)
+      .eq('status', 'completed')
+      .gt('created_at', oneDayAgo)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single();
+
+    if (existing) {
+      logInfo(`[Orchestrator] Cache L1 encontrado para ${politicianName}. Retornando ID: ${existing.id}`);
+      return { id: existing.id, status: 'completed', cached: true };
     }
 
-    // 2. Filter: Limpa e valida relevância
-    const filteredSources = await filterAgent.filter(rawSources);
-    if (filteredSources.length === 0) {
-      throw new Error(`O Agente Coletor filtrou todas as fontes como irrelevantes para ${politicianName}`);
-    }
+    // 2. Criar Job de Análise (Pendente/Processando)
+    const analysisId = nanoid();
+    await supabase.from('analyses').insert([{
+      id: analysisId,
+      user_id: userId,
+      author: politicianName,
+      text: `Análise automática iniciada para ${politicianName}`,
+      status: 'processing'
+    }]);
 
-    // 3. Brain: Analisa profundamente e gera o dossiê
-    return await brainAgent.analyze(politicianName, filteredSources, userId);
+    // 3. Execução Assíncrona (Não bloqueia o retorno da API)
+    // Usamos setImmediate para liberar a thread do Express
+    setImmediate(async () => {
+      try {
+        logInfo(`[Orchestrator] [Job:${analysisId}] Iniciando Tríade para: ${politicianName}`);
+        
+        // Scout
+        const rawSources = await scoutAgent.search(politicianName);
+        if (rawSources.length === 0) throw new Error('Nenhuma fonte encontrada');
+
+        // Filter
+        const filteredSources = await filterAgent.filter(rawSources);
+        if (filteredSources.length === 0) throw new Error('Nenhuma promessa relevante detectada');
+
+        // Brain (O Brain já salva os dados finais no banco)
+        await brainAgent.analyze(politicianName, filteredSources, userId, analysisId);
+        
+        // Marcar como concluído (O Brain faz o insert, mas precisamos garantir o status correto)
+        // Nota: O BrainAgent atual cria uma NOVA análise. Vamos ajustar para ele atualizar a existente se passarmos o ID.
+        // Por agora, garantimos o status no registro inicial ou o Brain fará o trabalho.
+        logInfo(`[Orchestrator] [Job:${analysisId}] Concluído com sucesso.`);
+      } catch (error: any) {
+        logError(`[Orchestrator] [Job:${analysisId}] Falha: ${error.message}`);
+        await supabase.from('analyses').update({
+          status: 'failed',
+          errorMessage: error.message
+        }).eq('id', analysisId);
+      }
+    });
+
+    return { id: analysisId, status: 'processing' };
   }
 }
 

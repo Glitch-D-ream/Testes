@@ -16,4 +16,10 @@ router.get('/', searchController.searchPoliticians);
  */
 router.post('/auto-analyze', optionalAuthMiddleware, searchController.autoAnalyze);
 
+/**
+ * GET /api/search/status/:id
+ * Verifica o status de uma análise automática
+ */
+router.get('/status/:id', searchController.checkStatus);
+
 export default router;

@@ -7,7 +7,7 @@ export class BrainAgent {
   /**
    * O Cérebro Central 2.0: Integração automática com dados orçamentários reais
    */
-  async analyze(politicianName: string, sources: FilteredSource[], userId: string | null = null) {
+  async analyze(politicianName: string, sources: FilteredSource[], userId: string | null = null, existingAnalysisId: string | null = null) {
     logInfo(`[Brain] Iniciando processamento cognitivo para: ${politicianName}`);
     
     try {
@@ -56,13 +56,14 @@ export class BrainAgent {
         ${knowledgeBase}
       `;
       
-      // Criar a análise final usando o serviço central
-      const analysis = await analysisService.createAnalysis(
-        userId,
-        fullContext,
-        politicianName,
-        mainCategory
-      );
+      let analysis;
+      if (existingAnalysisId) {
+        // Se já temos um ID (fluxo de Job), atualizamos a análise existente
+        analysis = await this.updateExistingAnalysis(existingAnalysisId, fullContext, politicianName, mainCategory);
+      } else {
+        // Fluxo legado ou direto
+        analysis = await analysisService.createAnalysis(userId, fullContext, politicianName, mainCategory);
+      }
 
       // 5. Ajuste Dinâmico do Score (Opcional: O Brain pode ajustar o score da IA baseado no SICONFI)
       if (!budgetViability.viable && analysis.probabilityScore > 0.5) {
@@ -93,13 +94,65 @@ export class BrainAgent {
     return 'Geral';
   }
 
+  private async updateExistingAnalysis(id: string, text: string, author: string, category: string) {
+    const { aiService } = await import('../services/ai.service.js');
+    const { calculateProbability } = await import('../modules/probability.js');
+    const { nanoid } = await import('nanoid');
+    const supabase = getSupabase();
+
+    const aiAnalysis = await aiService.analyzeText(text);
+    const promises = aiAnalysis.promises.map(p => ({
+      text: p.text,
+      confidence: p.confidence,
+      category: p.category,
+      negated: p.negated,
+      conditional: p.conditional,
+      reasoning: p.reasoning
+    }));
+
+    const probabilityScore = await calculateProbability(promises, author, category);
+
+    // Atualizar a análise existente
+    const { error } = await supabase
+      .from('analyses')
+      .update({
+        text,
+        category,
+        extracted_promises: promises,
+        probability_score: probabilityScore,
+        status: 'completed',
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', id);
+
+    if (error) throw error;
+
+    // Salvar promessas individuais
+    if (promises.length > 0) {
+      const promisesToInsert = promises.map(p => ({
+        id: nanoid(),
+        analysis_id: id,
+        promise_text: p.text,
+        category: p.category,
+        confidence_score: p.confidence,
+        extracted_entities: (p as any).entities || {},
+        negated: p.negated || false,
+        conditional: p.conditional || false
+      }));
+      await supabase.from('promises').insert(promisesToInsert);
+    }
+
+    return { id, probabilityScore, promises };
+  }
+
   private async getPoliticianHistory(name: string) {
     try {
       const supabase = getSupabase();
       const { data, error } = await supabase
         .from('analyses')
         .select('probability_score')
-        .ilike('author', `%${name}%`);
+        .ilike('author', `%${name}%`)
+        .eq('status', 'completed');
 
       if (error || !data || data.length === 0) return null;
 

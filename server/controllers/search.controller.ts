@@ -13,8 +13,9 @@ export class SearchController {
       // Buscar análises que mencionam o político ou o termo
       const { data: analyses, error } = await supabase
         .from('analyses')
-        .select('author, probability_score')
-        .or(`author.ilike.%${query}%,text.ilike.%${query}%`);
+        .select('author, probability_score, id, status')
+        .or(`author.ilike.%${query}%,text.ilike.%${query}%`)
+        .eq('status', 'completed'); // Apenas as concluídas na busca global
 
       if (error) throw error;
 
@@ -28,7 +29,7 @@ export class SearchController {
             name: a.author,
             analysesCount: 0,
             totalScore: 0,
-            party: 'N/A', // Em produção, cruzar com dados do TSE
+            party: 'N/A', 
             state: 'N/A',
             id: a.author.toLowerCase().replace(/\s+/g, '-')
           });
@@ -51,7 +52,7 @@ export class SearchController {
   }
 
   /**
-   * Realiza busca na web e análise automática
+   * Realiza busca na web e análise automática (Job Based)
    */
   async autoAnalyze(req: Request, res: Response) {
     try {
@@ -65,13 +66,37 @@ export class SearchController {
       
       const result = await searchService.autoAnalyzePolitician(name, userId);
       
-      return res.status(201).json(result);
+      return res.status(202).json(result); // 202 Accepted
     } catch (error) {
       logError('Erro na análise automática', error as Error);
       return res.status(500).json({ 
         error: 'Erro ao realizar análise automática',
         message: (error as Error).message 
       });
+    }
+  }
+
+  /**
+   * Verifica o status de uma análise em andamento
+   */
+  async checkStatus(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const supabase = getSupabase();
+
+      const { data, error } = await supabase
+        .from('analyses')
+        .select('id, status, error_message, probability_score')
+        .eq('id', id)
+        .single();
+
+      if (error) throw error;
+      if (!data) return res.status(404).json({ error: 'Análise não encontrada' });
+
+      return res.json(data);
+    } catch (error) {
+      logError('Erro ao verificar status da análise', error as Error);
+      return res.status(500).json({ error: 'Erro ao verificar status' });
     }
   }
 }
