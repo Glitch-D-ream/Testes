@@ -9,31 +9,42 @@ export interface RawSource {
   source: string;
   publishedAt?: string;
   type: 'news' | 'social' | 'official';
+  confidence: 'high' | 'medium' | 'low';
 }
 
 export class ScoutAgent {
-  /**
-   * Busca notícias e falas usando múltiplas fontes
-   */
+  // Whitelist de domínios confiáveis para evitar Fake News
+  private readonly whitelist = [
+    'g1.globo.com', 'folha.uol.com.br', 'estadao.com.br', 'cnnbrasil.com.br',
+    'valor.globo.com', 'bbc.com', 'elpais.com', 'uol.com.br', 'r7.com',
+    'metropoles.com', 'poder360.com.br', 'agenciabrasil.ebc.com.br',
+    'camara.leg.br', 'senado.leg.br', 'planalto.gov.br'
+  ];
+
   async search(query: string): Promise<RawSource[]> {
     logInfo(`[Scout] Iniciando varredura multicanal para: ${query}`);
     
     const sources: RawSource[] = [];
     
     try {
-      // Canal 1: RSS Feeds de Notícias (Gratuito e em Tempo Real)
+      // 1. RSS Feeds (Alta Confiança)
       const rssResults = await this.fetchFromRSS(query);
       sources.push(...rssResults);
 
-      // Canal 2: Busca Web Inteligente (Pollinations/OpenAI) - Apenas se necessário
-      if (sources.length < 3) {
+      // 2. Busca Web (Pollinations) - Apenas se necessário
+      if (sources.length < 5) {
         const webResults = await this.fetchFromWeb(query);
         sources.push(...webResults);
       }
       
-      // Filtrar URLs já conhecidas e salvar novas no banco (Persistência)
       const newSources: RawSource[] = [];
       for (const source of sources) {
+        // Validação de URL e Whitelist
+        if (!this.isValidUrl(source.url)) continue;
+        
+        const isTrusted = this.whitelist.some(domain => source.url.includes(domain));
+        source.confidence = isTrusted ? 'high' : 'medium';
+
         const exists = await checkUrlExists(source.url);
         if (!exists) {
           await saveScoutHistory({
@@ -48,7 +59,7 @@ export class ScoutAgent {
         }
       }
       
-      logInfo(`[Scout] Varredura concluída. ${newSources.length} novas fontes encontradas.`);
+      logInfo(`[Scout] Varredura concluída. ${newSources.length} novas fontes validadas.`);
       return newSources;
     } catch (error) {
       logError(`[Scout] Erro na varredura de ${query}`, error as Error);
@@ -56,14 +67,24 @@ export class ScoutAgent {
     }
   }
 
+  private isValidUrl(url: string): boolean {
+    try {
+      const parsed = new URL(url);
+      return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+    } catch {
+      return false;
+    }
+  }
+
   private async fetchFromWeb(query: string): Promise<RawSource[]> {
-    const prompt = `Liste as 5 notícias ou falas mais recentes e importantes do político "${query}" sobre promessas, obras ou planos. 
-    Retorne um array JSON: [{"title": "string", "url": "string", "content": "string", "source": "string", "date": "string"}]`;
+    const prompt = `Aja como um buscador de notícias. Liste as 5 notícias ou falas reais mais recentes do político "${query}" sobre promessas ou planos. 
+    Retorne apenas um array JSON: [{"title": "string", "url": "string", "content": "string", "source": "string", "date": "string"}]
+    Dê preferência a links de grandes portais como G1, Folha, Estadão.`;
 
     try {
       const response = await axios.post('https://text.pollinations.ai/', {
         messages: [
-          { role: 'system', content: 'Você é um buscador de notícias políticas. Retorne apenas JSON.' },
+          { role: 'system', content: 'Você é um buscador de notícias políticas brasileiras. Responda apenas JSON.' },
           { role: 'user', content: prompt }
         ],
         model: 'openai',
@@ -78,10 +99,11 @@ export class ScoutAgent {
       return (data as any[]).map(item => ({
         title: item.title,
         url: item.url,
-        content: item.content || item.snippet,
-        source: item.source,
+        content: item.content || item.snippet || '',
+        source: item.source || 'Web Search',
         publishedAt: item.date,
-        type: 'news'
+        type: 'news',
+        confidence: 'medium'
       }));
     } catch (error) {
       logError('[Scout] Falha ao buscar na Web', error as Error);
@@ -89,17 +111,11 @@ export class ScoutAgent {
     }
   }
 
-  /**
-   * Busca em RSS Feeds públicos de grandes portais brasileiros
-   */
   private async fetchFromRSS(query: string): Promise<RawSource[]> {
-    logInfo(`[Scout] Verificando RSS Feeds para ${query}...`);
-    
-    // Feeds populares no Brasil que aceitam busca ou são gerais
     const feeds = [
       { name: 'G1 Política', url: 'https://g1.globo.com/rss/g1/politica/' },
       { name: 'Folha Poder', url: 'https://feeds.folha.uol.com.br/poder/rss091.xml' },
-      { name: 'Estadão Política', url: 'https://politica.estadao.com.br/rss/' }
+      { name: 'R7 Brasília', url: 'https://noticias.r7.com/brasilia/feed.xml' }
     ];
 
     const results: RawSource[] = [];
@@ -107,24 +123,23 @@ export class ScoutAgent {
 
     for (const feed of feeds) {
       try {
-        // Usando um serviço gratuito de conversão de RSS para JSON para facilitar o parsing sem dependências pesadas
-        // Alternativamente, poderíamos usar 'rss-parser' se instalado.
         const response = await axios.get(`https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(feed.url)}`, { timeout: 10000 });
         
-        if (response.data && response.data.items) {
+        if (response.data?.items) {
           const matchedItems = response.data.items.filter((item: any) => 
             item.title.toLowerCase().includes(queryLower) || 
-            item.description.toLowerCase().includes(queryLower)
+            (item.description && item.description.toLowerCase().includes(queryLower))
           );
 
           for (const item of matchedItems) {
             results.push({
               title: item.title,
               url: item.link,
-              content: item.description || item.content,
+              content: item.description || item.content || '',
               source: feed.name,
               publishedAt: item.pubDate,
-              type: 'news'
+              type: 'news',
+              confidence: 'high'
             });
           }
         }
