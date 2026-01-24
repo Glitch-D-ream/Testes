@@ -50,9 +50,9 @@ export const FormTextarea = forwardRef<HTMLTextAreaElement, FormTextareaProps>(
     };
 
     const variantClasses = {
-      default: 'border border-border rounded-md bg-background',
-      filled: 'bg-muted border-b-2 border-muted rounded-t-md',
-      outlined: 'border-2 border-border rounded-lg',
+      default: 'border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800',
+      filled: 'bg-gray-100 dark:bg-gray-700 border-b-2 border-gray-300 rounded-t-md',
+      outlined: 'border-2 border-gray-300 dark:border-gray-600 rounded-lg',
     };
 
     return (
@@ -65,10 +65,10 @@ export const FormTextarea = forwardRef<HTMLTextAreaElement, FormTextareaProps>(
         {label && (
           <label
             htmlFor={textareaId}
-            className="block text-sm font-medium text-foreground mb-2"
+            className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
           >
             {label}
-            {required && <span className="text-destructive ml-1">*</span>}
+            {required && <span className="text-red-500 ml-1">*</span>}
           </label>
         )}
 
@@ -91,11 +91,11 @@ export const FormTextarea = forwardRef<HTMLTextAreaElement, FormTextareaProps>(
             maxLength={maxLength}
             className={`
               w-full transition-all duration-200 resize-vertical
-              focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2
-              disabled:opacity-50 disabled:cursor-not-allowed
+              focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2
+              disabled:opacity-50 disabled:cursor-not-allowed dark:text-white
               ${sizeClasses[size]}
               ${variantClasses[variant]}
-              ${hasError ? 'border-destructive focus:ring-destructive' : ''}
+              ${hasError ? 'border-red-500 focus:ring-red-500' : ''}
               ${loading ? 'opacity-50' : ''}
               ${className || ''}
             `}
