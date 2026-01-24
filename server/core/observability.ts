@@ -1,6 +1,6 @@
 import * as Sentry from '@sentry/node';
 import { register, Counter, Histogram, Gauge } from 'prom-client';
-import logger from './logger';
+import logger from './logger.js';
 
 /**
  * Observability Module
