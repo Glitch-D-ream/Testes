@@ -40,7 +40,12 @@ app.use((req, res, next) => {
 });
 
 // Servir arquivos estáticos do cliente
-const clientBuildPath = path.join(__dirname, '../client/dist');
+// Em produção (dist/index.js), o frontend está em dist/public
+// Em desenvolvimento (server/index.ts), o frontend está em client/dist
+const clientBuildPath = process.env.NODE_ENV === 'production' 
+  ? path.join(__dirname, 'public')
+  : path.join(__dirname, '../client/dist');
+
 app.use(express.static(clientBuildPath));
 
 // Inicializar aplicação

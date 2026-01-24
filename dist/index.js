@@ -45,8 +45,8 @@ var SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE
 var supabase = null;
 async function initializeDatabase() {
   if (!SUPABASE_URL || !SUPABASE_KEY) {
-    logError("[Database] SUPABASE_URL ou SUPABASE_KEY n\xE3o configurados no .env", new Error("Missing credentials"));
-    throw new Error("Supabase credentials missing");
+    logInfo("[Database] SUPABASE_URL ou SUPABASE_KEY n\xE3o configurados. O sistema tentar\xE1 inicializar, mas chamadas ao banco podem falhar.");
+    return;
   }
   try {
     supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
@@ -55,18 +55,18 @@ async function initializeDatabase() {
       }
     });
     logInfo("[Database] Supabase SDK inicializado com sucesso");
-    const { error } = await supabase.from("users").select("id").limit(1);
-    if (error && error.code !== "PGRST116" && !error.message.includes("does not exist")) {
-      throw error;
-    }
-    logInfo("[Database] Conectividade com Supabase validada");
   } catch (err) {
     logError("[Database] Erro ao inicializar Supabase SDK", err);
-    throw err;
   }
 }
 function getSupabase() {
-  if (!supabase) throw new Error("Database not initialized");
+  if (!supabase) {
+    if (SUPABASE_URL && SUPABASE_KEY) {
+      supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+      return supabase;
+    }
+    throw new Error("Database not initialized and credentials missing");
+  }
   return supabase;
 }
 async function getUserById(userId) {
@@ -148,18 +148,6 @@ async function getPublicDataCache(dataType, dataSource) {
   const { data, error } = await getSupabase().from("public_data_cache").select("data_content").eq("data_type", dataType).eq("data_source", dataSource).or(`expiry_date.is.null,expiry_date.gt.${(/* @__PURE__ */ new Date()).toISOString()}`).single();
   if (error && error.code !== "PGRST116") logError("[Database] Erro ao buscar cache", error);
   return data ? data.data_content : null;
-}
-async function runQuery(sql, params = []) {
-  logInfo(`[Database] Executando runQuery (Legado): ${sql.substring(0, 50)}...`);
-  return { id: nanoid(), changes: 0 };
-}
-async function getQuery(sql, params = []) {
-  logInfo(`[Database] Executando getQuery (Legado): ${sql.substring(0, 50)}...`);
-  return null;
-}
-async function allQuery(sql, params = []) {
-  logInfo(`[Database] Executando allQuery (Legado): ${sql.substring(0, 50)}...`);
-  return [];
 }
 
 // server/core/routes.ts
@@ -680,17 +668,8 @@ async function getBudgetData(category, year, sphere = "FEDERAL") {
       timeout: 1e4
     }).catch(() => ({ data: null }));
     if (!response.data || response.data.length === 0) {
-      const mockData = {
-        year,
-        sphere,
-        category,
-        budgeted: 1e9,
-        executed: 85e7,
-        percentage: 85,
-        lastUpdated: /* @__PURE__ */ new Date()
-      };
-      await savePublicDataCache("SICONFI", cacheKey, mockData);
-      return mockData;
+      logger_default.warn(`[SICONFI] Nenhum dado real encontrado para: ${category} (${year})`);
+      return null;
     }
     const data = response.data[0];
     const result = {
@@ -772,20 +751,8 @@ async function getPoliticalHistory(candidateName, state) {
     const cached = await getPublicDataCache("TSE", cacheKey);
     if (cached) return cached;
     logger_default.info(`[TSE] Buscando hist\xF3rico: ${candidateName}`);
-    const mockHistory = {
-      candidateId: "mock-id",
-      candidateName,
-      totalElections: 4,
-      totalElected: 2,
-      electionRate: 50,
-      promisesFulfilled: 15,
-      promisesTotal: 30,
-      fulfillmentRate: 50,
-      controversies: 2,
-      scandals: 0
-    };
-    await savePublicDataCache("TSE", cacheKey, mockHistory);
-    return mockHistory;
+    logger_default.warn(`[TSE] API Real do TSE n\xE3o retornou dados para: ${candidateName}. Buscando fontes alternativas ou retornando nulo.`);
+    return null;
   } catch (error) {
     logger_default.error(`[TSE] Erro ao buscar hist\xF3rico: ${error}`);
     return null;
@@ -835,21 +802,29 @@ async function calculateFactors(promise, author, category) {
   };
 }
 function calculateSpecificity(promise) {
-  let score = 0.3;
-  if (promise.entities?.numbers?.length > 0) score += 0.2;
-  if (promise.text.match(/\b(até|em|durante|próximo|ano|mês|semana|dia)\b/i)) score += 0.2;
-  if (promise.text.length > 100) score += 0.1;
+  let score = 0.2;
+  if (promise.text.match(/\d+/)) score += 0.2;
+  if (promise.text.match(/\b(até|em|durante|próximo|ano|mês|semana|dia|202\d)\b/i)) score += 0.2;
+  if (promise.text.match(/\b(construir|entregar|criar|reduzir|aumentar|reformar|implementar)\b/i)) score += 0.2;
+  if (promise.text.length > 120) score += 0.2;
   return Math.min(score, 1);
 }
 function calculateTimelineFeasibility(promise) {
-  let score = 0.6;
-  const timelineMatch = promise.text.match(/(\d+)\s*(dias?|semanas?|meses?|anos?)/i);
+  let score = 0.5;
+  const text = promise.text.toLowerCase();
+  if (text.match(/\b(hospital|escola|ponte|estrada|rodovia|aeroporto)\b/) && text.match(/\b(meses|dias|1 ano)\b/)) {
+    score -= 0.3;
+  }
+  if (text.match(/\b(4 anos|mandato|até o fim)\b/)) {
+    score += 0.2;
+  }
+  const timelineMatch = text.match(/(\d+)\s*(dias?|semanas?|meses?|anos?)/i);
   if (timelineMatch) {
     const value = parseInt(timelineMatch[1]);
     const unit = timelineMatch[2].toLowerCase();
     let days = unit.includes("dia") ? value : unit.includes("semana") ? value * 7 : unit.includes("m\xEAs") ? value * 30 : value * 365;
-    if (days < 30) score -= 0.2;
-    else if (days > 1825) score -= 0.15;
+    if (days < 30) score -= 0.1;
+    else if (days > 1460) score -= 0.2;
     else score += 0.1;
   }
   return Math.min(Math.max(score, 0), 1);
@@ -1098,8 +1073,102 @@ var analysisService = new AnalysisService();
 // server/services/export.service.ts
 import { jsPDF } from "jspdf";
 import "jspdf-autotable";
+import nodeHtmlToImage from "node-html-to-image";
 var ExportService = class {
   analysisService = new AnalysisService();
+  async generateAnalysisImage(analysisId) {
+    const analysis = await this.analysisService.getAnalysisById(analysisId);
+    if (!analysis) throw new Error("An\xE1lise n\xE3o encontrada");
+    const score = Math.round((analysis.probability_score || 0) * 100);
+    const date = new Date(analysis.created_at).toLocaleDateString("pt-BR");
+    let level = "Moderada";
+    let color = "#f59e0b";
+    if (score >= 80) {
+      level = "Altamente Vi\xE1vel";
+      color = "#10b981";
+    } else if (score >= 60) {
+      level = "Vi\xE1vel";
+      color = "#3b82f6";
+    } else if (score >= 20) {
+      level = "Baixa";
+      color = "#f97316";
+    } else {
+      level = "Muito Baixa";
+      color = "#ef4444";
+    }
+    const html = `
+      <html>
+        <head>
+          <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+          <style>
+            body { width: 1200px; height: 630px; font-family: 'Inter', sans-serif; }
+            .card-bg { background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%); }
+          </style>
+        </head>
+        <body class="flex items-center justify-center p-0 m-0">
+          <div class="card-bg w-full h-full p-12 flex flex-col justify-between text-white relative overflow-hidden">
+            <div class="absolute top-0 right-0 w-64 h-64 bg-white opacity-5 rounded-full -mr-32 -mt-32"></div>
+            
+            <div class="flex justify-between items-start">
+              <div>
+                <h1 class="text-4xl font-bold mb-2">Detector de Promessa Vazia</h1>
+                <p class="text-blue-200 text-xl">An\xE1lise de Viabilidade Pol\xEDtica</p>
+              </div>
+              <div class="bg-white text-blue-900 px-4 py-2 rounded-lg font-bold text-lg">
+                ${date}
+              </div>
+            </div>
+
+            <div class="flex-1 flex items-center gap-12 my-8">
+              <div class="flex-1">
+                <div class="bg-white bg-opacity-10 p-6 rounded-2xl border border-white border-opacity-20">
+                  <p class="text-blue-100 text-sm uppercase tracking-wider mb-2">Pol\xEDtico / Autor</p>
+                  <h2 class="text-3xl font-bold mb-4">${analysis.author || "N\xE3o informado"}</h2>
+                  <p class="text-blue-100 text-sm uppercase tracking-wider mb-2">Texto Analisado</p>
+                  <p class="text-xl italic line-clamp-3">"${analysis.text.substring(0, 180)}${analysis.text.length > 180 ? "..." : ""}"</p>
+                </div>
+              </div>
+
+              <div class="w-80 flex flex-col items-center justify-center bg-white rounded-3xl p-8 shadow-2xl">
+                <p class="text-gray-500 font-bold uppercase text-sm mb-2">Score de Viabilidade</p>
+                <div class="text-7xl font-black mb-2" style="color: ${color}">${score}%</div>
+                <div class="px-6 py-2 rounded-full text-white font-bold text-lg" style="background-color: ${color}">
+                  ${level}
+                </div>
+              </div>
+            </div>
+
+            <div class="flex justify-between items-center border-t border-white border-opacity-10 pt-6">
+              <div class="flex gap-8">
+                <div>
+                  <p class="text-blue-200 text-xs uppercase">Promessas</p>
+                  <p class="text-xl font-bold">${analysis.promises?.length || 0}</p>
+                </div>
+                <div>
+                  <p class="text-blue-200 text-xs uppercase">Categoria</p>
+                  <p class="text-xl font-bold">${analysis.category || "Geral"}</p>
+                </div>
+              </div>
+              <div class="text-right">
+                <p class="text-blue-200 text-sm">Acesse a an\xE1lise completa em:</p>
+                <p class="text-lg font-mono font-bold">detector-promessa-vazia.pages.dev</p>
+              </div>
+            </div>
+          </div>
+        </body>
+      </html>
+    `;
+    const image = await nodeHtmlToImage({
+      html,
+      type: "jpeg",
+      quality: 90,
+      puppeteerArgs: {
+        executablePath: "/usr/bin/chromium-browser",
+        args: ["--no-sandbox", "--disable-setuid-sandbox"]
+      }
+    });
+    return image;
+  }
   async generateAnalysisPDF(analysisId) {
     const analysis = await this.analysisService.getAnalysisById(analysisId);
     if (!analysis) throw new Error("An\xE1lise n\xE3o encontrada");
@@ -1214,6 +1283,18 @@ var AnalysisController = class {
       return res.status(500).json({ error: "Erro ao gerar relat\xF3rio PDF" });
     }
   }
+  async exportImage(req, res) {
+    try {
+      const { id } = req.params;
+      const imageBuffer = await exportService.generateAnalysisImage(id);
+      res.setHeader("Content-Type", "image/jpeg");
+      res.setHeader("Content-Disposition", `inline; filename="analise-${id}.jpg"`);
+      return res.send(imageBuffer);
+    } catch (error) {
+      logError("Erro ao exportar Imagem", error);
+      return res.status(500).json({ error: "Erro ao gerar card de compartilhamento" });
+    }
+  }
 };
 var analysisController = new AnalysisController();
 
@@ -1233,6 +1314,7 @@ var analysisLimiter = rateLimit({
 router2.post("/", optionalAuthMiddleware, analysisLimiter, analysisController.create);
 router2.get("/:id", optionalAuthMiddleware, analysisController.getById);
 router2.get("/:id/pdf", optionalAuthMiddleware, analysisController.exportPDF);
+router2.get("/:id/image", optionalAuthMiddleware, analysisController.exportImage);
 router2.get("/", optionalAuthMiddleware, analysisController.list);
 var analysis_routes_default = router2;
 
@@ -1246,39 +1328,28 @@ var StatisticsController = class {
       const supabase2 = getSupabase();
       const { count: totalAnalyses, error: err1 } = await supabase2.from("analyses").select("*", { count: "exact", head: true });
       const { count: totalPromises, error: err2 } = await supabase2.from("promises").select("*", { count: "exact", head: true });
-      const { data: viabilityData, error: err3 } = await supabase2.from("analyses").select("probability_score");
-      const averageViability = viabilityData && viabilityData.length > 0 ? viabilityData.reduce((acc, curr) => acc + (curr.probability_score || 0), 0) / viabilityData.length : 0;
+      const { data: analysisData, error: err3 } = await supabase2.from("analyses").select("probability_score, author");
+      const averageConfidence = analysisData && analysisData.length > 0 ? analysisData.reduce((acc, curr) => acc + (curr.probability_score || 0), 0) / analysisData.length : 0;
+      const totalAuthors = new Set(analysisData?.map((a) => a.author).filter(Boolean)).size;
       const { data: categoriesData, error: err4 } = await supabase2.from("promises").select("category");
-      const categoriesDistribution = {};
+      const categoriesMap = {};
       categoriesData?.forEach((row) => {
         const cat = row.category || "Geral";
-        categoriesDistribution[cat] = (categoriesDistribution[cat] || 0) + 1;
+        categoriesMap[cat] = (categoriesMap[cat] || 0) + 1;
       });
-      const thirtyDaysAgo = /* @__PURE__ */ new Date();
-      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-      const { data: trendsData, error: err5 } = await supabase2.from("analyses").select("created_at, probability_score").gte("created_at", thirtyDaysAgo.toISOString()).order("created_at", { ascending: true });
-      const trendsMap = /* @__PURE__ */ new Map();
-      trendsData?.forEach((item) => {
-        const date = new Date(item.created_at).toISOString().split("T")[0];
-        if (!trendsMap.has(date)) {
-          trendsMap.set(date, { date, viability: 0, count: 0, sum: 0 });
-        }
-        const entry = trendsMap.get(date);
-        entry.count++;
-        entry.sum += item.probability_score || 0;
-        entry.viability = entry.sum / entry.count * 100;
-      });
-      const trends = Array.from(trendsMap.values());
-      if (err1 || err2 || err3 || err4 || err5) {
-        logError("Erro em uma das queries de estat\xEDsticas", err1 || err2 || err3 || err4 || err5);
+      const byCategory = Object.entries(categoriesMap).map(([category, count]) => ({
+        category,
+        count
+      })).sort((a, b) => b.count - a.count);
+      if (err1 || err2 || err3 || err4) {
+        logError("Erro em uma das queries de estat\xEDsticas", err1 || err2 || err3 || err4);
       }
       return res.json({
         totalAnalyses: totalAnalyses || 0,
         totalPromises: totalPromises || 0,
-        averageViability,
-        categoriesDistribution,
-        viabilityByCategory: {},
-        trends
+        averageConfidence,
+        totalAuthors,
+        byCategory
       });
     } catch (error) {
       logError("Erro ao buscar estat\xEDsticas globais", error);
@@ -1316,16 +1387,8 @@ async function getExpenses(category, startDate, endDate, limit = 100) {
       timeout: 1e4
     }).catch(() => ({ data: null }));
     if (!response.data || !response.data.dados) {
-      const mockData = [{
-        date: /* @__PURE__ */ new Date(),
-        description: `Gasto em ${category}`,
-        value: 5e5,
-        beneficiary: "Empresa Exemplo",
-        category,
-        source: "Tesouro Nacional"
-      }];
-      await savePublicDataCache("PORTAL_TRANSPARENCIA", cacheKey, mockData);
-      return mockData;
+      logger_default.warn(`[Portal Transpar\xEAncia] Falha na API ou dados inexistentes para: ${category}`);
+      return [];
     }
     const result = response.data.dados.map((item) => ({
       date: new Date(item.data),
@@ -1816,143 +1879,49 @@ var ai_test_routes_default = router6;
 // server/routes/search.routes.ts
 import { Router as Router7 } from "express";
 
-// server/services/search.service.ts
-var SearchService = class {
-  /**
-   * Busca políticos por nome, partido ou região
-   */
-  async searchPoliticians(query) {
-    logInfo(`[Search] Buscando pol\xEDticos: "${query}"`);
+// server/controllers/search.controller.ts
+var SearchController = class {
+  async searchPoliticians(req, res) {
     try {
-      const sql = `
-        SELECT id, name, party, office, region, photo_url as photoUrl, bio, credibility_score as credibilityScore
-        FROM politicians
-        WHERE name LIKE ? OR party LIKE ? OR region LIKE ?
-        LIMIT 20
-      `;
-      const searchTerm = `%${query}%`;
-      const results = await allQuery(sql, [searchTerm, searchTerm, searchTerm]);
-      return results || [];
+      const { q } = req.query;
+      const query = q?.toString() || "";
+      const supabase2 = getSupabase();
+      const { data: analyses, error } = await supabase2.from("analyses").select("author, probability_score").or(`author.ilike.%${query}%,text.ilike.%${query}%`);
+      if (error) throw error;
+      const politicianMap = /* @__PURE__ */ new Map();
+      analyses?.forEach((a) => {
+        if (!a.author) return;
+        if (!politicianMap.has(a.author)) {
+          politicianMap.set(a.author, {
+            name: a.author,
+            analysesCount: 0,
+            totalScore: 0,
+            party: "N/A",
+            // Em produção, cruzar com dados do TSE
+            state: "N/A",
+            id: a.author.toLowerCase().replace(/\s+/g, "-")
+          });
+        }
+        const p = politicianMap.get(a.author);
+        p.analysesCount++;
+        p.totalScore += a.probability_score || 0;
+      });
+      const results = Array.from(politicianMap.values()).map((p) => ({
+        ...p,
+        averageScore: Math.round(p.totalScore / p.analysesCount)
+      }));
+      return res.json({ results });
     } catch (error) {
-      console.error("[Search] Erro ao buscar pol\xEDticos:", error);
-      return [];
-    }
-  }
-  /**
-   * Busca promessas por texto ou categoria
-   */
-  async searchPromises(query) {
-    logInfo(`[Search] Buscando promessas: "${query}"`);
-    try {
-      const sql = `
-        SELECT p.id, p.promise_text as text, p.category, p.confidence_score as confidence, 
-               a.author, a.created_at as createdAt
-        FROM promises p
-        JOIN analyses a ON p.analysis_id = a.id
-        WHERE p.promise_text LIKE ? OR p.category LIKE ?
-        LIMIT 20
-      `;
-      const searchTerm = `%${query}%`;
-      const results = await allQuery(sql, [searchTerm, searchTerm]);
-      return results || [];
-    } catch (error) {
-      console.error("[Search] Erro ao buscar promessas:", error);
-      return [];
-    }
-  }
-  /**
-   * Busca global (Políticos + Promessas)
-   */
-  async globalSearch(query) {
-    const [foundPoliticians, foundPromises] = await Promise.all([
-      this.searchPoliticians(query),
-      this.searchPromises(query)
-    ]);
-    return {
-      politicians: foundPoliticians,
-      promises: foundPromises
-    };
-  }
-};
-var searchService = new SearchService();
-
-// server/services/import.service.ts
-import axios3 from "axios";
-import { nanoid as nanoid6 } from "nanoid";
-var ImportService = class {
-  /**
-   * Busca um político na API da Câmara e importa se não existir
-   */
-  async importFromCamara(name) {
-    logInfo(`[Import] Buscando "${name}" na API da C\xE2mara...`);
-    try {
-      const response = await axios3.get(`https://dadosabertos.camara.leg.br/api/v2/deputados?nome=${encodeURIComponent(name)}`);
-      const results = response.data.dados;
-      if (!results || results.length === 0) {
-        return null;
-      }
-      const camaraData = results[0];
-      const existing = await getQuery("SELECT id FROM politicians WHERE tse_id = ?", [camaraData.id.toString()]);
-      if (existing) {
-        logInfo(`[Import] Pol\xEDtico ${camaraData.nome} j\xE1 existe no banco.`);
-        return existing.id;
-      }
-      const id = nanoid6();
-      await runQuery(
-        "INSERT INTO politicians (id, name, party, office, region, tse_id, photo_url, bio, credibility_score) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        [
-          id,
-          camaraData.nome,
-          camaraData.siglaPartido,
-          "Deputado Federal",
-          camaraData.siglaUf,
-          camaraData.id.toString(),
-          camaraData.urlFoto,
-          `Deputado Federal em exerc\xEDcio (Legislatura ${camaraData.idLegislatura}). Dados importados da C\xE2mara dos Deputados.`,
-          50
-          // Score inicial neutro
-        ]
-      );
-      logInfo(`[Import] \u2705 ${camaraData.nome} importado com sucesso!`);
-      return id;
-    } catch (error) {
-      logError("[Import] Erro ao importar da C\xE2mara", error);
-      return null;
+      logError("Erro na busca de pol\xEDticos", error);
+      return res.status(500).json({ error: "Erro ao realizar busca" });
     }
   }
 };
-var importService = new ImportService();
+var searchController = new SearchController();
 
 // server/routes/search.routes.ts
 var router7 = Router7();
-router7.get("/", async (req, res) => {
-  try {
-    const query = req.query.q;
-    if (!query || query.length < 2) {
-      return res.status(400).json({ error: "Termo de busca muito curto" });
-    }
-    const results = await searchService.globalSearch(query);
-    res.json(results);
-  } catch (error) {
-    logError("Erro na busca global", error);
-    res.status(500).json({ error: "Erro interno ao realizar busca" });
-  }
-});
-router7.get("/politicians", async (req, res) => {
-  try {
-    const query = req.query.q;
-    if (!query) return res.json([]);
-    let results = await searchService.searchPoliticians(query);
-    if (results.length === 0 && query.length > 3) {
-      await importService.importFromCamara(query);
-      results = await searchService.searchPoliticians(query);
-    }
-    res.json(results);
-  } catch (error) {
-    logError("Erro na busca de pol\xEDticos", error);
-    res.status(500).json({ error: "Erro interno ao buscar pol\xEDticos" });
-  }
-});
+router7.get("/", searchController.searchPoliticians);
 var search_routes_default = router7;
 
 // server/core/routes.ts
@@ -2024,7 +1993,7 @@ app.use((req, res, next) => {
     next();
   }
 });
-var clientBuildPath = path2.join(__dirname2, "../client/dist");
+var clientBuildPath = process.env.NODE_ENV === "production" ? path2.join(__dirname2, "public") : path2.join(__dirname2, "../client/dist");
 app.use(express.static(clientBuildPath));
 (async () => {
   try {
