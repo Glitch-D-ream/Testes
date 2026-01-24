@@ -77,9 +77,9 @@ app.use(express.static(clientBuildPath));
       });
     });
 
-    // Iniciar servidor - Removendo o host '0.0.0.0' explícito para deixar o Express decidir
-    const server = app.listen(PORT, () => {
-      console.log(`[Detector de Promessa Vazia] Servidor ouvindo na porta: ${PORT}`);
+    // Iniciar servidor - Forçando 0.0.0.0 para garantir que o Railway consiga rotear o tráfego
+    const server = app.listen(Number(PORT), '0.0.0.0', () => {
+      console.log(`[Detector de Promessa Vazia] Servidor ouvindo em 0.0.0.0:${PORT}`);
       
       // Configurar webhook do Telegram se as variáveis estiverem definidas
       if (process.env.TELEGRAM_BOT_TOKEN && process.env.WEBHOOK_DOMAIN) {
