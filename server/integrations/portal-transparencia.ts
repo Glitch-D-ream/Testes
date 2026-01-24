@@ -45,17 +45,8 @@ export async function getExpenses(
     }).catch(() => ({ data: null }));
 
     if (!response.data || !response.data.dados) {
-      // Mock data if API fails
-      const mockData = [{
-        date: new Date(),
-        description: `Gasto em ${category}`,
-        value: 500000,
-        beneficiary: 'Empresa Exemplo',
-        category: category,
-        source: 'Tesouro Nacional'
-      }];
-      await savePublicDataCache('PORTAL_TRANSPARENCIA', cacheKey, mockData);
-      return mockData;
+      logger.warn(`[Portal Transparência] Falha na API ou dados inexistentes para: ${category}`);
+      return [];
     }
 
     const result = response.data.dados.map((item: any) => ({

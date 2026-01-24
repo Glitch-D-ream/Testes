@@ -1,4 +1,3 @@
-
 import { Request, Response } from 'express';
 import { getSupabase } from '../core/database.js';
 import { logError } from '../core/logger.js';
@@ -18,65 +17,47 @@ export class StatisticsController {
         .from('promises')
         .select('*', { count: 'exact', head: true });
 
-      // 3. Viabilidade média
-      const { data: viabilityData, error: err3 } = await supabase
+      // 3. Viabilidade média e autores
+      const { data: analysisData, error: err3 } = await supabase
         .from('analyses')
-        .select('probability_score');
+        .select('probability_score, author');
       
-      const averageViability = viabilityData && viabilityData.length > 0
-        ? viabilityData.reduce((acc: number, curr: any) => acc + (curr.probability_score || 0), 0) / viabilityData.length
+      const averageConfidence = analysisData && analysisData.length > 0
+        ? analysisData.reduce((acc: number, curr: any) => acc + (curr.probability_score || 0), 0) / analysisData.length
         : 0;
+
+      const totalAuthors = new Set(analysisData?.map(a => a.author).filter(Boolean)).size;
 
       // 4. Distribuição por categoria
       const { data: categoriesData, error: err4 } = await supabase
         .from('promises')
         .select('category');
 
-      const categoriesDistribution: Record<string, number> = {};
+      const categoriesMap: Record<string, number> = {};
       categoriesData?.forEach((row: any) => {
         const cat = row.category || 'Geral';
-        categoriesDistribution[cat] = (categoriesDistribution[cat] || 0) + 1;
+        categoriesMap[cat] = (categoriesMap[cat] || 0) + 1;
       });
 
-      // 5. Tendências (últimos 30 dias)
-      const thirtyDaysAgo = new Date();
-      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-      
-      const { data: trendsData, error: err5 } = await supabase
-        .from('analyses')
-        .select('created_at, probability_score')
-        .gte('created_at', thirtyDaysAgo.toISOString())
-        .order('created_at', { ascending: true });
+      const byCategory = Object.entries(categoriesMap).map(([category, count]) => ({
+        category,
+        count
+      })).sort((a, b) => b.count - a.count);
 
-      const trendsMap = new Map();
-      trendsData?.forEach((item: any) => {
-        const date = new Date(item.created_at).toISOString().split('T')[0];
-        if (!trendsMap.has(date)) {
-          trendsMap.set(date, { date, viability: 0, count: 0, sum: 0 });
-        }
-        const entry = trendsMap.get(date);
-        entry.count++;
-        entry.sum += (item.probability_score || 0);
-        entry.viability = (entry.sum / entry.count) * 100;
-      });
-
-      const trends = Array.from(trendsMap.values());
-
-      if (err1 || err2 || err3 || err4 || err5) {
-        logError('Erro em uma das queries de estatísticas', (err1 || err2 || err3 || err4 || err5) as any);
+      if (err1 || err2 || err3 || err4) {
+        logError('Erro em uma das queries de estatísticas', (err1 || err2 || err3 || err4) as any);
       }
 
-      return (res as any).json({
+      return res.json({
         totalAnalyses: totalAnalyses || 0,
         totalPromises: totalPromises || 0,
-        averageViability,
-        categoriesDistribution,
-        viabilityByCategory: {}, 
-        trends,
+        averageConfidence,
+        totalAuthors,
+        byCategory,
       });
     } catch (error) {
       logError('Erro ao buscar estatísticas globais', error as Error);
-      return (res as any).status(500).json({ error: 'Erro ao buscar estatísticas' });
+      return res.status(500).json({ error: 'Erro ao buscar estatísticas' });
     }
   }
 }

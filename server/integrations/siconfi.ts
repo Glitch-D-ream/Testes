@@ -54,18 +54,8 @@ export async function getBudgetData(
     }).catch(() => ({ data: null }));
 
     if (!response.data || response.data.length === 0) {
-      // Fallback para dados simulados se a API falhar (para garantir que o sistema funcione)
-      const mockData: BudgetData = {
-        year,
-        sphere,
-        category,
-        budgeted: 1000000000,
-        executed: 850000000,
-        percentage: 85,
-        lastUpdated: new Date(),
-      };
-      await savePublicDataCache('SICONFI', cacheKey, mockData);
-      return mockData;
+      logger.warn(`[SICONFI] Nenhum dado real encontrado para: ${category} (${year})`);
+      return null;
     }
 
     const data = response.data[0];

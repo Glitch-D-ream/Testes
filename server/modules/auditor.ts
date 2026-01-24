@@ -36,17 +36,27 @@ export class DeepAuditor {
     // 2. Consistência Política (API da Câmara - REAL)
     const consistency = await votingService.checkInconsistency(politicianId, category);
 
-    // 3. Lógica de Veredito
+    // 3. Lógica de Veredito Baseada em Dados Reais
     let verdict: 'REALISTA' | 'DUVIDOSA' | 'VAZIA' = 'DUVIDOSA';
+    
+    // Se não temos dados orçamentários nem históricos, não podemos classificar como Realista ou Vazia com confiança
+    const hasBudgetData = budgetInfo !== null;
+    const hasVotingData = consistency.relevantVotes.length > 0;
+    
     let score = viability.confidence * 100;
 
-    if (score < 40 || consistency.votedAgainst) {
-      verdict = 'VAZIA';
-    } else if (score > 75 && !consistency.votedAgainst) {
-      verdict = 'REALISTA';
+    if (hasBudgetData && hasVotingData) {
+      if (score < 30 || consistency.votedAgainst) {
+        verdict = 'VAZIA';
+      } else if (score > 70 && !consistency.votedAgainst) {
+        verdict = 'REALISTA';
+      }
+    } else if (!hasBudgetData && !hasVotingData) {
+      verdict = 'DUVIDOSA';
+      score = 50; // Neutro por falta de dados
     }
 
-    const explanation = this.generateExplanation(verdict, category, viability, consistency);
+    const explanation = this.generateExplanation(verdict, category, viability, consistency, hasBudgetData, hasVotingData);
 
     return {
       promise: promiseText,
@@ -65,14 +75,25 @@ export class DeepAuditor {
 
   // O método checkPoliticalConsistency foi substituído pelo votingService.checkInconsistency real
 
-  private generateExplanation(verdict: string, category: string, viability: any, consistency: any): string {
+  private generateExplanation(verdict: string, category: string, viability: any, consistency: any, hasBudget: boolean, hasVoting: boolean): string {
+    let text = "";
+    
+    if (!hasBudget && !hasVoting) {
+      return `Não foi possível encontrar dados orçamentários ou histórico de votação suficiente para validar esta promessa de ${category} de forma conclusiva.`;
+    }
+
     if (verdict === 'VAZIA') {
-      return `Esta promessa é classificada como VAZIA porque, apesar de ser na área de ${category}, o histórico de votação do político mostra posicionamentos contrários ao investimento nesta área, e a taxa de execução orçamentária federal para este setor é de apenas ${viability.confidence * 100}%.`;
+      text = `Esta promessa apresenta sinais de inconsistência. `;
+      if (consistency.votedAgainst) text += `O político já votou contra medidas relacionadas a ${category} no passado. `;
+      if (viability.confidence < 0.4) text += `Além disso, a execução orçamentária real para este setor está abaixo da média histórica (${(viability.confidence * 100).toFixed(0)}%).`;
+      return text;
     }
+    
     if (verdict === 'REALISTA') {
-      return `Esta promessa tem alta viabilidade. O orçamento para ${category} tem sido executado de forma consistente e o político não possui votos contrários recentes a este tema.`;
+      return `Esta promessa possui base em dados reais. O setor de ${category} apresenta execução orçamentária sólida e não foram encontrados votos contrários do autor sobre o tema.`;
     }
-    return `Esta promessa é DUVIDOSA. Embora o orçamento exista, a execução histórica é instável e não há dados suficientes sobre a consistência política do autor neste tema específico.`;
+    
+    return `Análise inconclusiva. Embora existam dados, a execução orçamentária para ${category} é instável ou o histórico político do autor é misto em relação a este tema.`;
   }
 }
 

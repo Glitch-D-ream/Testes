@@ -44,22 +44,8 @@ export async function getPoliticalHistory(candidateName: string, state: string):
 
     logger.info(`[TSE] Buscando histórico: ${candidateName}`);
 
-    // Mock data para garantir funcionamento enquanto a API real do TSE é integrada
-    const mockHistory: PoliticalHistory = {
-      candidateId: 'mock-id',
-      candidateName,
-      totalElections: 4,
-      totalElected: 2,
-      electionRate: 50,
-      promisesFulfilled: 15,
-      promisesTotal: 30,
-      fulfillmentRate: 50,
-      controversies: 2,
-      scandals: 0
-    };
-
-    await savePublicDataCache('TSE', cacheKey, mockHistory);
-    return mockHistory;
+    logger.warn(`[TSE] API Real do TSE não retornou dados para: ${candidateName}. Buscando fontes alternativas ou retornando nulo.`);
+    return null;
   } catch (error) {
     logger.error(`[TSE] Erro ao buscar histórico: ${error}`);
     return null;
