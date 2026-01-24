@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "vite build && npx esbuild server/index.ts --bundle --platform=node --format=esm --outfile=dist/index.js --external:express --external:jsonwebtoken --external:bcryptjs --external:winston --external:dotenv --external:@supabase/supabase-js --external:nanoid --external:express-rate-limit --external:cookie-parser --external:telegraf --external:groq-sdk --external:openai --external:@google/generative-ai --external:jspdf --external:jspdf-autotable --external:node-html-to-image --external:axios --external:zod --external:tsx",
+    "build": "vite build && node scripts/build-server.js",
     "start": "node dist/index.js"
   },
   "dependencies": {
@@ -51,6 +51,7 @@
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^4.0.0",
+    "esbuild": "^0.27.2",
     "supabase": "^2.72.8",
     "typescript": "^5.7.3",
     "vite": "^6.0.0",
