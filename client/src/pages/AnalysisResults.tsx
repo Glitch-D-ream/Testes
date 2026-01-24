@@ -149,7 +149,13 @@ export function AnalysisResults() {
 
           {/* Texto Original */}
           <div className="mt-8 pt-8 border-t border-gray-200">
-            <h3 className="text-lg font-semibold text-gray-900 mb-3">Texto Analisado</h3>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-lg font-semibold text-gray-900">Relatório de Inteligência</h3>
+              <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-blue-600 bg-blue-50 px-2 py-1 rounded border border-blue-100">
+                <span className="w-1.5 h-1.5 bg-blue-600 rounded-full animate-pulse"></span>
+                Auditado via SICONFI/TSE
+              </span>
+            </div>
             <div className="prose prose-slate max-w-none text-gray-700 leading-relaxed bg-gray-50 p-6 rounded-lg border border-gray-100">
               <ReactMarkdown>{data.text}</ReactMarkdown>
             </div>

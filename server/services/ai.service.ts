@@ -16,31 +16,30 @@ export interface AIAnalysisResult {
 
 export class AIService {
   private promptTemplate(text: string): string {
-    return `Você é um analista político especializado em fact-checking e análise de promessas. 
-    Analise o texto fornecido e extraia todas as promessas políticas.
+    return `Você é um analista político especializado em fact-checking e análise técnica de promessas.
+    Sua missão é extrair promessas, planos ou compromissos de forma TOTALMENTE IMPARCIAL e RIGOROSA.
+    
+    DIRETRIZES DE RIGOR:
+    1. NEUTRALIDADE: Ignore adjetivos e foque em ações concretas (verbos de ação).
+    2. EVIDÊNCIA: Apenas extraia o que está explicitamente no texto. Não deduza intenções.
+    3. ESPECIFICIDADE: Diferencie "intenções vagas" de "promessas concretas" (com prazos ou valores).
+    4. CETICISMO: Se uma promessa for impossível de ser cumprida apenas pelo executivo, mencione no raciocínio.
+    
     Para cada promessa, identifique:
     1. O texto exato da promessa.
-    2. A categoria (Saúde, Educação, Infraestrutura, Economia, etc).
-    3. Score de confiança (0-1) de que isso é realmente uma promessa.
-    4. Se é uma promessa negativa (ex: "não vou fazer").
-    5. Se é uma promessa condicional (ex: "se eu ganhar").
-    6. Uma breve explicação do raciocínio.
+    2. A categoria (Saúde, Educação, Economia, etc).
+    3. O nível de confiança na extração (0 a 1).
+    4. Se a promessa é uma negação (ex: "não vou aumentar impostos").
+    5. Se a promessa é condicional (ex: "se eu for eleito").
+    6. O raciocínio técnico (justificativa baseada em fatos).
     
-    Também forneça um sentimento geral do texto e um score de credibilidade inicial (0-100).
-    Responda estritamente em formato JSON seguindo esta estrutura:
+    Responda APENAS um JSON no formato:
     {
       "promises": [
-        {
-          "text": "string",
-          "category": "string",
-          "confidence": number,
-          "negated": boolean,
-          "conditional": boolean,
-          "reasoning": "string"
-        }
+        { "text": "string", "category": "string", "confidence": number, "negated": boolean, "conditional": boolean, "reasoning": "string" }
       ],
-      "overallSentiment": "string",
-      "credibilityScore": number
+      "overallSentiment": "Neutral",
+      "credibilityScore": number (0 a 100)
     }
     
     Texto para análise:
@@ -48,36 +47,49 @@ export class AIService {
   }
 
   /**
-   * Provedor de Código Aberto (Pollinations AI) - Gratuito e sem necessidade de chave
+   * Provedor de Código Aberto (Pollinations AI) com Multi-Model Fallback
    */
   private async analyzeWithOpenSource(text: string): Promise<AIAnalysisResult> {
-    logInfo('Iniciando análise com Provedor Open Source (Pollinations)...');
-    
-    try {
-      const response = await axios.post('https://text.pollinations.ai/', {
-        messages: [
-          { role: 'system', content: 'Você é um analista político que responde apenas em JSON válido.' },
-          { role: 'user', content: this.promptTemplate(text) }
-        ],
-        model: 'openai'
-      }, { timeout: 45000 });
+    const models = ['mistral', 'llama', 'qwen', 'openai'];
+    let lastError: any;
 
-      let content = response.data;
-      if (typeof content === 'string') {
-        // Limpar possíveis markdown blocks
-        content = content.replace(/```json\n?|\n?```/g, '').trim();
-        // Tentar encontrar o JSON se houver texto extra
-        const jsonMatch = content.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-          content = jsonMatch[0];
+    for (const model of models) {
+      try {
+        logInfo(`[AI] Tentando análise com modelo: ${model}...`);
+        const response = await axios.post('https://text.pollinations.ai/', {
+          messages: [
+            { role: 'system', content: 'Você é um analista político rigoroso. Responda APENAS JSON válido.' },
+            { role: 'user', content: this.promptTemplate(text) }
+          ],
+          model: model,
+          jsonMode: true
+        }, { timeout: 30000 });
+
+        let content = response.data;
+        
+        // Extração robusta de JSON
+        if (typeof content === 'object' && content.choices) {
+          content = content.choices[0]?.message?.content || content;
         }
-        return JSON.parse(content) as AIAnalysisResult;
+
+        if (typeof content === 'string') {
+          content = content.replace(/```json\n?|\n?```/g, '').trim();
+          const jsonMatch = content.match(/\{[\s\S]*\}/);
+          if (jsonMatch) content = jsonMatch[0];
+          return JSON.parse(content) as AIAnalysisResult;
+        }
+        
+        if (content && content.promises) return content as AIAnalysisResult;
+        
+        throw new Error(`Modelo ${model} retornou formato inválido`);
+      } catch (error) {
+        logError(`[AI] Falha no modelo ${model}`, error as Error);
+        lastError = error;
+        continue; // Tenta o próximo modelo
       }
-      return content as AIAnalysisResult;
-    } catch (error) {
-      logError('Falha no Provedor Open Source', error as Error);
-      throw error;
     }
+
+    throw lastError || new Error('Todos os modelos de IA falharam');
   }
 
   /**
