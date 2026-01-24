@@ -11,7 +11,7 @@ services:
       - key: PORT
         value: 10000
       - key: SUPABASE_URL
-        value: https://zajzmsfiprtyiijvhmqv.supabase.co
+        value: https://ceexfkjldhsbpugxvuyn.supabase.co
       - key: SUPABASE_ANON_KEY
         sync: false
       - key: JWT_SECRET
