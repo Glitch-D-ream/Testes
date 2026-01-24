@@ -18,6 +18,7 @@ const analysisLimiter = rateLimit({
 router.post('/', optionalAuthMiddleware, analysisLimiter, analysisController.create);
 router.get('/:id', optionalAuthMiddleware, analysisController.getById);
 router.get('/:id/pdf', optionalAuthMiddleware, analysisController.exportPDF);
+router.get('/:id/image', optionalAuthMiddleware, analysisController.exportImage);
 router.get('/', optionalAuthMiddleware, analysisController.list);
 
 export default router;

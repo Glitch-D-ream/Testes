@@ -90,6 +90,20 @@ export class AnalysisController {
       return (res as any).status(500).json({ error: 'Erro ao gerar relatório PDF' });
     }
   }
+
+  async exportImage(req: Request, res: Response) {
+    try {
+      const { id } = (req as any).params;
+      const imageBuffer = await exportService.generateAnalysisImage(id);
+
+      (res as any).setHeader('Content-Type', 'image/jpeg');
+      (res as any).setHeader('Content-Disposition', `inline; filename="analise-${id}.jpg"`);
+      return (res as any).send(imageBuffer);
+    } catch (error) {
+      logError('Erro ao exportar Imagem', error as Error);
+      return (res as any).status(500).json({ error: 'Erro ao gerar card de compartilhamento' });
+    }
+  }
 }
 
 export const analysisController = new AnalysisController();

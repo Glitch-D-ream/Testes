@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { Download, Share2 } from 'lucide-react';
+import { Download, Share2, Image as ImageIcon } from 'lucide-react';
 import { PromiseCard } from '../components/PromiseCard';
 import { useAnalysis } from '../hooks/useAnalysis';
 
@@ -18,7 +18,8 @@ export function AnalysisResults() {
   const handleDownloadPDF = async () => {
     if (!id) return;
     try {
-      const response = await fetch(`/api/analyze/${id}/pdf`);
+      const apiUrl = import.meta.env.VITE_API_URL || '';
+      const response = await fetch(`${apiUrl}/api/analyze/${id}/pdf`);
       if (!response.ok) throw new Error('Erro ao baixar PDF');
 
       const blob = await response.blob();
@@ -97,9 +98,18 @@ export function AnalysisResults() {
               <button
                 onClick={handleDownloadPDF}
                 className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition"
+                title="Baixar Relatório PDF"
               >
                 <Download className="w-4 h-4" />
                 PDF
+              </button>
+              <button
+                onClick={() => window.open(`${import.meta.env.VITE_API_URL || ''}/api/analyze/${id}/image`, '_blank')}
+                className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition"
+                title="Gerar Card para Redes Sociais"
+              >
+                <ImageIcon className="w-4 h-4" />
+                Card
               </button>
               <button
                 onClick={handleShare}
