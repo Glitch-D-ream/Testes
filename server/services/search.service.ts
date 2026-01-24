@@ -1,7 +1,8 @@
-import axios from 'axios';
 import { allQuery } from '../core/database.js';
 import { logInfo, logError } from '../core/logger.js';
-import { aiService } from './ai.service.js';
+import { scoutAgent } from '../agents/scout.js';
+import { filterAgent } from '../agents/filter.js';
+import { brainAgent } from '../agents/brain.js';
 
 export interface SearchResult {
   title: string;
@@ -78,58 +79,25 @@ export class SearchService {
   }
 
   /**
-   * NOVO: Busca notícias e falas recentes de um político na Web
-   */
-  async searchPoliticianPromisesWeb(politicianName: string): Promise<SearchResult[]> {
-    logInfo(`[Search Web] Iniciando busca automatizada para: ${politicianName}`);
-    
-    try {
-      const prompt = `Busque e liste as 5 promessas ou falas mais recentes e relevantes do político "${politicianName}" sobre planos para o futuro, obras ou mudanças sociais. 
-      Retorne APENAS um array JSON com objetos contendo: title, link, snippet (a fala ou promessa em si) e source.`;
-
-      const response = await axios.post('https://text.pollinations.ai/', {
-        messages: [
-          { role: 'system', content: 'Você é um buscador de notícias políticas que retorna apenas JSON.' },
-          { role: 'user', content: prompt }
-        ],
-        model: 'openai',
-        jsonMode: true
-      }, { timeout: 30000 });
-
-      let results = response.data;
-      if (typeof results === 'string') {
-        results = JSON.parse(results.replace(/```json\n?|\n?```/g, '').trim());
-      }
-
-      return results as SearchResult[];
-    } catch (error) {
-      logError(`[Search Web] Erro ao buscar dados para ${politicianName}`, error as Error);
-      return [];
-    }
-  }
-
-  /**
-   * NOVO: Processa os resultados da busca web e gera uma análise automática
+   * Orquestração da Tríade de Agentes para Análise Automática
    */
   async autoAnalyzePolitician(politicianName: string, userId: string | null = null) {
-    const searchResults = await this.searchPoliticianPromisesWeb(politicianName);
+    logInfo(`[Orchestrator] Iniciando Tríade de Agentes para: ${politicianName}`);
     
-    if (searchResults.length === 0) {
-      throw new Error(`Não foram encontradas falas recentes para ${politicianName}`);
+    // 1. Scout: Busca dados brutos
+    const rawSources = await scoutAgent.search(politicianName);
+    if (rawSources.length === 0) {
+      throw new Error(`O Agente Buscador não encontrou fontes para ${politicianName}`);
     }
 
-    const consolidatedText = searchResults.map(r => `Fonte: ${r.source}\nFala: ${r.snippet}`).join('\n\n');
-    
-    logInfo(`[Auto-Analysis] Analisando ${searchResults.length} fontes para ${politicianName}`);
-    
-    const { analysisService } = await import('./analysis.service.js');
-    
-    return await analysisService.createAnalysis(
-      userId,
-      consolidatedText,
-      politicianName,
-      'BUSCA_AUTOMATICA'
-    );
+    // 2. Filter: Limpa e valida relevância
+    const filteredSources = await filterAgent.filter(rawSources);
+    if (filteredSources.length === 0) {
+      throw new Error(`O Agente Coletor filtrou todas as fontes como irrelevantes para ${politicianName}`);
+    }
+
+    // 3. Brain: Analisa profundamente e gera o dossiê
+    return await brainAgent.analyze(politicianName, filteredSources, userId);
   }
 }
 
