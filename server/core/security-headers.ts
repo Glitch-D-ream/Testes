@@ -29,21 +29,8 @@ export function securityHeadersMiddleware(req: Request, res: Response, next: Nex
     'geolocation=(), microphone=(), camera=(), payment=()'
   );
 
-  // Content-Security-Policy: previne injeção de conteúdo
-  res.setHeader(
-    'Content-Security-Policy',
-    [
-      "default-src 'self'",
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
-      "style-src 'self' 'unsafe-inline'",
-      "img-src 'self' data: https:",
-      "font-src 'self' data:",
-      "connect-src 'self' https:",
-      "frame-ancestors 'none'",
-      "base-uri 'self'",
-      "form-action 'self'",
-    ].join('; ')
-  );
+  // Content-Security-Policy: desabilitado temporariamente para depuração de rede
+  // res.setHeader('Content-Security-Policy', [...].join('; '));
 
   next();
 }

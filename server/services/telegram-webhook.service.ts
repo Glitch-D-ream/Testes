@@ -161,7 +161,13 @@ export class TelegramWebhookService {
     }
 
     try {
-      const webhookUrl = `${WEBHOOK_DOMAIN}${WEBHOOK_PATH}`;
+      // Garantir que o domínio não termine com barra e o path comece com barra
+      const domain = WEBHOOK_DOMAIN.endsWith('/') ? WEBHOOK_DOMAIN.slice(0, -1) : WEBHOOK_DOMAIN;
+      const path = WEBHOOK_PATH.startsWith('/') ? WEBHOOK_PATH : `/${WEBHOOK_PATH}`;
+      const webhookUrl = `${domain}${path}`;
+      
+      console.log(`[Telegram] Configurando webhook em: ${webhookUrl}`);
+      
       await this.bot.telegram.setWebhook(webhookUrl, {
         drop_pending_updates: true,
         allowed_updates: ['message', 'callback_query']
