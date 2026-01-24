@@ -27,17 +27,12 @@ export function useAnalysis(options?: UseAnalysisOptions) {
       setError(null);
 
       try {
-        // Obter token CSRF
-        const csrfRes = await fetch('/api/csrf-token');
-        const { csrfToken } = await csrfRes.json();
-
-        const response = await fetch('/api/analyze', {
+        const apiUrl = import.meta.env.VITE_API_URL || '';
+        const response = await fetch(`${apiUrl}/api/analyze`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'x-xsrf-token': csrfToken,
           },
-          credentials: 'include',
           body: JSON.stringify({ text, author, category }),
         });
 
@@ -67,7 +62,8 @@ export function useAnalysis(options?: UseAnalysisOptions) {
       setError(null);
 
       try {
-        const response = await fetch(`/api/analyze/${id}`);
+        const apiUrl = import.meta.env.VITE_API_URL || '';
+        const response = await fetch(`${apiUrl}/api/analyze/${id}`);
 
         if (!response.ok) {
           throw new Error('Análise não encontrada');
