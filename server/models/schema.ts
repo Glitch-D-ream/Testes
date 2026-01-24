@@ -55,6 +55,7 @@ export const promises = pgTable('promises', {
   evidenceSnippet: text('evidence_snippet'), // O parágrafo original
   sourceUrl: text('source_url'), // Link direto da notícia
   sourceName: varchar('source_name', { length: 100 }), // Ex: G1, Folha
+  newsTitle: text('news_title'), // Título da notícia original
 });
 
 export const auditLogs = pgTable('audit_logs', {

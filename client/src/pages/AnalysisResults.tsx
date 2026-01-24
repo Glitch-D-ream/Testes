@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { Download, Share2, Image as ImageIcon } from 'lucide-react';
-import { PromiseCard } from '../components/PromiseCard';
+import TopicCard from '../components/TopicCard';
 import { ViabilityThermometer } from '../components/ViabilityThermometer';
 import { useAnalysis } from '../hooks/useAnalysis';
 
@@ -79,6 +79,15 @@ export function AnalysisResults() {
   }
 
   const promises = data.promises || [];
+  
+  // Agrupar promessas por categoria
+  const groupedPromises = promises.reduce((acc: Record<string, any[]>, promise: any) => {
+    const cat = promise.category || 'Geral';
+    if (!acc[cat]) acc[cat] = [];
+    acc[cat].push(promise);
+    return acc;
+  }, {});
+
   const averageConfidence = promises.length > 0
     ? (promises.reduce((sum: number, p: any) => sum + (p.confidence_score || p.confidence || 0), 0) / promises.length) * 100
     : 0;
@@ -146,30 +155,29 @@ export function AnalysisResults() {
           </div>
         </div>
 
-        {/* Promessas */}
-        <div className="bg-white rounded-lg shadow-md p-8">
-          <h2 className="text-2xl font-bold text-gray-900 mb-6">Promessas Identificadas</h2>
+        {/* Dossiê por Tópicos */}
+        <div className="mb-8">
+          <div className="flex items-center gap-3 mb-6">
+            <h2 className="text-2xl font-bold text-slate-900 dark:text-white">Dossiê por Assuntos</h2>
+            <span className="px-3 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-xs font-bold rounded-full">
+              {promises.length} Descobertas
+            </span>
+          </div>
 
           {promises.length > 0 ? (
-            <div className="space-y-4">
-              {promises.map((promise: any, index: number) => (
-                <PromiseCard
-                  key={index}
-                  id={promise.id}
-                  text={promise.promise_text || promise.text}
-                  category={promise.category || 'Geral'}
-                  confidence={promise.confidence_score || promise.confidence || 0}
-                  negated={promise.negated || false}
-                  conditional={promise.conditional || false}
-                  reasoning={promise.reasoning}
-                  evidenceSnippet={promise.evidence_snippet}
-                  sourceName={promise.source_name}
-                  sourceUrl={promise.source_url}
+            <div className="space-y-2">
+              {Object.entries(groupedPromises).map(([category, categoryPromises]) => (
+                <TopicCard
+                  key={category}
+                  category={category}
+                  promises={categoryPromises}
                 />
               ))}
             </div>
           ) : (
-            <p className="text-gray-500 text-center py-8">Nenhuma promessa identificada neste texto.</p>
+            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-12 text-center">
+              <p className="text-slate-500">Nenhuma promessa identificada neste dossiê.</p>
+            </div>
           )}
         </div>
 

@@ -103,9 +103,12 @@ export class BrainAgent {
     const aiAnalysis = await aiService.analyzeText(text);
     const promises = aiAnalysis.promises.map(p => {
       // Tentar encontrar a fonte original no texto de contexto para cada promessa
-      // Isso é uma heurística: buscamos qual fonte mencionada no texto contém a promessa
-      const sourceMatch = text.split('\n\n').find(block => block.includes(p.text.substring(0, 20)));
+      const blocks = text.split('\n\n');
+      const sourceMatch = blocks.find(block => block.includes(p.text.substring(0, 20))) || blocks[0];
+      
+      // Extrair metadados da fonte se existirem no bloco
       const sourceName = sourceMatch?.match(/\[Fonte: (.*?)\]/)?.[1] || 'Fonte Desconhecida';
+      const newsTitle = sourceMatch?.split('\n')[0]?.replace(/\[Fonte: .*?\]/, '').trim() || 'Notícia Identificada';
       
       return {
         text: p.text,
@@ -115,7 +118,8 @@ export class BrainAgent {
         conditional: p.conditional,
         reasoning: p.reasoning,
         evidenceSnippet: sourceMatch || text.substring(0, 500),
-        sourceName: sourceName
+        sourceName: sourceName,
+        newsTitle: newsTitle // Novo campo para o título da notícia
       };
     });
 
@@ -148,7 +152,8 @@ export class BrainAgent {
         negated: p.negated || false,
         conditional: p.conditional || false,
         evidence_snippet: (p as any).evidenceSnippet,
-        source_name: (p as any).sourceName
+        source_name: (p as any).sourceName,
+        news_title: (p as any).newsTitle // Salvar o título da notícia
       }));
       await supabase.from('promises').insert(promisesToInsert);
     }
