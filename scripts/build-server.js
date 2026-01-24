@@ -33,8 +33,7 @@ async function runBuild() {
       external: [
         'express', 'jsonwebtoken', 'bcryptjs', 'winston', 'dotenv', 
         '@supabase/supabase-js', 'nanoid', 'express-rate-limit', 
-        'cookie-parser', 'telegraf', 'groq-sdk', 'openai', 
-        '@google/generative-ai', 'jspdf', 'jspdf-autotable', 
+        'cookie-parser', 'telegraf', 'jspdf', 'jspdf-autotable', 
         'node-html-to-image', 'axios', 'zod', 'tsx', 'prom-client', '@sentry/node'
       ],
     });

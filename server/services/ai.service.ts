@@ -1,16 +1,5 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
-import Groq from 'groq-sdk';
-import OpenAI from 'openai';
 import axios from 'axios';
 import { logInfo, logError } from '../core/logger.js';
-
-// Configuração dos Provedores
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY || '' });
-const deepseek = new OpenAI({
-  baseURL: 'https://api.deepseek.com',
-  apiKey: process.env.DEEPSEEK_API_KEY || '',
-});
 
 export interface AIAnalysisResult {
   promises: Array<{
@@ -59,25 +48,29 @@ export class AIService {
   }
 
   /**
-   * Provedor de Código Aberto (Pollinations AI) - Gratuito e sem necessidade de chave complexa
+   * Provedor de Código Aberto (Pollinations AI) - Gratuito e sem necessidade de chave
    */
   private async analyzeWithOpenSource(text: string): Promise<AIAnalysisResult> {
-    logInfo('Tentando análise com Provedor Open Source (Pollinations/Llama 3)...');
+    logInfo('Iniciando análise com Provedor Open Source (Pollinations)...');
     
     try {
       const response = await axios.post('https://text.pollinations.ai/', {
         messages: [
-          { role: 'system', content: 'Você é um assistente que responde apenas em JSON válido.' },
+          { role: 'system', content: 'Você é um analista político que responde apenas em JSON válido.' },
           { role: 'user', content: this.promptTemplate(text) }
         ],
-        model: 'openai', // Pollinations usa 'openai' como alias para modelos de alta qualidade
-        jsonMode: true
-      }, { timeout: 30000 });
+        model: 'openai'
+      }, { timeout: 45000 });
 
       let content = response.data;
       if (typeof content === 'string') {
         // Limpar possíveis markdown blocks
         content = content.replace(/```json\n?|\n?```/g, '').trim();
+        // Tentar encontrar o JSON se houver texto extra
+        const jsonMatch = content.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          content = jsonMatch[0];
+        }
         return JSON.parse(content) as AIAnalysisResult;
       }
       return content as AIAnalysisResult;
@@ -87,70 +80,44 @@ export class AIService {
     }
   }
 
-  private async analyzeWithGemini(text: string): Promise<AIAnalysisResult> {
-    logInfo('Tentando análise com Gemini 1.5 Flash...');
-    const model = genAI.getGenerativeModel({ 
-      model: "gemini-1.5-flash",
-      generationConfig: { responseMimeType: "application/json" }
-    });
-    const result = await model.generateContent(this.promptTemplate(text));
-    const response = await result.response;
-    return JSON.parse(response.text()) as AIAnalysisResult;
-  }
-
-  private async analyzeWithDeepSeek(text: string): Promise<AIAnalysisResult> {
-    logInfo('Tentando análise com DeepSeek-V3.2...');
-    const response = await deepseek.chat.completions.create({
-      model: 'deepseek-chat',
-      messages: [{ role: 'user', content: this.promptTemplate(text) }],
-      response_format: { type: 'json_object' },
-    });
-    const content = response.choices[0]?.message?.content;
-    if (!content) throw new Error('Resposta vazia do DeepSeek');
-    return JSON.parse(content) as AIAnalysisResult;
-  }
-
+  /**
+   * Fallback para Groq se a chave estiver presente (Llama 3 70B Gratuito)
+   */
   private async analyzeWithGroq(text: string): Promise<AIAnalysisResult> {
+    if (!process.env.GROQ_API_KEY) throw new Error('GROQ_API_KEY não configurada');
+    
     logInfo('Tentando análise com Groq (Llama 3.3 70B)...');
-    const completion = await groq.chat.completions.create({
-      messages: [{ role: 'user', content: this.promptTemplate(text) }],
+    const response = await axios.post('https://api.groq.com/openai/v1/chat/completions', {
+      messages: [
+        { role: 'system', content: 'Você é um analista político que responde apenas em JSON válido.' },
+        { role: 'user', content: this.promptTemplate(text) }
+      ],
       model: 'llama-3.3-70b-versatile',
-      response_format: { type: 'json_object' },
+      response_format: { type: 'json_object' }
+    }, {
+      headers: {
+        'Authorization': `Bearer ${process.env.GROQ_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      timeout: 30000
     });
-    const content = completion.choices[0]?.message?.content;
+
+    const content = response.data.choices[0]?.message?.content;
     if (!content) throw new Error('Resposta vazia do Groq');
     return JSON.parse(content) as AIAnalysisResult;
   }
 
   async analyzeText(text: string): Promise<AIAnalysisResult> {
-    // 1. Tentar Gemini
-    if (process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY.length > 10) {
-      try {
-        return await this.analyzeWithGemini(text);
-      } catch (error) {
-        logError('Falha no Gemini, tentando próximo...', error as Error);
-      }
-    }
-
-    // 2. Tentar DeepSeek
-    if (process.env.DEEPSEEK_API_KEY && process.env.DEEPSEEK_API_KEY.length > 10) {
-      try {
-        return await this.analyzeWithDeepSeek(text);
-      } catch (error) {
-        logError('Falha no DeepSeek, tentando próximo...', error as Error);
-      }
-    }
-
-    // 3. Tentar Groq
+    // 1. Tentar Groq (se houver chave, é gratuito e de alto nível)
     if (process.env.GROQ_API_KEY && process.env.GROQ_API_KEY.length > 10) {
       try {
         return await this.analyzeWithGroq(text);
       } catch (error) {
-        logError('Falha no Groq, tentando próximo...', error as Error);
+        logError('Falha no Groq, tentando Pollinations...', error as Error);
       }
     }
 
-    // 4. Fallback Final: Provedor Open Source (Sempre disponível)
+    // 2. Fallback Final: Pollinations (Sempre disponível e gratuito)
     try {
       return await this.analyzeWithOpenSource(text);
     } catch (error) {

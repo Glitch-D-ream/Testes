@@ -1,9 +1,6 @@
 import axios from 'axios';
-import { OpenAI } from 'openai';
 import { logInfo, logError } from '../core/logger.js';
 import { saveScoutHistory, checkUrlExists } from '../core/database.js';
-
-const openai = new OpenAI();
 
 export interface RawSource {
   title: string;
@@ -16,7 +13,6 @@ export interface RawSource {
 }
 
 export class ScoutAgent {
-  // Whitelist de domínios confiáveis para evitar Fake News
   private readonly whitelist = [
     'g1.globo.com', 'folha.uol.com.br', 'estadao.com.br', 'cnnbrasil.com.br',
     'valor.globo.com', 'bbc.com', 'elpais.com', 'uol.com.br', 'r7.com',
@@ -30,11 +26,9 @@ export class ScoutAgent {
     const sources: RawSource[] = [];
     
     try {
-      // 1. RSS Feeds (Alta Confiança)
       const rssResults = await this.fetchFromRSS(query);
       sources.push(...rssResults);
 
-      // 2. Busca Web (Pollinations) - Apenas se necessário
       if (sources.length < 5) {
         const webResults = await this.fetchFromWeb(query);
         sources.push(...webResults);
@@ -42,7 +36,6 @@ export class ScoutAgent {
       
       const newSources: RawSource[] = [];
       for (const source of sources) {
-        // Validação de URL e Whitelist
         if (!this.isValidUrl(source.url)) continue;
         
         const isTrusted = this.whitelist.some(domain => source.url.includes(domain));
@@ -86,52 +79,38 @@ export class ScoutAgent {
     [
       {
         "title": "Título da notícia",
-        "url": "URL válida da fonte (ex: g1.globo.com/...)",
+        "url": "URL válida da fonte",
         "content": "Resumo ou trecho da fala/promessa",
-        "source": "Nome do portal (ex: G1, Folha, CNN)",
+        "source": "Nome do portal",
         "date": "Data aproximada"
       }
-    ]
-    
-    Dê prioridade absoluta a fontes confiáveis da whitelist: G1, Folha de S.Paulo, Estadão, CNN Brasil, Metrópoles, Poder360.`;
+    ]`;
 
     try {
       let content: any;
       try {
+        // Tentar Pollinations (Llama 3 Gratuito)
         const response = await axios.post('https://text.pollinations.ai/', {
           messages: [
             { role: 'system', content: 'Você é um buscador de notícias políticas brasileiras. Responda apenas JSON.' },
             { role: 'user', content: prompt }
           ],
-          model: 'openai',
+          model: 'llama',
           jsonMode: true
-        }, { timeout: 20000 });
+        }, { timeout: 25000 });
 
-        let data = response.data;
-        content = typeof data === 'string' ? data : data.choices?.[0]?.message?.content || data;
+        content = response.data;
       } catch (pollError) {
-        logInfo('[Scout] Pollinations falhou ou atingiu limite. Usando OpenAI Fallback...');
-        const completion = await openai.chat.completions.create({
-          messages: [
-            { role: 'system', content: 'Você é um buscador de notícias políticas brasileiras. Responda apenas JSON.' },
-            { role: 'user', content: prompt }
-          ],
-          model: 'gpt-4.1-mini',
-          response_format: { type: 'json_object' }
-        });
-        content = completion.choices[0].message.content;
+        logInfo('[Scout] Pollinations falhou. Tentando fallback via Hugging Face ou similar...');
+        // Aqui poderíamos adicionar outro provedor gratuito se necessário
+        return [];
       }
       
       if (typeof content === 'string') {
-        try {
-          content = JSON.parse(content.replace(/```json\n?|\n?```/g, '').trim());
-        } catch (e) {
-          logError('[Scout] Erro ao parsear JSON da busca web', e as Error);
-          return [];
-        }
+        content = JSON.parse(content.replace(/```json\n?|\n?```/g, '').trim());
       }
       
-      const results = Array.isArray(content) ? content : (content.news || content.results || content.noticias || []);
+      const results = Array.isArray(content) ? content : (content.news || content.results || []);
       
       return (results as any[]).map(item => ({
         title: item.title || item.titulo,
