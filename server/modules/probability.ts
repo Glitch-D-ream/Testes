@@ -134,9 +134,24 @@ export async function calculateProbabilityWithDetails(
     };
   }
 
+  // 1. Calcular fatores externos apenas UMA VEZ por análise (SICONFI e TSE)
+  const siconfiCategory = mapPromiseToSiconfiCategory(category || 'GERAL');
+  const budgetValidation = await validateBudgetViability(siconfiCategory, 0, new Date().getFullYear());
+  const authorValidation = author ? await validateCandidateCredibility(author, 'BR') : null;
+
   const allFactors: ProbabilityFactors[] = [];
   for (const promise of promises) {
-    allFactors.push(await calculateFactors(promise, author, category));
+    // 2. Calcular fatores específicos da promessa (Linguística e Cronograma)
+    const specificity = calculateSpecificity(promise);
+    const timeline = calculateTimelineFeasibility(promise);
+
+    allFactors.push({
+      promiseSpecificity: specificity,
+      historicalCompliance: budgetValidation.confidence,
+      budgetaryFeasibility: budgetValidation.viable ? 0.8 : 0.3,
+      timelineFeasibility: timeline,
+      authorTrack: authorValidation ? authorValidation.score : 0.5
+    });
   }
 
   const avgFactors: ProbabilityFactors = {
@@ -155,7 +170,7 @@ export async function calculateProbabilityWithDetails(
   else riskLevel = 'ALTO';
 
   return {
-    score: Math.round(score * 100),
+    score: score, // Retornar entre 0 e 1 para consistência
     factors: avgFactors,
     riskLevel,
     confidence: 0.85 // Alta confiança devido ao uso de dados reais

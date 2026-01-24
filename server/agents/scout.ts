@@ -73,7 +73,7 @@ export class ScoutAgent {
   }
 
   private async fetchFromWeb(query: string): Promise<RawSource[]> {
-    const prompt = `Aja como um buscador de notícias em tempo real. Liste as 5 notícias, discursos ou falas reais mais recentes do político "${query}" que contenham promessas, planos de governo ou declarações de intenção.
+    const prompt = `Aja como um buscador de notícias em tempo real. Liste as 5 notícias, discursos ou falas reais mais recentes do político brasileiro "${query}" que contenham promessas, planos de governo ou declarações de intenção.
     
     IMPORTANTE: Retorne APENAS um array JSON puro, sem explicações, no seguinte formato:
     [
@@ -89,28 +89,32 @@ export class ScoutAgent {
     try {
       let content: any;
       try {
-        // Tentar Pollinations (Llama 3 Gratuito)
+        // Usando o modelo 'mistral' no Pollinations que é gratuito e estável
         const response = await axios.post('https://text.pollinations.ai/', {
           messages: [
             { role: 'system', content: 'Você é um buscador de notícias políticas brasileiras. Responda apenas JSON.' },
             { role: 'user', content: prompt }
           ],
-          model: 'llama',
-          jsonMode: true
-        }, { timeout: 25000 });
+          model: 'mistral'
+        }, { timeout: 30000 });
 
-        content = response.data;
+        const data = response.data;
+        content = data.choices?.[0]?.message?.content || data;
       } catch (pollError) {
-        logInfo('[Scout] Pollinations falhou. Tentando fallback via Hugging Face ou similar...');
-        // Aqui poderíamos adicionar outro provedor gratuito se necessário
+        logError('[Scout] Falha na API de busca Pollinations', pollError as Error);
         return [];
       }
       
       if (typeof content === 'string') {
-        content = JSON.parse(content.replace(/```json\n?|\n?```/g, '').trim());
+        try {
+          content = JSON.parse(content.replace(/```json\n?|\n?```/g, '').trim());
+        } catch (e) {
+          logError('[Scout] Erro ao parsear JSON da Web', e as Error);
+          return [];
+        }
       }
       
-      const results = Array.isArray(content) ? content : (content.news || content.results || []);
+      const results = Array.isArray(content) ? content : (content.news || content.results || content.noticias || []);
       
       return (results as any[]).map(item => ({
         title: item.title || item.titulo,
