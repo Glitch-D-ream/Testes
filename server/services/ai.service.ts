@@ -15,31 +15,39 @@ export interface AIAnalysisResult {
 }
 
 export class AIService {
+  /**
+   * Prompt de Alta Performance (Versão Restaurada e Melhorada)
+   * Focado em profundidade, utilidade e análise técnica rigorosa.
+   */
   private promptTemplate(text: string): string {
-    return `Você é um analista político especializado em fact-checking e análise técnica de promessas.
-    Sua missão é extrair promessas, planos ou compromissos de forma TOTALMENTE IMPARCIAL e RIGOROSA.
+    return `Você é um analista político de elite, especializado em auditoria de promessas e análise de viabilidade.
+    Sua missão é transformar o texto bruto em um relatório de inteligência profundo, útil e extremamente detalhado.
     
-    DIRETRIZES DE RIGOR:
-    1. NEUTRALIDADE: Ignore adjetivos e foque em ações concretas (verbos de ação).
-    2. EVIDÊNCIA: Apenas extraia o que está explicitamente no texto. Não deduza intenções.
-    3. ESPECIFICIDADE: Diferencie "intenções vagas" de "promessas concretas" (com prazos ou valores).
-    4. CETICISMO: Se uma promessa for impossível de ser cumprida apenas pelo executivo, mencione no raciocínio.
+    DIRETRIZES DE QUALIDADE:
+    1. PROFUNDIDADE: Não seja superficial. Analise as implicações de cada promessa.
+    2. UTILIDADE: O texto deve servir para um cidadão decidir se a promessa é realista ou não.
+    3. RIGOR TÉCNICO: Use termos técnicos de administração pública quando apropriado (ex: PPA, LOA, dotação orçamentária).
+    4. DETECÇÃO DE NUANCES: Identifique se a promessa depende de aprovação do Congresso ou se é ato exclusivo do Executivo.
     
-    Para cada promessa, identifique:
-    1. O texto exato da promessa.
-    2. A categoria (Saúde, Educação, Economia, etc).
-    3. O nível de confiança na extração (0 a 1).
-    4. Se a promessa é uma negação (ex: "não vou aumentar impostos").
-    5. Se a promessa é condicional (ex: "se eu for eleito").
-    6. O raciocínio técnico (justificativa baseada em fatos).
+    Para cada promessa extraída, forneça um raciocínio (reasoning) que explique:
+    - Por que ela é difícil ou fácil de cumprir.
+    - Qual o impacto social esperado.
+    - Se existe base legal óbvia para ela.
     
-    Responda APENAS um JSON no formato:
+    Responda estritamente em formato JSON seguindo esta estrutura:
     {
       "promises": [
-        { "text": "string", "category": "string", "confidence": number, "negated": boolean, "conditional": boolean, "reasoning": "string" }
+        {
+          "text": "Texto integral da promessa",
+          "category": "Saúde/Educação/Economia/etc",
+          "confidence": 0.95,
+          "negated": false,
+          "conditional": true,
+          "reasoning": "Análise técnica profunda sobre a viabilidade e impacto desta promessa específica."
+        }
       ],
-      "overallSentiment": "Neutral",
-      "credibilityScore": number (0 a 100)
+      "overallSentiment": "Análise qualitativa do tom do discurso (ex: Populista, Técnico, Austero)",
+      "credibilityScore": 85
     }
     
     Texto para análise:
@@ -48,26 +56,30 @@ export class AIService {
 
   /**
    * Provedor de Código Aberto (Pollinations AI) com Multi-Model Fallback
+   * Usando modelos de alto nível para garantir a qualidade do texto.
    */
   private async analyzeWithOpenSource(text: string): Promise<AIAnalysisResult> {
-    const models = ['mistral', 'llama', 'qwen', 'openai'];
+    // Focando nos modelos que demonstraram melhor capacidade de escrita profunda
+    const models = ['openai', 'mistral', 'llama'];
     let lastError: any;
 
     for (const model of models) {
       try {
-        logInfo(`[AI] Tentando análise com modelo: ${model}...`);
+        logInfo(`[AI] Gerando relatório de alta qualidade com modelo: ${model}...`);
         const response = await axios.post('https://text.pollinations.ai/', {
           messages: [
-            { role: 'system', content: 'Você é um analista político rigoroso. Responda APENAS JSON válido.' },
+            { 
+              role: 'system', 
+              content: 'Você é um analista político sênior. Seus relatórios são famosos pela profundidade técnica e utilidade prática. Você nunca é superficial. Responda apenas JSON.' 
+            },
             { role: 'user', content: this.promptTemplate(text) }
           ],
           model: model,
           jsonMode: true
-        }, { timeout: 30000 });
+        }, { timeout: 60000 }); // Aumentado timeout para permitir respostas mais longas e profundas
 
         let content = response.data;
         
-        // Extração robusta de JSON
         if (typeof content === 'object' && content.choices) {
           content = content.choices[0]?.message?.content || content;
         }
@@ -81,60 +93,23 @@ export class AIService {
         
         if (content && content.promises) return content as AIAnalysisResult;
         
-        throw new Error(`Modelo ${model} retornou formato inválido`);
+        throw new Error(`Modelo ${model} não gerou a profundidade esperada`);
       } catch (error) {
-        logError(`[AI] Falha no modelo ${model}`, error as Error);
+        logError(`[AI] Falha na tentativa com ${model}`, error as Error);
         lastError = error;
-        continue; // Tenta o próximo modelo
+        continue;
       }
     }
 
-    throw lastError || new Error('Todos os modelos de IA falharam');
-  }
-
-  /**
-   * Fallback para Groq se a chave estiver presente (Llama 3 70B Gratuito)
-   */
-  private async analyzeWithGroq(text: string): Promise<AIAnalysisResult> {
-    if (!process.env.GROQ_API_KEY) throw new Error('GROQ_API_KEY não configurada');
-    
-    logInfo('Tentando análise com Groq (Llama 3.3 70B)...');
-    const response = await axios.post('https://api.groq.com/openai/v1/chat/completions', {
-      messages: [
-        { role: 'system', content: 'Você é um analista político que responde apenas em JSON válido.' },
-        { role: 'user', content: this.promptTemplate(text) }
-      ],
-      model: 'llama-3.3-70b-versatile',
-      response_format: { type: 'json_object' }
-    }, {
-      headers: {
-        'Authorization': `Bearer ${process.env.GROQ_API_KEY}`,
-        'Content-Type': 'application/json'
-      },
-      timeout: 30000
-    });
-
-    const content = response.data.choices[0]?.message?.content;
-    if (!content) throw new Error('Resposta vazia do Groq');
-    return JSON.parse(content) as AIAnalysisResult;
+    throw lastError || new Error('Falha ao gerar relatório de alta qualidade');
   }
 
   async analyzeText(text: string): Promise<AIAnalysisResult> {
-    // 1. Tentar Groq (se houver chave, é gratuito e de alto nível)
-    if (process.env.GROQ_API_KEY && process.env.GROQ_API_KEY.length > 10) {
-      try {
-        return await this.analyzeWithGroq(text);
-      } catch (error) {
-        logError('Falha no Groq, tentando Pollinations...', error as Error);
-      }
-    }
-
-    // 2. Fallback Final: Pollinations (Sempre disponível e gratuito)
     try {
       return await this.analyzeWithOpenSource(text);
     } catch (error) {
-      logError('Falha em todos os provedores de IA', error as Error);
-      throw new Error('Não foi possível realizar a análise de IA no momento.');
+      logError('Erro crítico na geração do relatório', error as Error);
+      throw new Error('Não foi possível gerar o relatório detalhado no momento.');
     }
   }
 }
