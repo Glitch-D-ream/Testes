@@ -29,7 +29,7 @@ export class ScoutAgent {
       const rssResults = await this.fetchFromRSS(query);
       sources.push(...rssResults);
 
-      if (sources.length < 5) {
+      if (sources.length < 3) {
         const webResults = await this.fetchFromWeb(query);
         sources.push(...webResults);
       }
@@ -73,62 +73,50 @@ export class ScoutAgent {
   }
 
   private async fetchFromWeb(query: string): Promise<RawSource[]> {
-    const prompt = `Aja como um buscador de notícias em tempo real. Liste as 5 notícias, discursos ou falas reais mais recentes do político brasileiro "${query}" que contenham promessas, planos de governo ou declarações de intenção.
-    
-    IMPORTANTE: Retorne APENAS um array JSON puro, sem explicações, no seguinte formato:
-    [
-      {
-        "title": "Título da notícia",
-        "url": "URL válida da fonte",
-        "content": "Resumo ou trecho da fala/promessa",
-        "source": "Nome do portal",
-        "date": "Data aproximada"
-      }
-    ]`;
+    const prompt = `Liste 5 notícias reais e recentes do político brasileiro "${query}" com promessas ou declarações. Retorne APENAS um array JSON: [{"title": "...", "url": "...", "content": "...", "source": "...", "date": "..."}]`;
 
-    try {
-      let content: any;
+    let retries = 3;
+    const models = ['searchgpt', 'mistral', 'openai'];
+
+    for (let i = 0; i < retries; i++) {
       try {
-        // Usando o modelo 'mistral' no Pollinations que é gratuito e estável
-        const response = await axios.post('https://text.pollinations.ai/', {
-          messages: [
-            { role: 'system', content: 'Você é um buscador de notícias políticas brasileiras. Responda apenas JSON.' },
-            { role: 'user', content: prompt }
-          ],
-          model: 'mistral'
-        }, { timeout: 30000 });
-
-        const data = response.data;
-        content = data.choices?.[0]?.message?.content || data;
-      } catch (pollError) {
-        logError('[Scout] Falha na API de busca Pollinations', pollError as Error);
-        return [];
-      }
-      
-      if (typeof content === 'string') {
-        try {
-          content = JSON.parse(content.replace(/```json\n?|\n?```/g, '').trim());
-        } catch (e) {
-          logError('[Scout] Erro ao parsear JSON da Web', e as Error);
-          return [];
+        const model = models[i];
+        logInfo(`[Scout] Tentando busca web (Tentativa ${i + 1}) com modelo: ${model}`);
+        
+        const encodedPrompt = encodeURIComponent(prompt);
+        const url = `https://text.pollinations.ai/${encodedPrompt}?model=${model}&json=true`;
+        
+        const response = await axios.get(url, { timeout: 30000 });
+        let content = response.data;
+        
+        if (typeof content === 'string') {
+          try {
+            content = JSON.parse(content.replace(/```json\n?|\n?```/g, '').trim());
+          } catch (e) {
+            logError('[Scout] Erro ao parsear JSON da Web', e as Error);
+            continue;
+          }
+        }
+        
+        const results = Array.isArray(content) ? content : (content.news || content.results || content.noticias || []);
+        
+        return (results as any[]).map(item => ({
+          title: item.title || item.titulo,
+          url: item.url || item.link,
+          content: item.content || item.snippet || item.resumo || '',
+          source: item.source || item.fonte || 'Web Search',
+          publishedAt: item.date || item.data,
+          type: 'news',
+          confidence: 'medium'
+        }));
+      } catch (error: any) {
+        logError(`[Scout] Falha na tentativa ${i + 1} com modelo ${models[i]}`, error as Error);
+        if (i < retries - 1) {
+          await new Promise(resolve => setTimeout(resolve, 2000));
         }
       }
-      
-      const results = Array.isArray(content) ? content : (content.news || content.results || content.noticias || []);
-      
-      return (results as any[]).map(item => ({
-        title: item.title || item.titulo,
-        url: item.url || item.link,
-        content: item.content || item.snippet || item.resumo || '',
-        source: item.source || item.fonte || 'Web Search',
-        publishedAt: item.date || item.data,
-        type: 'news',
-        confidence: 'medium'
-      }));
-    } catch (error) {
-      logError('[Scout] Falha crítica na busca Web', error as Error);
-      return [];
     }
+    return [];
   }
 
   private async fetchFromRSS(query: string): Promise<RawSource[]> {

@@ -6,7 +6,7 @@ import * as dotenv from 'dotenv';
 dotenv.config();
 
 async function testFullFlow() {
-  const name = 'Nikolas Ferreira';
+  const name = process.argv[2] || 'Nikolas Ferreira';
   console.log(`--- Testando Fluxo Completo da Tríade para: ${name} ---`);
   
   try {
