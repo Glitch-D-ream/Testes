@@ -10,7 +10,7 @@ export interface FilteredSource extends RawSource {
 
 export class FilterAgent {
   /**
-   * Filtra e limpa os dados brutos usando uma IA leve para classificação
+   * Filtra e limpa os dados brutos usando uma IA leve com processamento em lote
    */
   async filter(sources: RawSource[]): Promise<FilteredSource[]> {
     logInfo(`[Filter] Analisando relevância de ${sources.length} fontes...`);
@@ -18,63 +18,87 @@ export class FilterAgent {
     // 1. Remover duplicatas por URL
     const uniqueSources = Array.from(new Map(sources.map(s => [s.url, s])).values());
     
-    const filteredResults: FilteredSource[] = [];
-
-    for (const source of uniqueSources) {
-      try {
-        // Usamos uma chamada rápida de IA para decidir se o conteúdo é uma promessa
-        // Isso evita que o "Brain" (IA cara) processe lixo.
-        const isRelevant = await this.checkRelevance(source);
-        
-        if (isRelevant.isPromise) {
-          filteredResults.push({
-            ...source,
-            relevanceScore: isRelevant.score,
-            isPromise: true,
-            justification: isRelevant.reason
-          });
-        }
-      } catch (error) {
-        logError(`[Filter] Erro ao filtrar fonte: ${source.url}`, error as Error);
-        // Fallback: se a IA falhar, usamos uma heurística simples de palavras-chave
-        if (this.simpleHeuristic(source.content)) {
-          filteredResults.push({
-            ...source,
-            relevanceScore: 0.5,
-            isPromise: true,
-            justification: 'Aprovado por heurística de palavras-chave (Fallback)'
-          });
-        }
-      }
+    // 2. Pré-filtragem por heurística simples (NLP Local) para economizar IA
+    const candidates = uniqueSources.filter(source => this.simpleHeuristic(source.title + " " + source.content));
+    
+    if (candidates.length === 0) {
+      logInfo(`[Filter] Nenhuma fonte passou na heurística inicial.`);
+      return [];
     }
 
-    logInfo(`[Filter] Refino concluído. ${filteredResults.length} fontes úteis para o Brain.`);
-    return filteredResults;
+    logInfo(`[Filter] ${candidates.length} fontes passaram na heurística. Iniciando análise em lote via IA...`);
+
+    try {
+      // 3. Processamento em Lote (Batch) via IA
+      // Enviamos as fontes em grupos para economizar chamadas e tempo
+      const filteredResults = await this.checkRelevanceBatch(candidates);
+      
+      logInfo(`[Filter] Refino concluído. ${filteredResults.length} fontes úteis para o Brain.`);
+      return filteredResults;
+    } catch (error) {
+      logError(`[Filter] Erro no processamento em lote. Usando fallback individual...`, error as Error);
+      
+      // Fallback: se o lote falhar, tenta processar os candidatos com a heurística aprovada
+      return candidates.map(source => ({
+        ...source,
+        relevanceScore: 0.5,
+        isPromise: true,
+        justification: 'Aprovado por heurística (Fallback de erro na IA)'
+      }));
+    }
   }
 
-  private async checkRelevance(source: RawSource): Promise<{ isPromise: boolean, score: number, reason: string }> {
-    const prompt = `Analise se o texto abaixo contém uma promessa política, plano de governo ou compromisso público.
-    Texto: "${source.content}"
-    Responda apenas JSON: {"isPromise": boolean, "score": 0-1, "reason": "string"}`;
+  /**
+   * Analisa um lote de fontes em uma única chamada de IA
+   */
+  private async checkRelevanceBatch(sources: RawSource[]): Promise<FilteredSource[]> {
+    // Preparar o lote para o prompt
+    const batchData = sources.map((s, idx) => ({
+      id: idx,
+      text: `${s.title}: ${s.content.substring(0, 300)}...`
+    }));
+
+    const prompt = `Analise quais dos textos abaixo contêm promessas políticas, planos de governo ou compromissos públicos.
+    Textos: ${JSON.stringify(batchData)}
+    Responda apenas um JSON no formato: {"results": [{"id": number, "isPromise": boolean, "score": number, "reason": "string"}]}`;
 
     const response = await axios.post('https://text.pollinations.ai/', {
       messages: [
-        { role: 'system', content: 'Você é um classificador de dados políticos. Responda apenas JSON.' },
+        { role: 'system', content: 'Você é um classificador de dados políticos especializado em análise de promessas. Responda apenas JSON.' },
         { role: 'user', content: prompt }
       ],
       model: 'openai',
       jsonMode: true
-    }, { timeout: 15000 });
+    }, { timeout: 30000 });
 
     let data = response.data;
     if (typeof data === 'string') {
       data = JSON.parse(data.replace(/```json\n?|\n?```/g, '').trim());
     }
-    return data;
+
+    const filtered: FilteredSource[] = [];
+    if (data && data.results) {
+      for (const res of data.results) {
+        if (res.isPromise && sources[res.id]) {
+          filtered.push({
+            ...sources[res.id],
+            relevanceScore: res.score,
+            isPromise: true,
+            justification: res.reason
+          });
+        }
+      }
+    }
+
+    return filtered;
   }
 
   private simpleHeuristic(content: string): boolean {
-    const keywords = ['vou', 'vamos', 'prometo', 'farei', 'projeto', 'plano', 'investir', 'construir'];
+    const keywords = [
+      'vou', 'vamos', 'prometo', 'farei', 'projeto', 'plano', 'investir', 
+      'construir', 'obras', 'governo', 'edital', 'lançar', 'reforma', 
+      'ampliar', 'criar', 'reduzir', 'aumentar'
+    ];
     const contentLower = content.toLowerCase();
     return keywords.some(kw => contentLower.includes(kw));
   }
