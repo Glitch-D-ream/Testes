@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Search, Loader2, ShieldAlert, CheckCircle2 } from 'lucide-react';
+import { Search, Loader2, AlertCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
@@ -7,6 +7,7 @@ export default function SearchBar() {
   const [query, setQuery] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [status, setStatus] = useState<string>('');
+  const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
 
   const handleSearch = async (e: React.FormEvent) => {
@@ -14,6 +15,7 @@ export default function SearchBar() {
     if (!query.trim()) return;
 
     setIsProcessing(true);
+    setError(null);
     setStatus('Iniciando Tríade de Agentes...');
     
     try {
@@ -26,7 +28,10 @@ export default function SearchBar() {
         body: JSON.stringify({ name: query }),
       });
 
-      if (!response.ok) throw new Error('Erro ao iniciar análise');
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Erro ao iniciar análise');
+      }
       
       const { id, status: initialStatus } = await response.json();
 
@@ -40,6 +45,8 @@ export default function SearchBar() {
       const pollInterval = setInterval(async () => {
         try {
           const statusRes = await fetch(`${apiUrl}/api/search/status/${id}`);
+          if (!statusRes.ok) throw new Error('Erro ao verificar status');
+          
           const data = await statusRes.json();
 
           if (data.status === 'processing') {
@@ -51,17 +58,30 @@ export default function SearchBar() {
           } else if (data.status === 'failed') {
             clearInterval(pollInterval);
             setIsProcessing(false);
-            toast.error(`Falha na análise: ${data.error_message}`);
+            const msg = data.error_message || 'Os agentes não conseguiram extrair promessas suficientes para este político.';
+            setError(msg);
+            toast.error('A análise falhou');
           }
         } catch (err) {
           console.error('Erro no polling:', err);
+          // Não limpamos o intervalo imediatamente em caso de erro de rede temporário
         }
       }, 3000);
 
-    } catch (error) {
+      // Limite de segurança: 2 minutos para o polling
+      setTimeout(() => {
+        clearInterval(pollInterval);
+        if (isProcessing) {
+          setIsProcessing(false);
+          setError('A análise está demorando mais que o esperado. Tente novamente em instantes.');
+        }
+      }, 120000);
+
+    } catch (error: any) {
       console.error('Erro:', error);
-      toast.error('Erro ao conectar com os agentes.');
+      toast.error(error.message || 'Erro ao conectar com os agentes.');
       setIsProcessing(false);
+      setError(error.message || 'Erro de conexão.');
     }
   };
 
@@ -85,7 +105,17 @@ export default function SearchBar() {
         </button>
       </form>
 
-      {isProcessing && (
+      {error && (
+        <div className="mt-4 p-4 bg-rose-50 dark:bg-rose-900/20 border border-rose-100 dark:border-rose-800 rounded-xl flex items-start gap-3">
+          <AlertCircle className="text-rose-600 shrink-0 mt-0.5" size={18} />
+          <div className="text-sm text-rose-700 dark:text-rose-400">
+            <p className="font-bold">Não foi possível completar a análise</p>
+            <p>{error}</p>
+          </div>
+        </div>
+      )}
+
+      {isProcessing && !error && (
         <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded-xl animate-pulse">
           <div className="flex items-center gap-3 text-blue-700 dark:text-blue-400">
             <Loader2 className="animate-spin" size={20} />

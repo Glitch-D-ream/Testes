@@ -82,7 +82,8 @@ export class SearchService {
    * Orquestração da Tríade de Agentes para Análise Automática (V2 com Jobs)
    */
   async autoAnalyzePolitician(politicianName: string, userId: string | null = null) {
-    const supabase = (await import('../core/database.js')).getSupabase();
+    const { getSupabase } = await import('../core/database.js');
+    const supabase = getSupabase();
     const { nanoid } = await import('nanoid');
     
     // 1. Verificar Cache (L1) - Análise recente concluída nas últimas 24h
@@ -120,24 +121,26 @@ export class SearchService {
         
         // Scout
         const rawSources = await scoutAgent.search(politicianName);
-        if (rawSources.length === 0) throw new Error('Nenhuma fonte encontrada');
+        if (rawSources.length === 0) {
+          throw new Error('O Agente Buscador não encontrou notícias ou fontes recentes para este político. Tente um nome mais conhecido.');
+        }
 
         // Filter
         const filteredSources = await filterAgent.filter(rawSources);
-        if (filteredSources.length === 0) throw new Error('Nenhuma promessa relevante detectada');
+        if (filteredSources.length === 0) {
+          throw new Error('Nenhuma promessa ou compromisso político claro foi detectado nas notícias encontradas.');
+        }
 
         // Brain (O Brain já salva os dados finais no banco)
         await brainAgent.analyze(politicianName, filteredSources, userId, analysisId);
         
-        // Marcar como concluído (O Brain faz o insert, mas precisamos garantir o status correto)
-        // Nota: O BrainAgent atual cria uma NOVA análise. Vamos ajustar para ele atualizar a existente se passarmos o ID.
-        // Por agora, garantimos o status no registro inicial ou o Brain fará o trabalho.
         logInfo(`[Orchestrator] [Job:${analysisId}] Concluído com sucesso.`);
       } catch (error: any) {
         logError(`[Orchestrator] [Job:${analysisId}] Falha: ${error.message}`);
+        // Atualizar o status para failed no banco para o polling do frontend parar
         await supabase.from('analyses').update({
           status: 'failed',
-          errorMessage: error.message
+          error_message: error.message // Corrigido para error_message conforme o banco
         }).eq('id', analysisId);
       }
     });
