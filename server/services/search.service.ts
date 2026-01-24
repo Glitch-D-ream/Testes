@@ -86,22 +86,8 @@ export class SearchService {
     const supabase = getSupabase();
     const { nanoid } = await import('nanoid');
     
-    // 1. Verificar Cache (L1) - Análise recente concluída nas últimas 24h
-    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-    const { data: existing } = await supabase
-      .from('analyses')
-      .select('id, status, created_at')
-      .ilike('author', `%${politicianName}%`)
-      .eq('status', 'completed')
-      .gt('created_at', oneDayAgo)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .single();
-
-    if (existing) {
-      logInfo(`[Orchestrator] Cache L1 encontrado para ${politicianName}. Retornando ID: ${existing.id}`);
-      return { id: existing.id, status: 'completed', cached: true };
-    }
+    // Cache L1 desativado para garantir que a lógica mais recente seja aplicada
+    logInfo(`[Orchestrator] Ignorando cache para garantir análise com lógica atualizada: ${politicianName}`);
 
     // 2. Criar Job de Análise (Pendente/Processando)
     const analysisId = nanoid();
