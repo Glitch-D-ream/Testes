@@ -2,45 +2,13 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { Moon, Sun, ShieldCheck, Database, Cpu, Search, History, BarChart3, FileText } from 'lucide-react';
-import AnalysisForm from '../components/AnalysisForm';
+import SearchBar from '../components/SearchBar';
 import { Button } from '../components/Button';
 import { useTheme } from '../hooks/useTheme';
 
 export default function Home() {
   const navigate = useNavigate();
-  const [isLoading, setIsLoading] = useState(false);
   const { theme, toggleTheme } = useTheme();
-
-  const handleSubmit = async (data: {
-    text: string;
-    author?: string;
-    category?: string;
-  }) => {
-    setIsLoading(true);
-    try {
-      const apiUrl = import.meta.env.VITE_API_URL || '';
-      const response = await fetch(`${apiUrl}/api/analyze`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(data),
-      });
-
-      if (!response.ok) {
-        throw new Error('Erro ao processar análise');
-      }
-
-      const result = await response.json();
-      toast.success('Análise realizada com sucesso!');
-      navigate(`/analysis/${result.id}`);
-    } catch (error) {
-      console.error('Erro:', error);
-      toast.error('Erro ao processar análise. Tente novamente.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   return (
     <div className={`min-h-screen transition-colors ${
@@ -99,14 +67,7 @@ export default function Home() {
           </div>
 
           <div className="max-w-4xl mx-auto">
-            <div className={`rounded-2xl shadow-2xl overflow-hidden border ${
-              theme === 'dark' ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'
-            }`}>
-              <div className="p-1 bg-gradient-to-r from-blue-600 to-indigo-500" />
-              <div className="p-8">
-                <AnalysisForm onSubmit={handleSubmit} isLoading={isLoading} />
-              </div>
-            </div>
+            <SearchBar />
           </div>
         </div>
         
