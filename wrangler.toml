@@ -1,7 +1,0 @@
-name = "detector-promessa-vazia"
-compatibility_date = "2024-01-23"
-pages_build_output_dir = "client/dist"
-[vars]
-NODE_ENV = "production"
-[functions]
-compatibility_flags = ["nodejs_compat"]
