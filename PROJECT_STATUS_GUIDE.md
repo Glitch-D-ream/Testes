@@ -47,4 +47,4 @@ O projeto está dividido em quatro pilares integrados:
 4. **Banco:** O schema do banco está no Supabase. Verifique `server/models/schema.ts` para a estrutura das tabelas.
 
 ---
-*Guia gerado por Manus em 24/01/2026.*
+*Guia gerado por Seth VII em 24/01/2026.*

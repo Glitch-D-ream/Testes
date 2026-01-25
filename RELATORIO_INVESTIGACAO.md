@@ -1,6 +1,6 @@
 # Relatório de Investigação e Propostas de Melhoria: Detector de Promessa Vazia
 
-**Autor:** Manus AI
+**Autor:** Seth VII
 **Data:** 24 de Janeiro de 2026
 **Projeto:** Detector de Promessa Vazia (Repositório: Glitch-D-ream/Testes)
 

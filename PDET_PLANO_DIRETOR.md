@@ -1,7 +1,7 @@
 # 🚀 Plano Diretor de Evolução Técnica (PDET): Detector de Promessa Vazia
 
 **Versão:** 1.0 (Janeiro 2026)  
-**Responsável:** Manus AI  
+**Responsável:** Seth VII  
 **Objetivo:** Elevar o sistema ao padrão de auditoria estatal e jornalismo de dados de alta precisão.
 
 ---

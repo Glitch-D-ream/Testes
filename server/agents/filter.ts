@@ -20,9 +20,10 @@ export class FilterAgent {
 
     for (const source of sources) {
       const content = source.content || '';
+      const title = source.title || '';
       
-      // Heurística simples para pré-filtragem
-      if (this.simpleHeuristic(content, flexibleMode)) {
+      // Heurística simples para pré-filtragem (passando título também)
+      if (this.simpleHeuristic(content, flexibleMode, title)) {
         filtered.push({
           title: source.title,
           url: source.url,
@@ -38,7 +39,7 @@ export class FilterAgent {
     return filtered;
   }
 
-  private simpleHeuristic(content: string, flexibleMode: boolean = false): boolean {
+  private simpleHeuristic(content: string, flexibleMode: boolean = false, title: string = ''): boolean {
     const actionVerbs = [
       'vou', 'vamos', 'prometo', 'farei', 'irei', 'pretendo', 'planejo',
       'investir', 'construir', 'obras', 'edital', 'lançar', 'reforma', 
@@ -57,6 +58,8 @@ export class FilterAgent {
     ];
 
     const contentLower = content.toLowerCase();
+    const titleLower = title.toLowerCase();
+    const combinedText = (titleLower + ' ' + contentLower).trim();
 
     // Bloqueio de Ruído (Blacklist)
     const noiseKeywords = [
@@ -64,14 +67,29 @@ export class FilterAgent {
       'clique aqui', 'assine já', 'newsletter', 'fallback', 'generic search',
       'não encontrado', 'erro 404', 'página não encontrada'
     ];
-    const isNoise = noiseKeywords.some(kw => contentLower.includes(kw));
+    const isNoise = noiseKeywords.some(kw => combinedText.includes(kw));
     if (isNoise) return false;
     
-    const hasAction = actionVerbs.some(kw => contentLower.includes(kw));
-    const hasContext = politicalContext.some(kw => contentLower.includes(kw));
+    const hasAction = actionVerbs.some(kw => combinedText.includes(kw));
+    const hasContext = politicalContext.some(kw => combinedText.includes(kw));
 
-    // MODO ULTRA FLEXÍVEL: Se o conteúdo for minimamente longo e tiver contexto político, aceita.
-    return hasAction || hasContext || content.length > 60;
+    // MODO REFINADO: Exige ação OU contexto político forte, e ignora textos curtos ou puramente biográficos
+    const isTooShort = content.length < 100;
+    
+    // Verifica se o conteúdo ou o título indicam um perfil biográfico sem ação
+    const isBiographical = (combinedText.includes('deputado') || combinedText.includes('perfil:')) && 
+                          (combinedText.includes('email') || combinedText.includes('partido') || combinedText.includes('sigla'));
+    
+    // Se for biográfico ou muito curto, SÓ aceita se tiver uma ação MUITO clara (não apenas verbos comuns)
+    const hasStrongAction = ['prometo', 'vou investir', 'farei', 'projeto de lei'].some(kw => combinedText.includes(kw));
+
+    if (isBiographical && !hasStrongAction) return false;
+    if (isTooShort && !hasStrongAction) return false;
+
+    // Se o conteúdo for puramente informativo/biográfico, descarta
+    if (combinedText.includes('perfil:') && !hasStrongAction) return false;
+
+    return hasAction || (hasContext && content.length > 150);
   }
 }
 

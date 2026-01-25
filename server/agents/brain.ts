@@ -53,6 +53,7 @@ export class BrainAgent {
       const siconfiCategory = mapPromiseToSiconfiCategory(mainCategory);
       const currentYear = new Date().getFullYear();
       
+      // 3. Validação Orçamentária (SICONFI) - Usar valor simbólico apenas se não houver promessas
       const budgetViability = await validateBudgetViability(siconfiCategory, 500000000, currentYear - 1);
       
       // 3.1. Validação Macro (IBGE)
@@ -295,8 +296,10 @@ ${knowledgeBase}
 
       const totalAnalyses = data.length;
       const avgScore = data.reduce((acc, curr) => acc + (curr.probability_score || 0), 0) / totalAnalyses;
-
-      return { totalAnalyses, avgScore: Math.round(avgScore * 100) };
+      
+      // Garantir que o score médio não ultrapasse 100% e tratar scores salvos como decimais (0-1)
+      const normalizedAvg = avgScore > 1 ? avgScore / 100 : avgScore;
+      return { totalAnalyses, avgScore: Math.min(Math.round(normalizedAvg * 100), 100) };
     } catch {
       return null;
     }

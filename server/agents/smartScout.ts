@@ -117,6 +117,38 @@ export class SmartScout {
   }
 
   /**
+   * Validação de Identidade (Anti-Ambiguidade)
+   */
+  private validateIdentity(foundName: string, searchedName: string): boolean {
+    const found = foundName.toLowerCase();
+    const searched = searchedName.toLowerCase();
+    
+    // 1. Match Exato
+    if (found === searched) return true;
+    
+    // 2. Casos Especiais de Alto Perfil (Hardcoded para segurança)
+    const highProfile = {
+      'lula': 'luiz inácio lula da silva',
+      'bolsonaro': 'jair messias bolsonaro',
+      'tarcisio': 'tarcísio gomes de freitas',
+      'haddad': 'fernando haddad'
+    };
+    
+    if (highProfile[searched as keyof typeof highProfile] === found) return true;
+    
+    // 3. Bloqueio de Falsos Positivos Comuns (Ex: Lula da Fonte para Lula)
+    if (searched === 'lula' && found.includes('fonte')) return false;
+    
+    // 4. Verificação de Substring (Deve ser o nome principal, não apenas parte do sobrenome)
+    const foundParts = found.split(' ');
+    const searchedParts = searched.split(' ');
+    
+    // Se o nome buscado for apenas uma palavra, ela deve ser uma das partes do nome encontrado
+    // mas não pode ser apenas um sobrenome comum se houver ambiguidade
+    return searchedParts.every(part => foundParts.includes(part));
+  }
+
+  /**
    * API da Câmara dos Deputados
    */
   private async searchCamaraAPI(politicianName: string, options?: any): Promise<SearchResult[]> {
@@ -125,10 +157,29 @@ export class SmartScout {
     const timeoutId = setTimeout(() => controller.abort(), this.config.timeoutMs);
 
     try {
+      // 1. Primeiro, validar se o político existe e pegar o nome oficial
+      const searchUrl = `https://dadosabertos.camara.leg.br/api/v2/deputados?nome=${encodeURIComponent(politicianName)}&ordem=ASC&ordenarBy=nome`;
+      const searchRes = await fetch(searchUrl, { headers: { 'Accept': 'application/json' }, signal: controller.signal });
+      
+      let officialName = politicianName;
+      if (searchRes.ok) {
+        const searchData: any = await searchRes.json();
+        if (searchData.dados && searchData.dados.length > 0) {
+          // Filtrar por validação de identidade
+          const validPoliticians = searchData.dados.filter((p: any) => this.validateIdentity(p.nome, politicianName));
+          
+          if (validPoliticians.length > 0) {
+            officialName = validPoliticians[0].nome;
+            console.log(`🎯 [SmartScout] Identidade validada: ${politicianName} -> ${officialName}`);
+          } else if (searchData.dados.length > 1) {
+            console.warn(`⚠️ [SmartScout] Ambiguidade detectada para "${politicianName}". Resultados podem ser imprecisos.`);
+          }
+        }
+      }
+
       const endpoints = [
-        `https://dadosabertos.camara.leg.br/api/v2/deputados?nome=${encodeURIComponent(politicianName)}`,
-        `https://dadosabertos.camara.leg.br/api/v2/proposicoes?autor=${encodeURIComponent(politicianName)}&itens=5`,
-        `https://dadosabertos.camara.leg.br/api/v2/discursos?autor=${encodeURIComponent(politicianName)}&itens=5`
+        `https://dadosabertos.camara.leg.br/api/v2/proposicoes?autor=${encodeURIComponent(officialName)}&itens=5`,
+        `https://dadosabertos.camara.leg.br/api/v2/discursos?autor=${encodeURIComponent(officialName)}&itens=5`
       ];
       
       for (const endpoint of endpoints) {
@@ -144,12 +195,12 @@ export class SmartScout {
           
           if (data.dados && Array.isArray(data.dados)) {
             for (const item of data.dados) {
-              const result = await this.normalizeCamaraData(item, politicianName);
+              const result = await this.normalizeCamaraData(item, officialName);
               if (result) results.push(result);
             }
           }
         } catch (e) {
-          // Erro individual em endpoint não deve parar outros
+          // Erro individual
         }
       }
     } catch (error: any) {

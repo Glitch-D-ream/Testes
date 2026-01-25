@@ -1,7 +1,7 @@
 # 🛠️ Plano Diretor de Evolução (v2.0): Realidade de Trincheira
 
 **Foco:** Eficácia, Baixo Custo e Rigor Analítico.  
-**Analista:** Manus AI  
+**Analista:** Seth VII  
 
 Este plano substitui a versão anterior, eliminando complexidades desnecessárias e focando no que realmente faz o **Detector de Promessa Vazia** ser útil e confiável.
 

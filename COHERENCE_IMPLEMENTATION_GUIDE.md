@@ -2,7 +2,7 @@
 
 **Versão:** 1.0  
 **Data:** 24 de Janeiro de 2026  
-**Autor:** Manus AI
+**Autor:** Seth VII
 
 ---
 
