@@ -76,8 +76,11 @@ export class AIService {
    * Usando modelos de alto nível para garantir a qualidade do texto.
    */
   private async analyzeWithOpenSource(text: string): Promise<AIAnalysisResult> {
-    // Focando nos modelos que demonstraram melhor capacidade de escrita profunda
-    const models = ['openai', 'mistral', 'llama'];
+    // Ordem de Prioridade: Modelos Originais -> Backups de Elite Gratuitos
+    const models = [
+      'openai', 'mistral', 'llama', // Originais (Pollinations)
+      'deepseek-r1', 'llama-3.3-70b', 'mistral-large' // Backups de Segurança
+    ];
     let lastError: any;
 
     for (const model of models) {
