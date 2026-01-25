@@ -33,6 +33,7 @@ Responda estritamente em formato JSON puro (sem markdown):
     {
       "text": "A promessa ou declaração exata",
       "category": "Saúde|Educação|Economia|Segurança|Infraestrutura|Geral",
+      "estimatedValue": 1000000, // Valor estimado em Reais (se mencionado ou estimável, senão 0)
       "confidence": 0.0 a 1.0,
       "negated": false,
       "conditional": false,

@@ -49,6 +49,7 @@ export class AIService {
         {
           "text": "Texto integral da promessa",
           "category": "Saúde/Educação/Economia/etc",
+          "estimatedValue": 1000000,
           "confidence": 0.95,
           "negated": false,
           "conditional": true,

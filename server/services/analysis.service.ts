@@ -4,22 +4,37 @@ import { getSupabase } from '../core/database.ts';
 import { extractPromises } from '../modules/nlp.ts';
 import { calculateProbability } from '../modules/probability.ts';
 import { aiService } from './ai.service.ts';
+import { deepSeekService } from './ai-deepseek.service.ts';
 import { logError, logInfo } from '../core/logger.ts';
 
 export class AnalysisService {
   async createAnalysis(userId: string | null, text: string, author: string, category: string) {
     let promises;
     let aiAnalysis = null;
+    const openRouterKey = process.env.OPENROUTER_API_KEY;
     
     try {
-      aiAnalysis = await aiService.analyzeText(text);
+      if (openRouterKey && openRouterKey !== 'sua_chave_aqui') {
+        try {
+          logInfo('[AnalysisService] Tentando DeepSeek R1 via OpenRouter...');
+          aiAnalysis = await deepSeekService.analyzeText(text, openRouterKey);
+        } catch (dsError) {
+          logError('[AnalysisService] Falha no DeepSeek R1, tentando fallback para AIService padrão', dsError as Error);
+          aiAnalysis = await aiService.analyzeText(text);
+        }
+      } else {
+        logInfo('[AnalysisService] Utilizando AIService padrão (Pollinations)...');
+        aiAnalysis = await aiService.analyzeText(text);
+      }
+
       promises = aiAnalysis.promises.map(p => ({
         text: p.text,
         confidence: p.confidence,
         category: p.category,
         negated: p.negated,
         conditional: p.conditional,
-        reasoning: p.reasoning
+        reasoning: p.reasoning,
+        risks: (p as any).risks || []
       }));
     } catch (error) {
       logError('Fallback para NLP local devido a erro na IA', error as Error);
@@ -29,28 +44,28 @@ export class AnalysisService {
     const analysisId = nanoid();
     const probabilityScore = await calculateProbability(promises, author, category);
 
-    const supabase = getSupabase();
+    try {
+      const supabase = getSupabase();
 
-    // Salvar análise no Supabase
-    const { error: analysisError } = await supabase
-      .from('analyses')
-      .insert([{
-        id: analysisId,
-        user_id: userId,
-        text,
-        author,
-        category,
-        extracted_promises: promises,
-        probability_score: probabilityScore
-      }]);
+      // Salvar análise no Supabase
+      const { error: analysisError } = await supabase
+        .from('analyses')
+        .insert([{
+          id: analysisId,
+          user_id: userId,
+          text,
+          author,
+          category,
+          extracted_promises: promises,
+          probability_score: probabilityScore
+        }]);
 
-    if (analysisError) {
-      logError('Erro ao salvar análise no Supabase', analysisError as any);
-      throw analysisError;
-    }
+      if (analysisError) {
+        logError('Erro ao salvar análise no Supabase', analysisError as any);
+      }
 
-    // Salvar promessas individuais
-    if (promises.length > 0) {
+      // Salvar promessas individuais
+      if (promises.length > 0) {
       const promisesToInsert = promises.map(p => ({
         id: nanoid(),
         analysis_id: analysisId,
@@ -59,16 +74,20 @@ export class AnalysisService {
         confidence_score: p.confidence,
         extracted_entities: (p as any).entities || {},
         negated: p.negated || false,
-        conditional: p.conditional || false
+        conditional: p.conditional || false,
+        risks: p.risks || []
       }));
 
-      const { error: promisesError } = await supabase
-        .from('promises')
-        .insert(promisesToInsert);
+        const { error: promisesError } = await supabase
+          .from('promises')
+          .insert(promisesToInsert);
 
-      if (promisesError) {
-        logError('Erro ao salvar promessas no Supabase', promisesError as any);
+        if (promisesError) {
+          logError('Erro ao salvar promessas no Supabase', promisesError as any);
+        }
       }
+    } catch (dbError) {
+      logError('Sistema operando sem persistência em banco de dados', dbError as Error);
     }
 
     return {

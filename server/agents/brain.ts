@@ -2,6 +2,7 @@ import { FilteredSource } from './filter.ts';
 import { logInfo, logError, logWarn } from '../core/logger.ts';
 import { getSupabase } from '../core/database.ts';
 import { validateBudgetViability, mapPromiseToSiconfiCategory } from '../integrations/siconfi.ts';
+import { validateValueAgainstPIB } from '../integrations/ibge.ts';
 import { getDeputadoId, getVotacoesDeputado, analisarIncoerencia } from '../integrations/camara.ts';
 import { getSenadorCodigo, getVotacoesSenador } from '../integrations/senado.ts';
 import { cacheService } from '../services/cache.service.ts';
@@ -44,6 +45,9 @@ export class BrainAgent {
       const currentYear = new Date().getFullYear();
       
       const budgetViability = await validateBudgetViability(siconfiCategory, 500000000, currentYear - 1);
+      
+      // 3.1. Validação Macro (IBGE)
+      const pibViability = await validateValueAgainstPIB(500000000);
 
       // 4. NOVO: Análise de Incoerência Temporal (Diz vs Faz)
       const promiseTexts = sources.map(s => s.content).filter(c => c && c.length > 0);
@@ -90,8 +94,9 @@ ${historyContext}
 | **Veredito Técnico** | ${budgetViability.reason} |
 | **Viabilidade Estimada** | ${budgetViability.viable ? '✅ ALTA VIABILIDADE' : '⚠️ EXECUÇÃO COMPLEXA'} |
 | **Confiança dos Dados** | ${Math.round(budgetViability.confidence * 100)}% |
-
----
+| **Contexto Macro (PIB)** | ${pibViability.context} |
+	
+	---
 
 ## ⚠️ 3. MATRIZ DE RISCOS (ANÁLISE DE CENÁRIOS)
 Abaixo, os principais obstáculos identificados que podem impedir o cumprimento das promessas:
@@ -125,6 +130,7 @@ ${knowledgeBase}
       await cacheService.saveAnalysis(politicianName, {
         ...analysis,
         budgetViability,
+        pibViability,
         mainCategory,
         temporalAnalysis
       }).catch(err => logWarn('[Brain] Erro ao salvar em cache', err));
@@ -134,6 +140,7 @@ ${knowledgeBase}
       return {
         ...analysis,
         budgetViability,
+        pibViability,
         mainCategory,
         temporalAnalysis
       };

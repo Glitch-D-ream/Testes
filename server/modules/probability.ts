@@ -5,6 +5,7 @@
 
 import { validateBudgetViability, mapPromiseToSiconfiCategory } from '../integrations/siconfi.ts';
 import { validateCandidateCredibility } from '../integrations/tse.ts';
+import { validateValueAgainstPIB } from '../integrations/ibge.ts';
 
 export interface ProbabilityFactors {
   promiseSpecificity: number;
@@ -134,21 +135,42 @@ export async function calculateProbabilityWithDetails(
     };
   }
 
-  // 1. Calcular fatores externos apenas UMA VEZ por análise (SICONFI e TSE)
-  const siconfiCategory = mapPromiseToSiconfiCategory(category || 'GERAL');
-  const budgetValidation = await validateBudgetViability(siconfiCategory, 0, new Date().getFullYear());
-  const authorValidation = author ? await validateCandidateCredibility(author, 'BR') : null;
-
   const allFactors: ProbabilityFactors[] = [];
+  const siconfiCategory = mapPromiseToSiconfiCategory(category || 'GERAL');
+
   for (const promise of promises) {
-    // 2. Calcular fatores específicos da promessa (Linguística e Cronograma)
+    // 1. Determinar o valor para validação (usar o extraído pela IA ou fallback de 500Mi)
+    const estimatedValue = promise.estimatedValue || 500000000;
+
+    // 2. Calcular fatores externos para CADA promessa (agora dinâmico pelo valor)
+    let budgetValidation, authorValidation, pibValidation;
+    
+    try {
+      budgetValidation = await validateBudgetViability(siconfiCategory, estimatedValue, new Date().getFullYear());
+    } catch (e) {
+      budgetValidation = { viable: true, confidence: 0.5 };
+    }
+
+    try {
+      authorValidation = author ? await validateCandidateCredibility(author, 'BR') : null;
+    } catch (e) {
+      authorValidation = { score: 0.5 };
+    }
+
+    try {
+      pibValidation = await validateValueAgainstPIB(estimatedValue);
+    } catch (e) {
+      pibValidation = { isReasonable: true };
+    }
+
+    // 3. Calcular fatores específicos da promessa (Linguística e Cronograma)
     const specificity = calculateSpecificity(promise);
     const timeline = calculateTimelineFeasibility(promise);
 
     allFactors.push({
       promiseSpecificity: specificity,
       historicalCompliance: budgetValidation.confidence,
-      budgetaryFeasibility: budgetValidation.viable ? 0.8 : 0.3,
+      budgetaryFeasibility: (budgetValidation.viable ? 0.5 : 0.2) + (pibValidation.isReasonable ? 0.3 : 0.1),
       timelineFeasibility: timeline,
       authorTrack: authorValidation ? authorValidation.score : 0.5
     });

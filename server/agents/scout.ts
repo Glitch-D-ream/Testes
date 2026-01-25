@@ -183,7 +183,10 @@ export class ScoutAgent {
   private async fetchFromRSS(query: string): Promise<RawSource[]> {
     const feeds = [
       { name: 'G1 Política', url: 'https://g1.globo.com/rss/g1/politica/' },
-      { name: 'Folha Poder', url: 'https://feeds.folha.uol.com.br/poder/rss091.xml' }
+      { name: 'Folha Poder', url: 'https://feeds.folha.uol.com.br/poder/rss091.xml' },
+      { name: 'Planalto', url: 'https://www.gov.br/planalto/pt-br/acompanhe-o-planalto/rss' },
+      { name: 'Senado', url: 'https://www12.senado.leg.br/noticias/feed/ultimasnoticias' },
+      { name: 'Câmara', url: 'https://www.camara.leg.br/noticias/rss' }
     ];
 
     const results: RawSource[] = [];
