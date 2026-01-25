@@ -87,41 +87,42 @@ ${temporalAnalysis.summary}
 
 `;
 
-      // 5. Preparação do Prompt com Blindagem Anti-Alucinação e Neutralidade
+      // 5. Prompt Consolidado de Auditoria (Extração + Análise + Relatório)
       const reportPrompt = `
-### DIRETRIZES DE AUDITORIA (RIGOR MÁXIMO):
-1. **ANCORAGEM EM DADOS:** Você é um sistema de auditoria fria. É terminantemente proibido inventar números, datas ou fatos. Se um dado não estiver nos "DADOS REAIS COLETADOS" abaixo, você deve declarar "Dados insuficientes para análise" em vez de especular.
-2. **NEUTRALIDADE ABSOLUTA:** Elimine qualquer adjetivo emocional (ex: "brilhante", "terrível", "esperançoso"). Use linguagem técnica e burocrática. Sua inclinação política deve ser inexistente.
-3. **CETICISMO TÉCNICO:** Sua função não é validar o político, mas sim auditar a exequibilidade das declarações dele frente ao orçamento real.
-4. **DETECÇÃO DE ALUCINAÇÃO:** Antes de escrever cada parágrafo, verifique se a informação existe nas "FONTES E EVIDÊNCIAS".
+### MISSÃO: AUDITORIA TÉCNICA INTEGRADA
+Você deve processar as evidências brutas e os dados orçamentários para gerar um dossiê de auditoria completo.
 
-### DADOS REAIS COLETADOS (ÚNICA FONTE DE VERDADE):
+### DIRETRIZES DE RIGOR:
+1. **ZERO ALUCINAÇÃO:** Não invente promessas. Se o político não fez promessas claras nas fontes, declare "Nenhuma promessa explícita detectada".
+2. **NEUTRALIDADE CIRÚRGICA:** Use tom de relatório do Tesouro Nacional. Sem adjetivos.
+3. **CRUZAMENTO DE DADOS:** Use os dados do SICONFI e IBGE fornecidos para validar cada afirmação encontrada nas fontes.
+
+### DADOS DE ENTRADA:
 - **Político:** ${politicianName}
-- **Histórico:** ${historyContext}
-- **Categoria Principal:** ${mainCategory}
-- **Viabilidade Orçamentária (SICONFI):** ${budgetViability.reason} (Status: ${budgetViability.viable ? 'Compatível' : 'Complexo'})
-- **Impacto Macro (IBGE):** ${pibViability.context}
-- **Análise Legislativa:** ${temporalAnalysis.summary}
+- **Categoria Alvo:** ${mainCategory}
+- **Orçamento Real (SICONFI):** ${budgetViability.reason}
+- **Contexto Macro (IBGE):** ${pibViability.context}
+- **Histórico Legislativo:** ${temporalAnalysis.summary}
 
-### FONTES E EVIDÊNCIAS AUDITADAS:
+### EVIDÊNCIAS BRUTAS (FONTES):
 ${knowledgeBase}
 
-### ESTRUTURA DO RELATÓRIO:
-## 📑 RELATÓRIO DE AUDITORIA TÉCNICA
-## 📊 1. CONTEXTO E BASE DE DADOS
-(Resumo factual sem adjetivos)
+### FORMATO DE SAÍDA (MARKDOWN):
+## 📑 DOSSIÊ DE AUDITORIA: ${politicianName.toUpperCase()}
+## 📊 1. EVIDÊNCIAS COLETADAS
+(Liste as principais declarações encontradas nas fontes)
 
-## 💰 2. ANÁLISE DE VIABILIDADE ORÇAMENTÁRIA
-(Cruze a categoria ${mainCategory} com os dados do SICONFI fornecidos)
+## 💰 2. ANÁLISE DE COMPATIBILIDADE FISCAL
+(Cruze as declarações com os dados do SICONFI: ${mainCategory})
 
-## ⚠️ 3. MATRIZ DE RISCOS E OBSTÁCULOS
-(Liste apenas obstáculos técnicos, fiscais ou legislativos reais)
+## ⚠️ 3. MATRIZ DE RISCOS TÉCNICOS
+(Obstáculos reais à execução)
 
-## ⚖️ 4. VEREDITO TÉCNICO FINAL
-(Conclusão baseada em evidências sobre a exequibilidade)
+## ⚖️ 4. PARECER TÉCNICO FINAL
+(Veredito sobre a exequibilidade baseado em dados)
 
 ---
-**NOTA DE TRANSPARÊNCIA:** Este relatório foi gerado pelo sistema **Seth VII** através de análise algorítmica de dados oficiais. A IA foi instruída a manter neutralidade absoluta e ancoragem estrita em evidências.
+**NOTA DE TRANSPARÊNCIA:** Auditoria gerada pelo sistema **Seth VII**. Ancoragem estrita em dados oficiais e evidências auditadas.
 `;
 
       const { aiService } = await import('../services/ai.service.js');
