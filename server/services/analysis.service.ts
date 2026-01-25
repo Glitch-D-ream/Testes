@@ -6,6 +6,8 @@ import { calculateProbability } from '../modules/probability.ts';
 import { aiService } from './ai.service.ts';
 import { deepSeekService } from './ai-deepseek.service.ts';
 import { logError, logInfo } from '../core/logger.ts';
+import { DataCompressor } from '../core/compression.ts';
+import { MemoryCache } from '../core/cache-l1.ts';
 
 export class AnalysisService {
   async createAnalysis(userId: string | null, text: string, author: string, category: string) {
@@ -47,7 +49,7 @@ export class AnalysisService {
     try {
       const supabase = getSupabase();
 
-      // Salvar análise no Supabase
+      // Salvar análise no Supabase (com compressão de dados pesados)
       const { error: analysisError } = await supabase
         .from('analyses')
         .insert([{
@@ -56,7 +58,7 @@ export class AnalysisService {
           text,
           author,
           category,
-          extracted_promises: promises,
+          extracted_promises: DataCompressor.compress(promises),
           probability_score: probabilityScore
         }]);
 
@@ -99,6 +101,13 @@ export class AnalysisService {
   }
 
   async getAnalysisById(id: string) {
+    // 1. Tentar Cache L1 primeiro
+    const cached = MemoryCache.get(`analysis:${id}`);
+    if (cached) {
+      logInfo(`[AnalysisService] Cache L1 Hit: analysis:${id}`);
+      return cached;
+    }
+
     const supabase = getSupabase();
     
     const { data: analysis, error: analysisError } = await supabase
@@ -109,16 +118,26 @@ export class AnalysisService {
 
     if (analysisError || !analysis) return null;
 
+    // 2. Descomprimir dados se necessário
+    if (analysis.extracted_promises && DataCompressor.isCompressed(analysis.extracted_promises as any)) {
+      analysis.extracted_promises = DataCompressor.decompress(analysis.extracted_promises as any);
+    }
+
     const { data: promises, error: promisesError } = await supabase
       .from('promises')
       .select('*')
       .eq('analysis_id', id);
 
-    return {
+    const result = {
       ...analysis,
       promises: promises || [],
       extracted_promises: analysis.extracted_promises || [],
     };
+
+    // 3. Salvar no Cache L1 para próximas requisições
+    MemoryCache.set(`analysis:${id}`, result);
+    
+    return result;
   }
 
   async listAnalyses(limit: number = 50, offset: number = 0) {
