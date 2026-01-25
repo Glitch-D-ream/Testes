@@ -94,12 +94,26 @@ ${knowledgeBase}
 
   private async updateExistingAnalysis(id: string, text: string, author: string, category: string) {
     const { aiService } = await import('../services/ai.service.js');
+    const { deepSeekService } = await import('../services/ai-deepseek.service.js');
     const { calculateProbability } = await import('../modules/probability.js');
     const { nanoid } = await import('nanoid');
     const supabase = getSupabase();
 
-    // A IA agora gera um JSON rico baseado no prompt restaurado
-    const aiAnalysis = await aiService.analyzeText(text);
+    // Tentar usar DeepSeek R1 se a chave estiver disponível, caso contrário usar o aiService padrão
+    let aiAnalysis;
+    const openRouterKey = process.env.OPENROUTER_API_KEY;
+    
+    if (openRouterKey && openRouterKey !== 'sua_chave_aqui') {
+      try {
+        logInfo('[Brain] Utilizando DeepSeek R1 para análise de raciocínio profundo...');
+        aiAnalysis = await deepSeekService.analyzeText(text, openRouterKey);
+      } catch (err) {
+        logError('[Brain] Falha no DeepSeek R1, recorrendo ao AIService padrão', err as Error);
+        aiAnalysis = await aiService.analyzeText(text);
+      }
+    } else {
+      aiAnalysis = await aiService.analyzeText(text);
+    }
     
     const promises = aiAnalysis.promises.map(p => ({
       text: p.text,
