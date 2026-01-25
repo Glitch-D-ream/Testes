@@ -54,10 +54,14 @@ export class DirectSearchImproved {
       if (response.data?.Results && Array.isArray(response.data.Results)) {
         response.data.Results.slice(0, 10).forEach((result: any) => {
           if (result.FirstURL && result.Text) {
+            // Limpar tags HTML simples (como <a>) que o DDG às vezes retorna
+            const cleanTitle = (result.Result || 'Resultado de Busca').replace(/<[^>]*>/g, '').trim();
+            const cleanSnippet = result.Text.replace(/<[^>]*>/g, '').trim();
+            
             results.push({
-              title: result.Result || 'Resultado de Busca',
+              title: cleanTitle,
               url: result.FirstURL,
-              snippet: result.Text,
+              snippet: cleanSnippet,
               source: this.extractDomain(result.FirstURL),
               publishedAt: new Date().toISOString()
             });
@@ -99,10 +103,13 @@ export class DirectSearchImproved {
       if (response.data?.Results && Array.isArray(response.data.Results)) {
         response.data.Results.slice(0, 5).forEach((result: any) => {
           if (result.FirstURL && result.Text) {
+            const cleanTitle = (result.Result || 'Resultado').replace(/<[^>]*>/g, '').trim();
+            const cleanSnippet = result.Text.replace(/<[^>]*>/g, '').trim();
+            
             results.push({
-              title: result.Result || 'Resultado',
+              title: cleanTitle,
               url: result.FirstURL,
-              snippet: result.Text,
+              snippet: cleanSnippet,
               source: this.extractDomain(result.FirstURL),
               publishedAt: new Date().toISOString()
             });
@@ -114,10 +121,13 @@ export class DirectSearchImproved {
       if (response.data?.RelatedTopics && Array.isArray(response.data.RelatedTopics)) {
         response.data.RelatedTopics.slice(0, 5).forEach((topic: any) => {
           if (topic.FirstURL && topic.Text) {
+            const cleanTitle = (topic.Result || topic.Text.substring(0, 50)).replace(/<[^>]*>/g, '').trim();
+            const cleanSnippet = topic.Text.replace(/<[^>]*>/g, '').trim();
+            
             results.push({
-              title: topic.Result || topic.Text.substring(0, 50),
+              title: cleanTitle,
               url: topic.FirstURL,
-              snippet: topic.Text,
+              snippet: cleanSnippet,
               source: this.extractDomain(topic.FirstURL),
               publishedAt: new Date().toISOString()
             });

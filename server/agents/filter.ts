@@ -81,15 +81,17 @@ export class FilterAgent {
                           (combinedText.includes('email') || combinedText.includes('partido') || combinedText.includes('sigla'));
     
     // Se for biográfico ou muito curto, SÓ aceita se tiver uma ação MUITO clara (não apenas verbos comuns)
-    const hasStrongAction = ['prometo', 'vou investir', 'farei', 'projeto de lei'].some(kw => combinedText.includes(kw));
+    const hasStrongAction = ['prometo', 'vou investir', 'farei', 'projeto de lei', 'candidato', 'eleição', 'voto'].some(kw => combinedText.includes(kw));
 
     if (isBiographical && !hasStrongAction) return false;
-    if (isTooShort && !hasStrongAction) return false;
+    
+    // Para políticos sem mandato, aceitamos textos um pouco menores se tiverem contexto político
+    if (isTooShort && !hasAction && !hasContext) return false;
 
-    // Se o conteúdo for puramente informativo/biográfico, descarta
-    if (combinedText.includes('perfil:') && !hasStrongAction) return false;
+    // Se o conteúdo for puramente informativo/biográfico da Câmara, descarta
+    if (combinedText.includes('perfil:') && combinedText.includes('deputado') && !hasStrongAction) return false;
 
-    return hasAction || (hasContext && content.length > 150);
+    return hasAction || (hasContext && content.length > 100);
   }
 }
 
