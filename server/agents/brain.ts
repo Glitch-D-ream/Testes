@@ -202,20 +202,31 @@ ${knowledgeBase}
       aiAnalysis = await aiService.analyzeText(text);
     }
     
-    const promises = aiAnalysis.promises.map(p => ({
-      text: p.text,
-      confidence: p.confidence,
-      category: p.category,
-      negated: p.negated,
-      conditional: p.conditional,
-      reasoning: p.reasoning,
-      risks: p.risks || [],
-      evidenceSnippet: text.substring(0, 1000),
-      sourceName: 'Múltiplas Fontes Auditadas',
-      newsTitle: 'Análise Consolidada',
-      legislativeIncoherence: null as string | null,
-      legislativeSourceUrl: null as string | null
-    }));
+    const promises = aiAnalysis.promises.map(p => {
+      // Tentar encontrar o snippet original no texto para dar contexto real
+      let evidenceSnippet = text.substring(0, 1000);
+      const promiseIndex = text.toLowerCase().indexOf(p.text.toLowerCase().substring(0, 30));
+      if (promiseIndex !== -1) {
+        const start = Math.max(0, promiseIndex - 200);
+        const end = Math.min(text.length, promiseIndex + p.text.length + 300);
+        evidenceSnippet = "..." + text.substring(start, end).replace(/\s+/g, ' ').trim() + "...";
+      }
+
+      return {
+        text: p.text,
+        confidence: p.confidence,
+        category: p.category,
+        negated: p.negated,
+        conditional: p.conditional,
+        reasoning: p.reasoning,
+        risks: p.risks || [],
+        evidenceSnippet: evidenceSnippet,
+        sourceName: 'Múltiplas Fontes Auditadas',
+        newsTitle: 'Análise Consolidada',
+        legislativeIncoherence: null as string | null,
+        legislativeSourceUrl: null as string | null
+      };
+    });
 
     if (author) {
       try {
