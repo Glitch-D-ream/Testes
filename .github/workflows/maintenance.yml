@@ -1,0 +1,41 @@
+name: Maintenance Jobs (Sync & Cleanup)
+
+on:
+  schedule:
+    - cron: '0 2 * * *' # Sincronização completa às 2:00 AM
+    - cron: '0 3 * * *' # Limpeza às 3:00 AM
+  workflow_dispatch: # Permite rodar manualmente
+
+jobs:
+  maintenance:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repositório
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Instalar pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8
+
+      - name: Instalar Dependências
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Executar Sincronização (se for 2:00 AM ou manual)
+        if: github.event.schedule == '0 2 * * *' || github.event_name == 'workflow_dispatch'
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: pnpm tsx server/scripts/sync-worker.ts
+
+      - name: Executar Limpeza (se for 3:00 AM ou manual)
+        if: github.event.schedule == '0 3 * * *' || github.event_name == 'workflow_dispatch'
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: pnpm tsx server/scripts/cleanup-worker.ts

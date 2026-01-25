@@ -23,19 +23,19 @@ let scheduledTasks: Map<string, ReturnType<typeof cron.schedule>> = new Map();
  * Inicializar scheduler de jobs
  */
 export function initializeScheduler(): void {
-  logger.info('[Scheduler] Inicializando scheduler de jobs');
+  logger.info('[Scheduler] Inicializando scheduler de jobs (Modo Híbrido: Jobs movidos para GitHub Actions)');
 
   try {
-    // Job 1: Sincronização completa diariamente às 2:00 AM
+    // Jobs movidos para GitHub Actions (.github/workflows/maintenance.yml e scout.yml)
+    // Mantemos o scheduler ativo apenas para disparos manuais via API se necessário
+    
+    /* 
     scheduleFullSync();
-
-    // Job 2: Sincronização incremental a cada 6 horas
     scheduleIncrementalSync();
-
-    // Job 3: Limpeza de cache antigo diariamente às 3:00 AM
     scheduleCleanup();
+    */
 
-    logger.info('[Scheduler] Scheduler inicializado com sucesso');
+    logger.info('[Scheduler] Scheduler em modo passivo (aguardando triggers manuais)');
   } catch (error) {
     logger.error(`[Scheduler] Erro ao inicializar: ${error}`);
   }
