@@ -28,7 +28,7 @@ async function runScoutWorker() {
 
     if (!politicians || politicians.length === 0) {
       // Se não houver políticos, vamos usar uma lista padrão para teste
-      const defaultPoliticians = ['Lula', 'Bolsonaro', 'Tarcísio de Freitas'];
+      const defaultPoliticians = ['Erika Hilton', 'Jones Manoel', 'Nikolas Ferreira', 'Lula', 'Bolsonaro'];
       logInfo(`Nenhum político encontrado no banco. Usando lista padrão: ${defaultPoliticians.join(', ')}`);
       
       for (const name of defaultPoliticians) {
