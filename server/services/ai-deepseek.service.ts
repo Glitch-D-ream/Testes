@@ -11,38 +11,46 @@ export class DeepSeekService {
   private readonly MODEL = 'deepseek/deepseek-r1'; // Ou 'deepseek/deepseek-r1:free' se disponível
 
   private promptTemplate(text: string): string {
-    return `Você é o DeepSeek R1, um modelo de raciocínio profundo especializado em auditoria política.
-    Sua missão é realizar uma análise rigorosa, cética e imparcial do texto fornecido.
-    
-    SISTEMA DE VEREDITO EM DUAS ETAPAS (OBRIGATÓRIO):
-    1. FATOS: Liste os dados concretos e a realidade atual mencionada ou relacionada.
-    2. CETICISMO: Questione tudo. Por que esta promessa pode falhar? Quais os obstáculos técnicos e políticos?
-    
-    Para cada promessa, identifique riscos específicos de descumprimento.
-    
-    Responda estritamente em formato JSON:
+    return `Você é um Analista Sênior de Inteligência Política e Auditor Orçamentário. Sua missão é dissecar o discurso político com rigor implacável, imparcialidade e ceticismo técnico.
+
+Analise o texto fornecido e extraia promessas, compromissos ou declarações de intenção. 
+Para cada item, você deve agir como um "Advogado do Diabo", questionando a viabilidade e identificando armadilhas retóricas.
+
+### DIRETRIZES DE REDAÇÃO:
+1. **Tom:** Profissional, analítico, seco e direto. Evite adjetivos desnecessários.
+2. **Ceticismo:** Não aceite intenções como fatos. Pergunte-se: "Onde está o dinheiro?", "Qual a base legal?", "Quem ganha com isso?".
+3. **Fatos vs. Retórica:** Separe o que é um dado concreto do que é uma construção narrativa para ganhar apoio popular.
+
+### SISTEMA DE VEREDITO EM DUAS ETAPAS (OBRIGATÓRIO):
+1. **FATOS:** Liste evidências concretas, dados orçamentários ou realidade política atual.
+2. **CETICISMO:** Liste pontos de dúvida técnica, inconsistências lógicas ou obstáculos políticos.
+
+Responda estritamente em formato JSON puro (sem markdown):
+{
+  "promises": [
     {
-      "promises": [
-        {
-          "text": "Texto da promessa",
-          "category": "Categoria",
-          "confidence": 0.0-1.0,
-          "negated": boolean,
-          "conditional": boolean,
-          "reasoning": "Raciocínio profundo",
-          "risks": ["Risco 1", "Risco 2"]
-        }
-      ],
-      "overallSentiment": "Tom do discurso",
-      "credibilityScore": 0-100,
-      "verdict": {
-        "facts": ["Fato 1"],
-        "skepticism": ["Obstáculo 1"]
-      }
+      "text": "A promessa ou declaração exata",
+      "category": "Saúde|Educação|Economia|Segurança|Infraestrutura|Geral",
+      "confidence": 0.0 a 1.0,
+      "negated": false,
+      "conditional": false,
+      "reasoning": "Análise técnica profunda sobre a viabilidade e o contexto histórico/político desta promessa específica.",
+      "risks": [
+        "Risco técnico/orçamentário específico",
+        "Obstáculo político ou legislativo identificado"
+      ]
     }
-    
-    Texto para análise:
-    ${text}`;
+  ],
+  "overallSentiment": "Tom predominante do discurso",
+  "credibilityScore": 0-100,
+  "verdict": {
+    "facts": ["Evidência concreta 1", "Evidência concreta 2"],
+    "skepticism": ["Ponto de dúvida técnica 1", "Inconsistência lógica ou política 2"]
+  }
+}
+
+Texto para análise:
+${text}`;
   }
 
   async analyzeText(text: string, apiKey: string): Promise<AIAnalysisResult> {

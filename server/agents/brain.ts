@@ -36,29 +36,42 @@ export class BrainAgent {
 
       // 4. Construção do Relatório de Inteligência (O "Dossiê")
       const fullContext = `
-# 📑 Dossiê de Inteligência Política: ${politicianName}
+# 📑 DOSSIÊ DE INTELIGÊNCIA POLÍTICA: ${politicianName.toUpperCase()}
 
-## 📊 Perfil e Histórico Recente
+---
+
+## 📊 1. PERFIL E CONTEXTO HISTÓRICO
 ${historyContext}
 
-## 💰 Análise de Viabilidade Financeira (Dados Oficiais SICONFI)
-**Categoria Analisada:** ${mainCategory}
-**Veredito do Tesouro:** ${budgetViability.reason}
-**Status de Viabilidade:** ${budgetViability.viable ? '✅ VIÁVEL' : '⚠️ DESAFIADOR'}
-**Nível de Confiança dos Dados:** ${Math.round(budgetViability.confidence * 100)}%
+---
 
-## ⚠️ Riscos de Descumprimento (Análise de Cenários)
-*   **Risco Orçamentário:** A dependência de repasses federais ou excesso de gastos obrigatórios pode inviabilizar novos investimentos nesta área.
-*   **Risco Político:** A falta de maioria legislativa ou oposição direta a projetos similares no passado aumenta a dificuldade de execução.
-*   **Risco de Execução:** Promessas sem cronograma claro ou fontes de custeio definidas tendem a ser meramente protocolares.
+## 💰 2. ANÁLISE DE VIABILIDADE FINANCEIRA (SICONFI)
+> **Foco Setorial:** ${mainCategory}
 
-## 🔍 Evidências Coletadas e Auditadas
-Abaixo, os registros brutos que fundamentam esta análise, extraídos de fontes públicas e verificadas:
+| Indicador | Status |
+| :--- | :--- |
+| **Veredito Técnico** | ${budgetViability.reason} |
+| **Viabilidade Estimada** | ${budgetViability.viable ? '✅ ALTA VIABILIDADE' : '⚠️ EXECUÇÃO COMPLEXA'} |
+| **Confiança dos Dados** | ${Math.round(budgetViability.confidence * 100)}% |
+
+---
+
+## ⚠️ 3. MATRIZ DE RISCOS (ANÁLISE DE CENÁRIOS)
+Abaixo, os principais obstáculos identificados que podem impedir o cumprimento das promessas:
+
+*   **📉 RISCO ORÇAMENTÁRIO:** Rigidez fiscal e dependência de fontes externas de financiamento.
+*   **⚖️ RISCO POLÍTICO:** Necessidade de articulação legislativa e histórico de oposição a pautas similares.
+*   **⚙️ RISCO OPERACIONAL:** Complexidade logística e ausência de cronogramas técnicos detalhados.
+
+---
+
+## 🔍 4. EVIDÊNCIAS AUDITADAS (FONTES PÚBLICAS)
+Os registros abaixo foram extraídos, sanitizados e validados pela Tríade de Agentes:
 
 ${knowledgeBase}
 
 ---
-*Este relatório foi gerado pela Tríade de Agentes (Scout, Filter, Brain) com foco em utilidade pública e transparência.*
+*Este relatório é um documento de utilidade pública gerado de forma autônoma pela Tríade de Agentes (Scout, Filter, Brain). A análise é baseada em dados públicos e algoritmos de inteligência artificial.*
       `;
       
       let analysis;
