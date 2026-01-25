@@ -122,8 +122,8 @@ export class MultiScoutAgent {
   private async searchViaDuckDuckGo(query: string): Promise<RawSource[]> {
     try {
       logInfo(`[Multi-Scout] Tentando busca via DuckDuckGo: ${query}`);
-      // Usando a versão HTML simples do DuckDuckGo para evitar bloqueios de JS
-      const response = await axios.get(`https://html.duckduckgo.com/html/`, {
+      // Usando a versão lite do DuckDuckGo que é mais estável para scraping
+      const response = await axios.get(`https://duckduckgo.com/lite/`, {
         params: { q: query },
         headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
@@ -134,16 +134,15 @@ export class MultiScoutAgent {
       const html = response.data;
       const sources: RawSource[] = [];
       
-      // Regex simples para extrair resultados do DuckDuckGo HTML
-      const resultRegex = /<a class="result__a" href="([^"]+)">([^<]+)<\/a>[\s\S]*?<a class="result__snippet"[^>]*>([^<]+)<\/a>/g;
+      // Regex para a versão Lite do DuckDuckGo
+      const resultRegex = /<a class="result-link" href="([^"]+)">([^<]+)<\/a>[\s\S]*?<td class="result-snippet">([^<]+)<\/td>/g;
       let match;
       let count = 0;
 
       while ((match = resultRegex.exec(html)) !== null && count < 5) {
-        const url = new URL(match[1], 'https://duckduckgo.com').searchParams.get('uddg') || match[1];
         sources.push({
           id: nanoid(),
-          url: url,
+          url: match[1],
           title: match[2].trim(),
           content: match[3].trim(),
           source: 'DuckDuckGo',
@@ -206,24 +205,11 @@ export class MultiScoutAgent {
   }
 
   /**
-   * Busca genérica de último recurso
-   * Retorna dados estruturados mesmo sem fonte externa real
+   * Busca genérica de último recurso (Desativada para evitar ruído)
    */
   private async searchGeneric(query: string): Promise<RawSource[]> {
-    logWarn(`[Multi-Scout] Usando fallback genérico para: ${query}`);
-
-    // Gerar dados estruturados baseado no query
-    return [
-      {
-        id: nanoid(),
-        url: `https://generic-search/${nanoid()}`,
-        title: `Análise de Compromissos: ${query}`,
-        content: `Busca genérica para ${query}. Nenhuma fonte externa disponível no momento. Sistema em modo fallback.`,
-        source: 'Generic Fallback',
-        publishedAt: new Date().toISOString(),
-        confidence: 'low'
-      }
-    ];
+    logWarn(`[Multi-Scout] Fallback genérico desativado para evitar dados inúteis para: ${query}`);
+    return [];
   }
 }
 

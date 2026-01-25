@@ -60,9 +60,10 @@ export class ScoutAgent {
       
       // 3. Fallback final: busca web direta via IA (Pollinations)
       if (sources.length < 3 || isDeepSearch) {
+        logWarn(`[Scout] Ativando busca web direta via IA para ${query}...`);
         const webResults = await this.fetchFromWeb(query);
         webResults.forEach(item => {
-          if (!sources.some(s => s.url === item.url)) {
+          if (!sources.some(s => s.url === item.url) && !item.content.includes('Busca genérica')) {
             sources.push(item);
           }
         });
