@@ -54,13 +54,13 @@ export async function getBudgetData(
     // Exemplo de endpoint real para Despesas por Função (DCA)
     // Nota: O SICONFI exige parâmetros específicos como an_exercicio, id_ente, etc.
     // Para simplificar e garantir funcionamento, usaremos o DCA (Declaração de Contas Anuais)
-    const response = await axios.get(`${SICONFI_API_BASE}/dca`, {
+      const response = await axios.get(`${SICONFI_API_BASE}/dca`, {
       params: { 
         an_exercicio: year, 
-        id_ente: sphere === 'FEDERAL' ? '1' : '35', // 1 para Brasil, 35 para SP (exemplo)
-        no_anexo: 'DCA-AnexoI-C' // Despesas por Função
+        id_ente: sphere === 'FEDERAL' ? '1' : '35',
+        no_anexo: 'DCA-AnexoI-C'
       },
-      timeout: 15000,
+      timeout: 5000, // Reduzido de 15s para 5s para acelerar o fallback
     }).catch(() => ({ data: null }));
 
     if (!response.data || !response.data.items) {

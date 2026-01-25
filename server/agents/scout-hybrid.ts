@@ -56,20 +56,24 @@ export class ScoutHybrid {
       logInfo(`[ScoutHybrid] FASE 2: Buscando via scraping direto...`);
       const directResults = await directSearchImproved.search(query);
       
-      for (const r of directResults) {
-        if (!sources.some(s => s.url === r.url)) {
-          const fullContent = await contentScraper.scrape(r.url);
-          sources.push({
-            title: r.title,
-            url: r.url,
-            content: fullContent || r.snippet, // Usa conteúdo completo, com fallback para snippet
-            source: r.source,
-            publishedAt: r.publishedAt,
-            type: 'news',
-            confidence: this.whitelist.some(d => r.url.includes(d)) ? 'high' : 'medium'
-          });
-        }
-      }
+      const uniqueDirectResults = directResults.filter(r => !sources.some(s => s.url === r.url));
+      
+      logInfo(`[ScoutHybrid] Iniciando scraping paralelo de ${uniqueDirectResults.length} fontes...`);
+      const directScrapePromises = uniqueDirectResults.map(async (r) => {
+        const fullContent = await contentScraper.scrape(r.url);
+        return {
+          title: r.title,
+          url: r.url,
+          content: fullContent || r.snippet,
+          source: r.source,
+          publishedAt: r.publishedAt,
+          type: 'news' as const,
+          confidence: this.whitelist.some(d => r.url.includes(d)) ? 'high' as const : 'medium' as const
+        };
+      });
+
+      const directScrapedSources = await Promise.all(directScrapePromises);
+      sources.push(...directScrapedSources);
       logInfo(`[ScoutHybrid] Scraping direto encontrou: ${directResults.length}`);
     }
 
@@ -78,25 +82,29 @@ export class ScoutHybrid {
       logInfo(`[ScoutHybrid] FASE 3: Deep Search em portais de elite...`);
       const elitePortals = ['g1.globo.com', 'folha.uol.com.br', 'estadao.com.br', 'poder360.com.br'];
       
-      for (const portal of elitePortals) {
+      const elitePromises = elitePortals.map(async (portal) => {
         const eliteQuery = `site:${portal} ${query} promessa OR anunciou OR projeto`;
         const varResults = await directSearchImproved.search(eliteQuery);
         
-        for (const r of varResults) {
-          if (!sources.some(s => s.url === r.url)) {
-            const fullContent = await contentScraper.scrape(r.url);
-            sources.push({
-              title: r.title,
-              url: r.url,
-              content: fullContent || r.snippet, // Usa conteúdo completo, com fallback para snippet
-              source: r.source,
-              publishedAt: r.publishedAt,
-              type: 'news',
-              confidence: 'high'
-            });
-          }
-        }
-        if (sources.length >= 10) break;
+        const uniqueVarResults = varResults.filter(r => !sources.some(s => s.url === r.url));
+        return Promise.all(uniqueVarResults.map(async (r) => {
+          const fullContent = await contentScraper.scrape(r.url);
+          return {
+            title: r.title,
+            url: r.url,
+            content: fullContent || r.snippet,
+            source: r.source,
+            publishedAt: r.publishedAt,
+            type: 'news' as const,
+            confidence: 'high' as const
+          };
+        }));
+      });
+
+      const eliteResultsArrays = await Promise.all(elitePromises);
+      for (const eliteResults of eliteResultsArrays) {
+        sources.push(...eliteResults);
+        if (sources.length >= 15) break;
       }
     }
 

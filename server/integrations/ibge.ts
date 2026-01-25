@@ -27,11 +27,11 @@ export async function getNationalSocioEconomicData(): Promise<SocioEconomicData 
     logger.info('[IBGE] Buscando dados socioeconômicos nacionais...');
 
     // 1. Buscar População (Estimativa mais recente)
-    const popRes = await axios.get(`${IBGE_API_BASE}/agregados/6579/periodos/-6/variaveis/93?localidades=N1[all]`);
+    const popRes = await axios.get(`${IBGE_API_BASE}/agregados/6579/periodos/-6/variaveis/93?localidades=N1[all]`, { timeout: 5000 });
     const population = parseInt(popRes.data[0].resumos[0].valor);
 
     // 2. Buscar PIB (Série histórica mais recente)
-    const pibRes = await axios.get(`${IBGE_API_BASE}/agregados/5938/periodos/-1/variaveis/37?localidades=N1[all]`);
+    const pibRes = await axios.get(`${IBGE_API_BASE}/agregados/5938/periodos/-1/variaveis/37?localidades=N1[all]`, { timeout: 5000 });
     const pib = parseFloat(pibRes.data[0].resumos[0].valor) * 1000000; // Valor em Milhões no IBGE
 
     const data: SocioEconomicData = {
