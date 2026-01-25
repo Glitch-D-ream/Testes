@@ -29,20 +29,27 @@ export class ScoutAgent {
   ];
 
   async search(query: string, isDeepSearch: boolean = false): Promise<RawSource[]> {
-    logInfo(`[Scout] Iniciando varredura multicanal (${isDeepSearch ? 'DEEP' : 'NORMAL'}) para: ${query}`);
+    logInfo(`[Scout] Iniciando varredura simplificada para: ${query}`);
     
     const sources: RawSource[] = [];
     
     try {
-      // 1. Tentar busca local (RSS)
-      const rssResults = await this.fetchFromRSS(query);
-      sources.push(...rssResults);
+      // 1. Prioridade Máxima: Busca via IA (Pollinations) - Mais confiável para nomes específicos
+      logInfo(`[Scout] Buscando dados via IA para ${query}...`);
+      const webResults = await this.fetchFromWeb(query);
+      sources.push(...webResults);
 
-      // 2. Multi-Scout resiliente (IA + DuckDuckGo)
-      if (sources.length < 3 || isDeepSearch) {
-        logWarn(`[Scout] Ativando Multi-Scout resiliente...`);
+      // 2. Fallback: RSS Feeds (Apenas se IA falhar ou para complementar)
+      if (sources.length < 3) {
+        const rssResults = await this.fetchFromRSS(query);
+        rssResults.forEach(item => {
+          if (!sources.some(s => s.url === item.url)) sources.push(item);
+        });
+      }
+
+      // 3. Fallback 2: Multi-Scout (DuckDuckGo)
+      if (sources.length < 2) {
         const multiScoutResults = await multiScoutAgent.search(query);
-        
         multiScoutResults.forEach(item => {
           if (!sources.some(s => s.url === item.url)) {
             sources.push({
@@ -54,17 +61,6 @@ export class ScoutAgent {
               type: 'news',
               confidence: item.confidence
             });
-          }
-        });
-      }
-      
-      // 3. Fallback final: busca web direta via IA (Pollinations)
-      if (sources.length < 3 || isDeepSearch) {
-        logWarn(`[Scout] Ativando busca web direta via IA para ${query}...`);
-        const webResults = await this.fetchFromWeb(query);
-        webResults.forEach(item => {
-          if (!sources.some(s => s.url === item.url) && !item.content.includes('Busca genérica')) {
-            sources.push(item);
           }
         });
       }

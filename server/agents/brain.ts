@@ -16,17 +16,14 @@ export class BrainAgent {
     logInfo(`[Brain] Iniciando análise profunda para: ${politicianName}`);
     
     try {
-      // 0. Validação de Qualidade de Dados (Anti-Ruído)
-      const validSources = sources.filter(s => {
-        const isGeneric = s.source === 'Generic Fallback' || s.content.includes('Busca genérica');
-        const isTooShort = s.content.length < 50;
-        return !isGeneric && !isTooShort;
-      });
+      // 0. Validação de Qualidade de Dados (Modo Permissivo)
+      const validSources = sources.filter(s => s.source !== 'Generic Fallback');
 
       if (validSources.length === 0 && sources.length > 0) {
-        logWarn(`[Brain] Todas as fontes fornecidas foram identificadas como ruído ou genéricas. Abortando análise para evitar dados inúteis.`);
-        throw new Error('Nenhuma fonte de informação confiável ou específica foi encontrada para este político. O sistema evitou gerar uma análise baseada em dados genéricos.');
+        logWarn(`[Brain] Nenhuma fonte válida encontrada. Usando fontes originais para tentar análise.`);
       }
+
+      const targetSources = validSources.length > 0 ? validSources : sources;
 
       // 0.1. Verificar Cache
       const cachedAnalysis = await cacheService.getAnalysis(politicianName);
@@ -37,8 +34,8 @@ export class BrainAgent {
       
       logWarn(`[Brain] Análise não encontrada em cache. Executando análise completa...`);
 
-      // 1. Base de Conhecimento Rica (Usando apenas fontes validadas)
-      const knowledgeBase = validSources
+      // 1. Base de Conhecimento Rica
+      const knowledgeBase = targetSources
         .map(s => {
           const title = s.title || 'Declaração Identificada';
           return `### ${title}\n**Fonte:** ${s.source} | **Data:** ${s.publishedAt || 'Recente'}\n\n> ${s.content}\n\n**Análise de Contexto:** ${s.justification}`;
