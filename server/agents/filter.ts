@@ -58,9 +58,20 @@ export class FilterAgent {
       text: `${s.title}: ${s.content.substring(0, 300)}...`
     }));
 
-    const prompt = `Analise quais dos textos abaixo contêm promessas políticas, planos de governo ou compromissos públicos.
-    Textos: ${JSON.stringify(batchData)}
-    Responda apenas um JSON no formato: {"results": [{"id": number, "isPromise": boolean, "score": number, "reason": "string"}]}`;
+    const prompt = `Você é um Analista de Triagem de Dados Públicos. Sua tarefa é filtrar as notícias abaixo com base em CRITÉRIOS TÉCNICOS de utilidade para auditoria.
+
+### CRITÉRIOS DE INCLUSÃO:
+1. **Compromisso de Ação:** Declarações que indicam uma ação futura (ex: "Vou construir", "Reduziremos").
+2. **Anúncio de Política Pública:** Lançamento de programas, obras ou mudanças legislativas.
+3. **Dados Concretos:** Notícias que citam valores, prazos ou metas específicas.
+
+### CRITÉRIOS DE EXCLUSÃO (IMPARCIALIDADE):
+1. **Opinião/Retórica Pura:** Críticas a adversários ou elogios a aliados sem proposta de ação.
+2. **Vida Pessoal/Protocolar:** Eventos sociais, agendas de viagens sem pauta técnica ou fofocas.
+3. **Viés Editorial:** Ignore o tom do jornalista; foque apenas na declaração direta do agente político.
+
+Textos: ${JSON.stringify(batchData)}
+Responda apenas um JSON no formato: {"results": [{"id": number, "isPromise": boolean, "score": number, "reason": "string"}]}`;
 
     const response = await axios.post('https://text.pollinations.ai/', {
       messages: [
