@@ -154,6 +154,7 @@ ${knowledgeBase}
 
     const probabilityScore = await calculateProbability(promises, author, category);
 
+    // Mapeamento resiliente para o esquema atual do banco
     const { error } = await supabase
       .from('analyses')
       .update({
@@ -161,10 +162,12 @@ ${knowledgeBase}
         category,
         extracted_promises: promises,
         probability_score: probabilityScore.score,
-        probability_score_details: {
-          ...probabilityScore.details,
+        // Usando methodology_notes para salvar os detalhes do score e veredito já que a coluna específica não existe
+        methodology_notes: JSON.stringify({
+          factors: probabilityScore.factors,
+          details: probabilityScore.details,
           verdict: aiAnalysis.verdict
-        },
+        }),
         status: 'completed',
         updated_at: new Date().toISOString()
       })
@@ -180,15 +183,16 @@ ${knowledgeBase}
         promise_text: p.text,
         category: p.category,
         confidence_score: p.confidence,
-        extracted_entities: {},
+        extracted_entities: { 
+          risks: p.risks || [],
+          legislative_incoherence: p.legislativeIncoherence,
+          legislative_source_url: p.legislativeSourceUrl
+        },
         negated: p.negated || false,
         conditional: p.conditional || false,
         evidence_snippet: p.evidenceSnippet,
         source_name: p.sourceName,
-        news_title: p.newsTitle,
-        legislative_incoherence: p.legislativeIncoherence,
-        legislative_source_url: p.legislativeSourceUrl,
-        risks: p.risks || []
+        news_title: p.newsTitle
       }));
       await supabase.from('promises').insert(promisesToInsert);
     }
