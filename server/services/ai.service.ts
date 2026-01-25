@@ -1,5 +1,6 @@
 import axios from 'axios';
-import { logInfo, logError } from '../core/logger.ts';
+import { logInfo, logError, logWarn } from '../core/logger.ts';
+import { groqService } from './ai-groq.service.ts';
 
 export interface AIAnalysisResult {
   promises: Array<{
@@ -170,7 +171,25 @@ export class AIService {
    * Geração de texto livre (Markdown) para relatórios profissionais
    */
   async generateReport(prompt: string): Promise<string> {
-    const models = ['openai', 'mistral', 'llama', 'deepseek-r1'];
+    // 1. Tentar Groq (Primário - Ultra Rápido)
+    try {
+      logInfo('[AI] Tentando Groq como provedor primário...');
+      const systemPrompt = `Você é o núcleo de inteligência do sistema Seth VII. 
+      Sua função é AUDITORIA TÉCNICA PURA. 
+      REGRAS INVIOLÁVEIS:
+      1. PROIBIDO EMOÇÃO: Não use exclamações, adjetivos elogiosos ou pejorativos.
+      2. PROIBIDO ALUCINAÇÃO: Se um dado não foi fornecido no prompt, você NÃO pode inventá-lo. Responda "Dados não disponíveis".
+      3. IMPARCIALIDADE: Trate todos os políticos com o mesmo rigor frio, seja de direita, esquerda ou centro.
+      4. FOCO ORÇAMENTÁRIO: Priorize sempre a viabilidade fiscal (SICONFI) sobre a retórica política.`;
+      
+      const result = await groqService.generateCompletion(systemPrompt, prompt);
+      if (result) return result;
+    } catch (error: any) {
+      logWarn(`[AI] Groq falhou: ${error.message}. Tentando fallbacks tradicionais...`);
+    }
+
+    // 2. Fallbacks tradicionais (Pollinations)
+    const models = ['openai', 'mistral', 'llama'];
     let lastError: any;
 
     for (const model of models) {
