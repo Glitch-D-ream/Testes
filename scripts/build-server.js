@@ -30,11 +30,15 @@ async function runBuild() {
       format: 'esm',
       outfile: 'dist/index.js',
       plugins: [resolverPlugin],
+      banner: {
+        js: "import { createRequire } from 'module'; const require = createRequire(import.meta.url);",
+      },
       external: [
         'express', 'jsonwebtoken', 'bcryptjs', 'winston', 'dotenv', 
         '@supabase/supabase-js', 'nanoid', 'express-rate-limit', 
         'cookie-parser', 'telegraf', 'jspdf', 'jspdf-autotable', 
-        'node-html-to-image', 'axios', 'zod', 'tsx', 'prom-client', '@sentry/node'
+        'node-html-to-image', 'axios', 'zod', 'tsx', 'prom-client', '@sentry/node',
+        'cheerio', 'puppeteer-core'
       ],
     });
     console.log('Server build completed successfully!');
