@@ -11,18 +11,31 @@ export interface FilteredSource extends RawSource {
 export class FilterAgent {
   /**
    * Filtra e limpa os dados brutos usando uma IA leve com processamento em lote
+   * Modo flexível: aceita menções relevantes além de promessas explícitas
    */
-  async filter(sources: RawSource[]): Promise<FilteredSource[]> {
-    logInfo(`[Filter] Analisando relevância de ${sources.length} fontes...`);
+  async filter(sources: RawSource[], flexibleMode: boolean = false): Promise<FilteredSource[]> {
+    logInfo(`[Filter] Analisando relevância de ${sources.length} fontes (Modo: ${flexibleMode ? 'FLEXÍVEL' : 'RIGOROSO'})...`);
     
     // 1. Remover duplicatas por URL
     const uniqueSources = Array.from(new Map(sources.map(s => [s.url, s])).values());
     
-    // 2. Pré-filtragem por heurística simples (NLP Local) para economizar IA
-    const candidates = uniqueSources.filter(source => this.simpleHeuristic(source.title + " " + source.content));
+    // 2. Pré-filtragem por heurística (mais flexível se flexibleMode)
+    const candidates = uniqueSources.filter(source => 
+      this.simpleHeuristic(source.title + " " + source.content, flexibleMode)
+    );
     
     if (candidates.length === 0) {
       logInfo(`[Filter] Nenhuma fonte passou na heurística inicial.`);
+      // Em modo flexível, retornar todas as fontes com score baixo
+      if (flexibleMode && uniqueSources.length > 0) {
+        logInfo(`[Filter] Modo flexível: aceitando todas as fontes com score reduzido.`);
+        return uniqueSources.map(source => ({
+          ...source,
+          relevanceScore: 0.3,
+          isPromise: false,
+          justification: 'Menção relevante (Modo Flexível)'
+        }));
+      }
       return [];
     }
 
@@ -30,20 +43,19 @@ export class FilterAgent {
 
     try {
       // 3. Processamento em Lote (Batch) via IA
-      // Enviamos as fontes em grupos para economizar chamadas e tempo
-      const filteredResults = await this.checkRelevanceBatch(candidates);
+      const filteredResults = await this.checkRelevanceBatch(candidates, flexibleMode);
       
       logInfo(`[Filter] Refino concluído. ${filteredResults.length} fontes úteis para o Brain.`);
       return filteredResults;
     } catch (error) {
       logError(`[Filter] Erro no processamento em lote. Usando fallback individual...`, error as Error);
       
-      // Fallback: se o lote falhar, tenta processar os candidatos com a heurística aprovada
+      // Fallback: aceitar candidatos com score reduzido
       return candidates.map(source => ({
         ...source,
-        relevanceScore: 0.5,
+        relevanceScore: flexibleMode ? 0.4 : 0.5,
         isPromise: true,
-        justification: 'Aprovado por heurística (Fallback de erro na IA)'
+        justification: flexibleMode ? 'Menção relevante (Fallback Flexível)' : 'Aprovado por heurística (Fallback)'
       }));
     }
   }
@@ -51,7 +63,7 @@ export class FilterAgent {
   /**
    * Analisa um lote de fontes em uma única chamada de IA
    */
-  private async checkRelevanceBatch(sources: RawSource[]): Promise<FilteredSource[]> {
+  private async checkRelevanceBatch(sources: RawSource[], flexibleMode: boolean = false): Promise<FilteredSource[]> {
     // Preparar o lote para o prompt
     const batchData = sources.map((s, idx) => ({
       id: idx,
@@ -108,7 +120,7 @@ Responda apenas um JSON no formato: {"results": [{"id": number, "isPromise": boo
     return filtered;
   }
 
-  private simpleHeuristic(content: string): boolean {
+  private simpleHeuristic(content: string, flexibleMode: boolean = false): boolean {
     const actionVerbs = [
       'vou', 'vamos', 'prometo', 'farei', 'irei', 'pretendo', 'planejo',
       'investir', 'construir', 'obras', 'edital', 'lançar', 'reforma', 
@@ -130,6 +142,10 @@ Responda apenas um JSON no formato: {"results": [{"id": number, "isPromise": boo
     // Se tiver um verbo de ação forte (ex: "vou construir"), já é um bom candidato
     const strongActions = ['vou', 'prometo', 'farei', 'irei', 'construir', 'investir'];
     const hasStrongAction = strongActions.some(kw => contentLower.includes(kw));
+
+    if (flexibleMode) {
+      return hasAction || hasContext || contentLower.includes('politico') || contentLower.includes('governo');
+    }
 
     return hasStrongAction || (hasAction && hasContext);
   }

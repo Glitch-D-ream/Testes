@@ -28,39 +28,65 @@ export class ScoutAgent {
     'influencer', 'blogueira', 'clima', 'previsão do tempo', 'receita', 'culinária'
   ];
 
-  async search(query: string): Promise<RawSource[]> {
-    logInfo(`[Scout] Iniciando varredura multicanal com resiliência para: ${query}`);
+  async search(query: string, isDeepSearch: boolean = false): Promise<RawSource[]> {
+    logInfo(`[Scout] Iniciando varredura multicanal (${isDeepSearch ? 'DEEP' : 'NORMAL'}) para: ${query}`);
     
     const sources: RawSource[] = [];
     
     try {
-      // Tentar busca local (RSS + Web) primeiro
+      // 1. Tentar busca local (RSS)
       const rssResults = await this.fetchFromRSS(query);
       sources.push(...rssResults);
 
-      // Se insuficiente, usar Multi-Scout resiliente
-      if (sources.length < 3) {
-        logWarn(`[Scout] Apenas ${sources.length} fontes via RSS. Ativando Multi-Scout resiliente...`);
+      // 2. Multi-Scout resiliente (IA + DuckDuckGo)
+      if (sources.length < 3 || isDeepSearch) {
+        logWarn(`[Scout] Ativando Multi-Scout resiliente...`);
         const multiScoutResults = await multiScoutAgent.search(query);
         
-        // Converter para formato RawSource
         multiScoutResults.forEach(item => {
-          sources.push({
-            title: item.title,
-            url: item.url,
-            content: item.content,
-            source: item.source,
-            publishedAt: item.publishedAt,
-            type: 'news',
-            confidence: item.confidence
-          });
+          if (!sources.some(s => s.url === item.url)) {
+            sources.push({
+              title: item.title,
+              url: item.url,
+              content: item.content,
+              source: item.source,
+              publishedAt: item.publishedAt,
+              type: 'news',
+              confidence: item.confidence
+            });
+          }
         });
       }
       
-      // Fallback final: busca web
-      if (sources.length < 3) {
+      // 3. Fallback final: busca web direta via IA (Pollinations)
+      if (sources.length < 3 || isDeepSearch) {
         const webResults = await this.fetchFromWeb(query);
-        sources.push(...webResults);
+        webResults.forEach(item => {
+          if (!sources.some(s => s.url === item.url)) {
+            sources.push(item);
+          }
+        });
+      }
+
+      // 4. DEEP SEARCH: Busca por variações e contexto se ainda estiver vazio
+      if (sources.length < 2 && isDeepSearch) {
+        logWarn(`[Scout] Deep Search ativado: tentando variações de query para ${query}`);
+        const variations = [
+          `${query} notícias`,
+          `${query} político`,
+          `${query} declarações`,
+          `${query} promessas`
+        ];
+        
+        for (const v of variations) {
+          const vResults = await this.fetchFromWeb(v);
+          vResults.forEach(item => {
+            if (!sources.some(s => s.url === item.url)) {
+              sources.push(item);
+            }
+          });
+          if (sources.length >= 5) break;
+        }
       }
       
       const newSources: RawSource[] = [];
