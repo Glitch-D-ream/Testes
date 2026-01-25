@@ -22,17 +22,20 @@ async function runScoutWorker() {
       .select('name')
       .limit(10); // Limite inicial para não estourar o tempo do worker
 
-    if (polError || !politicians) {
+    if (polError) {
       logError('Erro ao buscar políticos:', polError as any);
+    }
+
+    if (!politicians || politicians.length === 0) {
       // Se não houver políticos, vamos usar uma lista padrão para teste
       const defaultPoliticians = ['Lula', 'Bolsonaro', 'Tarcísio de Freitas'];
-      logInfo(`Usando lista padrão: ${defaultPoliticians.join(', ')}`);
+      logInfo(`Nenhum político encontrado no banco. Usando lista padrão: ${defaultPoliticians.join(', ')}`);
       
       for (const name of defaultPoliticians) {
         await processPolitician(name);
       }
     } else {
-      logInfo(`Monitorando ${politicians.length} políticos.`);
+      logInfo(`Monitorando ${politicians.length} políticos encontrados no banco.`);
       for (const p of politicians) {
         await processPolitician(p.name);
       }
