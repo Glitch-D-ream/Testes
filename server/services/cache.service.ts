@@ -1,4 +1,4 @@
-import { supabase } from '../core/database.js';
+import { getSupabase } from '../core/database.js';
 import { logInfo, logWarn } from '../core/logger.js';
 
 export interface CachedAnalysis {
@@ -22,6 +22,7 @@ export class CacheService {
    */
   async getAnalysis(politicianName: string): Promise<any | null> {
     try {
+      const supabase = getSupabase();
       const now = new Date().toISOString();
       
       const { data, error } = await supabase
@@ -56,6 +57,7 @@ export class CacheService {
    */
   async saveAnalysis(politicianName: string, analysisData: any): Promise<boolean> {
     try {
+      const supabase = getSupabase();
       const now = new Date();
       const expiresAt = new Date(now.getTime() + this.CACHE_TTL_DAYS * 24 * 60 * 60 * 1000);
 
@@ -95,6 +97,7 @@ export class CacheService {
    */
   async cleanExpiredCache(): Promise<number> {
     try {
+      const supabase = getSupabase();
       const now = new Date().toISOString();
 
       const { data, error } = await supabase
@@ -122,6 +125,7 @@ export class CacheService {
    */
   async getStats(): Promise<{ totalCached: number; totalHits: number; avgHitsPerAnalysis: number }> {
     try {
+      const supabase = getSupabase();
       const { data, error } = await supabase
         .from('analysis_cache')
         .select('hit_count');
