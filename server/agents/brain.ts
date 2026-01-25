@@ -1,18 +1,28 @@
 import { FilteredSource } from './filter.js';
-import { logInfo, logError } from '../core/logger.js';
+import { logInfo, logError, logWarn } from '../core/logger.js';
 import { getSupabase } from '../core/database.js';
 import { validateBudgetViability, mapPromiseToSiconfiCategory } from '../integrations/siconfi.js';
 import { getDeputadoId, getVotacoesDeputado, analisarIncoerencia } from '../integrations/camara.js';
 import { getSenadorCodigo, getVotacoesSenador } from '../integrations/senado.js';
+import { cacheService } from '../services/cache.service.js';
 
 export class BrainAgent {
   /**
-   * O Cérebro Central 3.0: Restaurado para Máxima Profundidade e Utilidade
+   * O Cérebro Central 3.0: Com Cache Inteligente e Resiliência
    */
   async analyze(politicianName: string, sources: FilteredSource[], userId: string | null = null, existingAnalysisId: string | null = null) {
     logInfo(`[Brain] Iniciando análise profunda para: ${politicianName}`);
     
     try {
+      // 0. Verificar Cache
+      const cachedAnalysis = await cacheService.getAnalysis(politicianName);
+      if (cachedAnalysis) {
+        logInfo(`[Brain] Análise recuperada do cache para: ${politicianName}`);
+        return cachedAnalysis;
+      }
+      
+      logWarn(`[Brain] Análise não encontrada em cache. Executando análise completa...`);
+
       // 1. Base de Conhecimento Rica
       const knowledgeBase = sources
         .map(s => {
@@ -82,6 +92,13 @@ ${knowledgeBase}
         analysis = await analysisService.createAnalysis(userId, fullContext, politicianName, mainCategory);
       }
 
+      // Salvar em cache para futuras consultas
+      await cacheService.saveAnalysis(politicianName, {
+        ...analysis,
+        budgetViability,
+        mainCategory
+      }).catch(err => logWarn('[Brain] Erro ao salvar em cache', err));
+
       logInfo(`[Brain] Análise concluída com sucesso para ${politicianName}.`);
       
       return {
@@ -136,7 +153,7 @@ ${knowledgeBase}
       conditional: p.conditional,
       reasoning: p.reasoning,
       risks: p.risks || [],
-      evidenceSnippet: text.substring(0, 1000), // Contexto rico
+      evidenceSnippet: text.substring(0, 1000),
       sourceName: 'Múltiplas Fontes Auditadas',
       newsTitle: 'Análise Consolidada',
       legislativeIncoherence: null as string | null,
@@ -175,7 +192,6 @@ ${knowledgeBase}
         category,
         extracted_promises: promises,
         probability_score: probabilityScore.score,
-        // Usando methodology_notes para salvar os detalhes do score e veredito já que a coluna específica não existe
         methodology_notes: JSON.stringify({
           factors: probabilityScore.factors,
           details: probabilityScore.details,
