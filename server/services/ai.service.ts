@@ -99,10 +99,30 @@ export class AIService {
         }
 
         if (typeof content === 'string') {
-          content = content.replace(/```json\n?|\n?```/g, '').trim();
-          const jsonMatch = content.match(/\{[\s\S]*\}/);
-          if (jsonMatch) content = jsonMatch[0];
-          return JSON.parse(content) as AIAnalysisResult;
+          // Limpeza agressiva de markdown e textos extras
+          let cleanContent = content.replace(/```json\n?|\n?```/g, '').trim();
+          const jsonMatch = cleanContent.match(/\{[\s\S]*\}/);
+          if (jsonMatch) {
+            cleanContent = jsonMatch[0];
+          }
+          
+          try {
+            const parsed = JSON.parse(cleanContent);
+            // Garantir que os novos campos existam
+            if (!parsed.verdict) {
+              parsed.verdict = { facts: [], skepticism: [] };
+            }
+            if (parsed.promises) {
+              parsed.promises = parsed.promises.map((p: any) => ({
+                ...p,
+                risks: p.risks || []
+              }));
+            }
+            return parsed as AIAnalysisResult;
+          } catch (parseError) {
+            logError(`[AI] Erro ao parsear JSON do modelo ${model}`, parseError as Error);
+            throw parseError;
+          }
         }
         
         if (content && content.promises) {

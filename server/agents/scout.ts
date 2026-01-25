@@ -109,7 +109,12 @@ export class ScoutAgent {
         
         if (typeof content === 'string') {
           try {
-            content = JSON.parse(content.replace(/```json\n?|\n?```/g, '').trim());
+            // Limpeza de markdown antes do parse
+            let cleanContent = content.replace(/```json\n?|\n?```/g, '').trim();
+            const jsonMatch = cleanContent.match(/\[[\s\S]*\]/); // Busca por array JSON
+            if (jsonMatch) cleanContent = jsonMatch[0];
+            
+            content = JSON.parse(cleanContent);
           } catch (e) {
             logError('[Scout] Erro ao parsear JSON da Web', e as Error);
             continue;
