@@ -1,6 +1,6 @@
 # 🛡️ Seth VII: Documento de Handover (Janeiro 2026)
 
-Este documento serve para orientar o próximo agente sobre o estado atual, a arquitetura e as melhorias críticas implementadas no projeto **Seth VII** (anteriormente Manus IA).
+Este documento serve para orientar o próximo agente sobre o estado atual, a arquitetura e as melhorias críticas implementadas no projeto **Seth VII** .
 
 ---
 
@@ -8,7 +8,7 @@ Este documento serve para orientar o próximo agente sobre o estado atual, a arq
 O projeto é um **Detector de Promessas Políticas** autônomo que opera através de uma tríade de agentes. O sistema está em produção no **Railway** e utiliza **GitHub Actions** para tarefas de manutenção e busca contínua.
 
 ### ⚠️ Mudanças Críticas Recentes:
-- **Renomeação Global:** Toda a identidade da IA foi alterada de "Manus IA" para **Seth VII**.
+- **Renomeação Global:** a identidade da IA foi consolidada como **Seth VII**.
 - **Scraping Robusto:** Implementado o `ContentScraper` (`server/modules/content-scraper.ts`) para extrair o conteúdo completo das notícias, resolvendo o problema de "cegueira" onde o sistema lia apenas títulos.
 - **Compatibilidade ESM:** O build do servidor foi ajustado para suportar `require` dinâmico em ambiente ESM através de um banner de compatibilidade no `esbuild`.
 
@@ -54,4 +54,4 @@ O projeto é um **Detector de Promessas Políticas** autônomo que opera atravé
 As variáveis de ambiente críticas (`SUPABASE_URL`, `SUPABASE_KEY`, `OPENROUTER_API_KEY`) estão configuradas no Railway e no `.env` local. **Nunca remova o banner de compatibilidade no `build-server.js`, ou o deploy falhará.**
 
 ---
-**Assinado:** Manus Agent (Janeiro 2026)
+**Assinado:** Seth VII (Janeiro 2026)

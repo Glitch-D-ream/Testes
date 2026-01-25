@@ -136,24 +136,21 @@ ${knowledgeBase}
         analysis = await analysisService.createAnalysis(userId, fullContext, politicianName, mainCategory);
       }
 
-      // Salvar em cache para futuras consultas
-      await cacheService.saveAnalysis(politicianName, {
+      const result = {
         ...analysis,
-        budgetViability,
-        pibViability,
-        mainCategory,
-        temporalAnalysis
-      }).catch(err => logWarn('[Brain] Erro ao salvar em cache', err));
-
-      logInfo(`[Brain] Análise concluída com sucesso para ${politicianName}.`);
-      
-      return {
-        ...analysis,
+        politicianName: politicianName, // Garantir que o nome do político seja retornado
         budgetViability,
         pibViability,
         mainCategory,
         temporalAnalysis
       };
+
+      // Salvar em cache para futuras consultas
+      cacheService.saveAnalysis(politicianName, result).catch(err => logWarn('[Brain] Erro ao salvar em cache', err));
+
+      logInfo(`[Brain] Análise concluída com sucesso para ${politicianName}.`);
+      
+      return result;
     } catch (error) {
       logError(`[Brain] Falha na análise profunda de ${politicianName}`, error as Error);
       throw error;

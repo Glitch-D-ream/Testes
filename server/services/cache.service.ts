@@ -38,11 +38,14 @@ export class CacheService {
       }
 
       // Incrementar contador de hits
-      await supabase
-        .from('analysis_cache')
-        .update({ hit_count: data.hit_count + 1 })
-        .eq('id', data.id)
-        .catch(() => {});
+      try {
+        await getSupabase()
+          .from('analysis_cache')
+          .update({ hit_count: data.hit_count + 1 })
+          .eq('id', data.id);
+      } catch (e) {
+        // Ignorar erro de atualização de hit count
+      }
 
       logInfo(`[Cache] Análise encontrada em cache para: ${politicianName} (Hits: ${data.hit_count + 1})`);
       return data.analysis_data;
@@ -62,11 +65,14 @@ export class CacheService {
       const expiresAt = new Date(now.getTime() + this.CACHE_TTL_DAYS * 24 * 60 * 60 * 1000);
 
       // Primeiro, tentar deletar análise antiga se existir
-      await supabase
-        .from('analysis_cache')
-        .delete()
-        .eq('politician_name', politicianName)
-        .catch(() => {});
+      try {
+        await supabase
+          .from('analysis_cache')
+          .delete()
+          .eq('politician_name', politicianName);
+      } catch (e) {
+        logWarn(`[Cache] Erro ao deletar cache antigo para ${politicianName}`);
+      }
 
       // Depois, inserir nova análise
       const { error } = await supabase

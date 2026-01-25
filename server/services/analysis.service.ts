@@ -80,9 +80,12 @@ export class AnalysisService {
         risks: p.risks || []
       }));
 
+        // Remover campo 'risks' se a coluna não existir no banco
+        const promisesToInsertClean = promisesToInsert.map(({ risks, ...rest }) => rest);
+        
         const { error: promisesError } = await supabase
           .from('promises')
-          .insert(promisesToInsert);
+          .insert(promisesToInsertClean);
 
         if (promisesError) {
           logError('Erro ao salvar promessas no Supabase', promisesError as any);
