@@ -42,17 +42,18 @@ export default function SearchBar() {
       }
 
       // 2. Polling de Status
+      let pollCount = 0;
       const pollInterval = setInterval(async () => {
+        pollCount++;
         try {
           const statusRes = await fetch(`${apiUrl}/api/search/status/${id}`);
           if (!statusRes.ok) throw new Error('Erro ao verificar status');
           
           const data = await statusRes.json();
 
-          if (data.status === 'processing') {
-            setStatus('Os agentes estão varrendo a web e cruzando dados orçamentários...');
-          } else if (data.status === 'completed') {
+          if (data.status === 'completed') {
             clearInterval(pollInterval);
+            setIsProcessing(false);
             toast.success('Análise concluída com sucesso!');
             navigate(`/analysis/${id}`);
           } else if (data.status === 'failed') {
@@ -61,10 +62,14 @@ export default function SearchBar() {
             const msg = data.error_message || 'Os agentes não conseguiram extrair promessas suficientes para este político.';
             setError(msg);
             toast.error('A análise falhou');
+          } else {
+            // Atualizar status baseado no tempo decorrido
+            if (pollCount < 5) setStatus('Iniciando varredura na web...');
+            else if (pollCount < 15) setStatus('Cruzando dados orçamentários (SICONFI)...');
+            else setStatus('Finalizando auditoria técnica com IA...');
           }
         } catch (err) {
           console.error('Erro no polling:', err);
-          // Não limpamos o intervalo imediatamente em caso de erro de rede temporário
         }
       }, 3000);
 
