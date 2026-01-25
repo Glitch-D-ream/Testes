@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import rateLimit from 'express-rate-limit';
 import { extractTokenFromHeader, verifyJWT } from './auth.js';
 
 /**
@@ -133,3 +134,21 @@ export function requestLoggerMiddleware(req: Request, res: Response, next: NextF
 
   next();
 }
+
+/**
+ * Rate Limiter para o Scout (Passo 1.4)
+ * 10 requisições por minuto por usuário/IP
+ */
+export const scoutRateLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minuto
+  max: 10, // limite de 10 requisições
+  message: {
+    error: 'Too Many Requests',
+    message: 'Limite de buscas atingido. Tente novamente em 1 minuto.',
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => {
+    return (req as any).userId || req.ip;
+  },
+});

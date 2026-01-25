@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { searchController } from '../controllers/search.controller.ts';
-import { optionalAuthMiddleware } from '../core/middleware.ts';
+import { optionalAuthMiddleware, scoutRateLimiter } from '../core/middleware.ts';
 
 const router = Router();
 
@@ -14,7 +14,7 @@ router.get('/', searchController.searchPoliticians);
  * POST /api/search/auto-analyze
  * Busca na web e analisa automaticamente um político
  */
-router.post('/auto-analyze', optionalAuthMiddleware, searchController.autoAnalyze);
+router.post('/auto-analyze', optionalAuthMiddleware, scoutRateLimiter, searchController.autoAnalyze);
 
 /**
  * GET /api/search/status/:id

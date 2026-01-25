@@ -127,6 +127,26 @@ export const cacheMisses = new Counter({
   labelNames: ['cache_name'],
 });
 
+// Scout metrics (Passo 2.4)
+export const scoutSourceLatency = new Histogram({
+  name: 'scout_source_latency_seconds',
+  help: 'Latency of scout sources in seconds',
+  labelNames: ['source'],
+  buckets: [0.1, 0.5, 1, 2, 5, 10],
+});
+
+export const scoutSourceErrors = new Counter({
+  name: 'scout_source_errors_total',
+  help: 'Total number of errors in scout sources',
+  labelNames: ['source'],
+});
+
+export const scoutCircuitBreakerState = new Gauge({
+  name: 'scout_circuit_breaker_state',
+  help: 'State of the scout circuit breaker (0=CLOSED, 1=OPEN, 2=HALF_OPEN)',
+  labelNames: ['resource'],
+});
+
 export const cacheSize = new Gauge({
   name: 'cache_size_bytes',
   help: 'Size of cache in bytes',
