@@ -5,10 +5,11 @@ import { validateBudgetViability, mapPromiseToSiconfiCategory } from '../integra
 import { getDeputadoId, getVotacoesDeputado, analisarIncoerencia } from '../integrations/camara.js';
 import { getSenadorCodigo, getVotacoesSenador } from '../integrations/senado.js';
 import { cacheService } from '../services/cache.service.js';
+import { temporalIncoherenceService } from '../services/temporal-incoherence.service.js';
 
 export class BrainAgent {
   /**
-   * O Cérebro Central 3.0: Com Cache Inteligente e Resiliência
+   * O Cérebro Central 3.0: Com Cache, Resiliência e Análise de Incoerência Temporal
    */
   async analyze(politicianName: string, sources: FilteredSource[], userId: string | null = null, existingAnalysisId: string | null = null) {
     logInfo(`[Brain] Iniciando análise profunda para: ${politicianName}`);
@@ -44,7 +45,33 @@ export class BrainAgent {
       
       const budgetViability = await validateBudgetViability(siconfiCategory, 500000000, currentYear - 1);
 
-      // 4. Construção do Relatório de Inteligência (O "Dossiê")
+      // 4. NOVO: Análise de Incoerência Temporal (Diz vs Faz)
+      const promiseTexts = sources.map(s => s.content).filter(c => c && c.length > 0);
+      const temporalAnalysis = await temporalIncoherenceService.analyzeIncoherence(politicianName, promiseTexts);
+
+      const temporalSection = temporalAnalysis.hasIncoherence
+        ? `## 🔄 ANÁLISE DE INCOERÊNCIA TEMPORAL (DIZ VS FAZ)
+**Coerência Histórica:** ${temporalAnalysis.coherenceScore}%
+
+${temporalAnalysis.contradictions.map(c => 
+  `- **${c.promiseText}** vs Votação em ${c.votedAgainstOn}: ${c.votedAgainstBill} (Severidade: ${c.severity.toUpperCase()})`
+).join('\n')}
+
+**Resumo:** ${temporalAnalysis.summary}
+
+---
+
+`
+        : `## 🔄 ANÁLISE DE INCOERÊNCIA TEMPORAL (DIZ VS FAZ)
+**Coerência Histórica:** ${temporalAnalysis.coherenceScore}%
+
+${temporalAnalysis.summary}
+
+---
+
+`;
+
+      // 5. Construção do Relatório de Inteligência (O "Dossiê")
       const fullContext = `
 # 📑 DOSSIÊ DE INTELIGÊNCIA POLÍTICA: ${politicianName.toUpperCase()}
 
@@ -75,7 +102,9 @@ Abaixo, os principais obstáculos identificados que podem impedir o cumprimento 
 
 ---
 
-## 🔍 4. EVIDÊNCIAS AUDITADAS (FONTES PÚBLICAS)
+${temporalSection}
+
+## 🔍 5. EVIDÊNCIAS AUDITADAS (FONTES PÚBLICAS)
 Os registros abaixo foram extraídos, sanitizados e validados pela Tríade de Agentes:
 
 ${knowledgeBase}
@@ -96,7 +125,8 @@ ${knowledgeBase}
       await cacheService.saveAnalysis(politicianName, {
         ...analysis,
         budgetViability,
-        mainCategory
+        mainCategory,
+        temporalAnalysis
       }).catch(err => logWarn('[Brain] Erro ao salvar em cache', err));
 
       logInfo(`[Brain] Análise concluída com sucesso para ${politicianName}.`);
@@ -104,7 +134,8 @@ ${knowledgeBase}
       return {
         ...analysis,
         budgetViability,
-        mainCategory
+        mainCategory,
+        temporalAnalysis
       };
     } catch (error) {
       logError(`[Brain] Falha na análise profunda de ${politicianName}`, error as Error);
@@ -129,7 +160,6 @@ ${knowledgeBase}
     const { nanoid } = await import('nanoid');
     const supabase = getSupabase();
 
-    // Tentar usar DeepSeek R1 se a chave estiver disponível, caso contrário usar o aiService padrão
     let aiAnalysis;
     const openRouterKey = process.env.OPENROUTER_API_KEY;
     
@@ -160,7 +190,6 @@ ${knowledgeBase}
       legislativeSourceUrl: null as string | null
     }));
 
-    // Detector de Incoerência Legislativa (Diz vs Faz)
     if (author) {
       try {
         const deputadoId = await getDeputadoId(author);
@@ -184,7 +213,6 @@ ${knowledgeBase}
 
     const probabilityScore = await calculateProbability(promises, author, category);
 
-    // Mapeamento resiliente para o esquema atual do banco
     const { error } = await supabase
       .from('analyses')
       .update({
@@ -204,7 +232,6 @@ ${knowledgeBase}
 
     if (error) throw error;
 
-    // Salvar promessas individuais para o Dossiê
     if (promises.length > 0) {
       const promisesToInsert = promises.map(p => ({
         id: nanoid(),
