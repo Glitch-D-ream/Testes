@@ -111,8 +111,8 @@ export class SearchService {
           throw new Error('O Agente Buscador não encontrou notícias ou fontes recentes para este político. Tente um nome mais conhecido.');
         }
 
-        // Filter
-        const filteredSources = await filterAgent.filter(rawSources);
+        // Filter (Habilitando modo flexível para evitar que a análise falhe por excesso de rigor)
+        const filteredSources = await filterAgent.filter(rawSources, true);
         if (filteredSources.length === 0) {
           throw new Error('Nenhuma promessa ou compromisso político claro foi detectado nas notícias encontradas.');
         }

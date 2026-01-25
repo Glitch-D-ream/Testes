@@ -75,7 +75,8 @@ export class FilterAgent {
 ### CRITÉRIOS DE INCLUSÃO:
 1. **Compromisso de Ação:** Declarações que indicam uma ação futura (ex: "Vou construir", "Reduziremos").
 2. **Anúncio de Política Pública:** Lançamento de programas, obras ou mudanças legislativas.
-3. **Dados Concretos:** Notícias que citam valores, prazos ou metas específicas.
+3. **Posicionamento e Defesa:** Defesa de projetos de lei, causas sociais ou propostas parlamentares (ex: "Defendo a lei X", "Apresentamos o projeto Y").
+4. **Dados Concretos:** Notícias que citam valores, prazos ou metas específicas.
 
 ### CRITÉRIOS DE EXCLUSÃO (IMPARCIALIDADE):
 1. **Opinião/Retórica Pura:** Críticas a adversários ou elogios a aliados sem proposta de ação.
@@ -125,12 +126,15 @@ Responda apenas um JSON no formato: {"results": [{"id": number, "isPromise": boo
       'vou', 'vamos', 'prometo', 'farei', 'irei', 'pretendo', 'planejo',
       'investir', 'construir', 'obras', 'edital', 'lançar', 'reforma', 
       'ampliar', 'criar', 'reduzir', 'aumentar', 'implementar', 'entregar',
-      'contratar', 'destinar', 'aplicar', 'baixar', 'cortar', 'eliminar'
+      'contratar', 'destinar', 'aplicar', 'baixar', 'cortar', 'eliminar',
+      'defendo', 'proponho', 'apresento', 'queremos', 'objetivo', 'meta',
+      'projeto', 'lei', 'votação', 'parlamentar', 'deputado', 'senador'
     ];
     
     const politicalContext = [
       'governo', 'prefeitura', 'estado', 'município', 'verba', 'orçamento',
-      'povo', 'cidadão', 'eleitor', 'campanha', 'mandato', 'gestão'
+      'povo', 'cidadão', 'eleitor', 'campanha', 'mandato', 'gestão',
+      'política', 'pública', 'direitos', 'social', 'saúde', 'educação'
     ];
 
     const contentLower = content.toLowerCase();
@@ -147,7 +151,8 @@ Responda apenas um JSON no formato: {"results": [{"id": number, "isPromise": boo
       return hasAction || hasContext || contentLower.includes('politico') || contentLower.includes('governo');
     }
 
-    return hasStrongAction || (hasAction && hasContext);
+    // Aumentando a sensibilidade: se tiver ação OU contexto forte, já passa para a IA analisar
+    return hasAction || hasContext || hasStrongAction;
   }
 }
 
