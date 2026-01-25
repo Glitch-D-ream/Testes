@@ -98,13 +98,29 @@ export class FilterAgent {
   }
 
   private simpleHeuristic(content: string): boolean {
-    const keywords = [
-      'vou', 'vamos', 'prometo', 'farei', 'projeto', 'plano', 'investir', 
-      'construir', 'obras', 'governo', 'edital', 'lançar', 'reforma', 
-      'ampliar', 'criar', 'reduzir', 'aumentar'
+    const actionVerbs = [
+      'vou', 'vamos', 'prometo', 'farei', 'irei', 'pretendo', 'planejo',
+      'investir', 'construir', 'obras', 'edital', 'lançar', 'reforma', 
+      'ampliar', 'criar', 'reduzir', 'aumentar', 'implementar', 'entregar',
+      'contratar', 'destinar', 'aplicar', 'baixar', 'cortar', 'eliminar'
     ];
+    
+    const politicalContext = [
+      'governo', 'prefeitura', 'estado', 'município', 'verba', 'orçamento',
+      'povo', 'cidadão', 'eleitor', 'campanha', 'mandato', 'gestão'
+    ];
+
     const contentLower = content.toLowerCase();
-    return keywords.some(kw => contentLower.includes(kw));
+    
+    // Heurística mais robusta: Verbo de ação + Contexto Político OU Verbo de ação forte
+    const hasAction = actionVerbs.some(kw => contentLower.includes(kw));
+    const hasContext = politicalContext.some(kw => contentLower.includes(kw));
+    
+    // Se tiver um verbo de ação forte (ex: "vou construir"), já é um bom candidato
+    const strongActions = ['vou', 'prometo', 'farei', 'irei', 'construir', 'investir'];
+    const hasStrongAction = strongActions.some(kw => contentLower.includes(kw));
+
+    return hasStrongAction || (hasAction && hasContext);
   }
 }
 

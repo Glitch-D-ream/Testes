@@ -9,9 +9,14 @@ export interface AIAnalysisResult {
     negated: boolean;
     conditional: boolean;
     reasoning: string;
+    risks: string[]; // Seção de Riscos de Descumprimento
   }>;
   overallSentiment: string;
   credibilityScore: number;
+  verdict: {
+    facts: string[];
+    skepticism: string[]; // "Por que isso pode dar errado?"
+  };
 }
 
 export class AIService {
@@ -29,10 +34,14 @@ export class AIService {
     3. RIGOR TÉCNICO: Use termos técnicos de administração pública quando apropriado (ex: PPA, LOA, dotação orçamentária).
     4. DETECÇÃO DE NUANCES: Identifique se a promessa depende de aprovação do Congresso ou se é ato exclusivo do Executivo.
     
-    Para cada promessa extraída, forneça um raciocínio (reasoning) que explique:
-    - Por que ela é difícil ou fácil de cumprir.
-    - Qual o impacto social esperado.
-    - Se existe base legal óbvia para ela.
+    SISTEMA DE VEREDITO EM DUAS ETAPAS:
+    Para cada análise, você deve obrigatoriamente responder a duas perguntas internas:
+    1. "Quais são os fatos?" (Baseado em dados e realidade atual)
+    2. "Por que isso pode dar errado?" (Análise de riscos, obstáculos e ceticismo)
+
+    Para cada promessa extraída, forneça:
+    - Um raciocínio (reasoning) técnico.
+    - Uma lista de "riscos" (risks) específicos de descumprimento.
     
     Responda estritamente em formato JSON seguindo esta estrutura:
     {
@@ -43,11 +52,16 @@ export class AIService {
           "confidence": 0.95,
           "negated": false,
           "conditional": true,
-          "reasoning": "Análise técnica profunda sobre a viabilidade e impacto desta promessa específica."
+          "reasoning": "Análise técnica profunda sobre a viabilidade e impacto desta promessa específica.",
+          "risks": ["Risco 1", "Risco 2"]
         }
       ],
       "overallSentiment": "Análise qualitativa do tom do discurso (ex: Populista, Técnico, Austero)",
-      "credibilityScore": 85
+      "credibilityScore": 85,
+      "verdict": {
+        "facts": ["Fato 1", "Fato 2"],
+        "skepticism": ["Obstáculo 1", "Motivo de falha 2"]
+      }
     }
     
     Texto para análise:
@@ -91,7 +105,18 @@ export class AIService {
           return JSON.parse(content) as AIAnalysisResult;
         }
         
-        if (content && content.promises) return content as AIAnalysisResult;
+        if (content && content.promises) {
+          // Garantir que os novos campos existam
+          const result = content as AIAnalysisResult;
+          if (!result.verdict) {
+            result.verdict = { facts: [], skepticism: [] };
+          }
+          result.promises = result.promises.map(p => ({
+            ...p,
+            risks: p.risks || []
+          }));
+          return result;
+        }
         
         throw new Error(`Modelo ${model} não gerou a profundidade esperada`);
       } catch (error) {

@@ -22,7 +22,9 @@ export class ScoutAgent {
 
   private readonly blacklistKeywords = [
     'bbb', 'festa', 'namoro', 'casamento', 'look', 'fofoca', 'celebridade',
-    'horóscopo', 'novela', 'futebol', 'gol', 'campeonato', 'venda', 'oferta'
+    'horóscopo', 'novela', 'futebol', 'gol', 'campeonato', 'venda', 'oferta',
+    'promoção', 'desconto', 'comprar', 'preço', 'ingresso', 'show', 'atriz', 'ator',
+    'influencer', 'blogueira', 'clima', 'previsão do tempo', 'receita', 'culinária'
   ];
 
   async search(query: string): Promise<RawSource[]> {
@@ -78,9 +80,13 @@ export class ScoutAgent {
   }
 
   private sanitizeText(text: string): string {
+    if (!text) return '';
     return text
-      .replace(/<[^>]*>/g, '') // Remover HTML
-      .replace(/\s+/g, ' ')    // Normalizar espaços
+      .replace(/<script\b[^>]*>([\s\S]*?)<\/script>/gmi, '') // Remover scripts
+      .replace(/<style\b[^>]*>([\s\S]*?)<\/style>/gmi, '')   // Remover estilos
+      .replace(/<[^>]*>/g, ' ')                             // Remover tags HTML
+      .replace(/&nbsp;/g, ' ')                              // Remover entidades HTML comuns
+      .replace(/\s+/g, ' ')                                 // Normalizar espaços
       .trim();
   }
 

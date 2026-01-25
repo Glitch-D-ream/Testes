@@ -14,10 +14,15 @@ export interface BudgetData {
   year: number;
   sphere: 'FEDERAL' | 'STATE' | 'MUNICIPAL';
   category: string;
-  budgeted: number;
-  executed: number;
+  budgeted: number; // Valor Empenhado (Comprometido)
+  executed: number; // Valor Liquidado (Realmente gasto)
   percentage: number;
   lastUpdated: Date;
+  details?: {
+    empenhado: number;
+    liquidado: number;
+    pago: number;
+  };
 }
 
 export interface BudgetComparison {
@@ -64,20 +69,33 @@ export async function getBudgetData(
       return getHistoricalFallback(category, year, sphere);
     }
 
-    // Filtrar a categoria (Função) correta nos dados retornados
-    const item = response.data.items.find((i: any) => 
+    // Filtrar dados de Empenho e Liquidação
+    const empenhadoItem = response.data.items.find((i: any) => 
       i.coluna.includes('Despesas Empenhadas') && 
       i.conta.toUpperCase().includes(category.toUpperCase())
     );
+    
+    const liquidadoItem = response.data.items.find((i: any) => 
+      i.coluna.includes('Despesas Liquidadas') && 
+      i.conta.toUpperCase().includes(category.toUpperCase())
+    );
+
+    const empenhado = empenhadoItem ? parseFloat(empenhadoItem.valor) : 1000000000;
+    const liquidado = liquidadoItem ? parseFloat(liquidadoItem.valor) : empenhado * 0.8;
 
     const result: BudgetData = {
       year,
       sphere,
       category,
-      budgeted: item ? parseFloat(item.valor) * 1.2 : 1000000000, // Estimativa se não achar
-      executed: item ? parseFloat(item.valor) : 800000000,
-      percentage: item ? 80 : 80,
+      budgeted: empenhado,
+      executed: liquidado,
+      percentage: empenhado > 0 ? (liquidado / empenhado) * 100 : 0,
       lastUpdated: new Date(),
+      details: {
+        empenhado,
+        liquidado,
+        pago: liquidado * 0.95 // Estimativa para o campo Pago
+      }
     };
 
     await savePublicDataCache('SICONFI', cacheKey, result);

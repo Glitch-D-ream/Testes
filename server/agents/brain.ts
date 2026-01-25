@@ -108,6 +108,7 @@ ${knowledgeBase}
       negated: p.negated,
       conditional: p.conditional,
       reasoning: p.reasoning,
+      risks: p.risks || [],
       evidenceSnippet: text.substring(0, 1000), // Contexto rico
       sourceName: 'Múltiplas Fontes Auditadas',
       newsTitle: 'Análise Consolidada',
@@ -146,7 +147,10 @@ ${knowledgeBase}
         category,
         extracted_promises: promises,
         probability_score: probabilityScore.score,
-        probability_score_details: probabilityScore.details,
+        probability_score_details: {
+          ...probabilityScore.details,
+          verdict: aiAnalysis.verdict
+        },
         status: 'completed',
         updated_at: new Date().toISOString()
       })
@@ -169,7 +173,8 @@ ${knowledgeBase}
         source_name: p.sourceName,
         news_title: p.newsTitle,
         legislative_incoherence: p.legislativeIncoherence,
-        legislative_source_url: p.legislativeSourceUrl
+        legislative_source_url: p.legislativeSourceUrl,
+        risks: p.risks || []
       }));
       await supabase.from('promises').insert(promisesToInsert);
     }
