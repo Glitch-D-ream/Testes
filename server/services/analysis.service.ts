@@ -97,6 +97,7 @@ export class AnalysisService {
 
     return {
       id: analysisId,
+      text, // Incluir o texto completo do relatório gerado
       probabilityScore,
       promisesCount: promises.length,
       promises,

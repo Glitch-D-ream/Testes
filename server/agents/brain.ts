@@ -12,7 +12,7 @@ export class BrainAgent {
   /**
    * O Cérebro Central 3.0: Com Cache, Resiliência e Análise de Incoerência Temporal
    */
-  async analyze(politicianName: string, sources: FilteredSource[], userId: string | null = null, existingAnalysisId: string | null = null) {
+  async analyze(politicianName: string, sources: FilteredSource[], userId: string | null = null, existingAnalysisId: string | null = null, ignoreCache: boolean = false) {
     logInfo(`[Brain] Iniciando análise profunda para: ${politicianName}`);
     
     try {
@@ -26,10 +26,12 @@ export class BrainAgent {
       const targetSources = validSources.length > 0 ? validSources : sources;
 
       // 0.1. Verificar Cache
-      const cachedAnalysis = await cacheService.getAnalysis(politicianName);
-      if (cachedAnalysis) {
-        logInfo(`[Brain] Análise recuperada do cache para: ${politicianName}`);
-        return cachedAnalysis;
+      if (!ignoreCache) {
+        const cachedAnalysis = await cacheService.getAnalysis(politicianName);
+        if (cachedAnalysis) {
+          logInfo(`[Brain] Análise recuperada do cache para: ${politicianName}`);
+          return cachedAnalysis;
+        }
       }
       
       logWarn(`[Brain] Análise não encontrada em cache. Executando análise completa...`);
