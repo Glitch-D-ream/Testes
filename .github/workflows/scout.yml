@@ -34,9 +34,24 @@ jobs:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
         run: pnpm tsx server/scripts/scout-worker.ts
 
-      - name: Salvar Logs de Execução (Cold Storage)
+      - name: Salvar Dados e Logs (Cold Storage)
         if: always()
         run: |
+          mkdir -p data/scout_history
           mkdir -p logs/scout
           echo "Execução em $(date)" > logs/scout/last_run.log
-          # Aqui poderíamos commitar os logs se quiséssemos manter histórico no Git
+          
+          # Configurar Git para commit automático
+          git config --global user.name "GitHub Action (Scout Worker)"
+          git config --global user.email "action@github.com"
+          
+          # Adicionar arquivos de dados gerados (se houver)
+          git add data/scout_history/*.json logs/scout/*.log || true
+          
+          # Commitar apenas se houver mudanças
+          if git diff --staged --quiet; then
+            echo "Nenhuma mudança para commitar."
+          else
+            git commit -m "chore: update scout history and logs [skip ci]"
+            git push origin master
+          fi
