@@ -1,7 +1,7 @@
 import { jsPDF } from 'jspdf';
 import 'jspdf-autotable';
 import nodeHtmlToImage from 'node-html-to-image';
-import { AnalysisService } from './analysis.service.js';
+import { AnalysisService } from './analysis.service.ts';
 
 export class ExportService {
   private analysisService = new AnalysisService();

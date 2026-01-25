@@ -1,18 +1,18 @@
 import { Express, Request, Response, NextFunction } from 'express';
 import rateLimit from 'express-rate-limit';
 import { nanoid } from 'nanoid';
-import { authMiddleware, optionalAuthMiddleware, requestLoggerMiddleware } from './middleware.js';
-import { csrfProtection, csrfTokenRoute } from './csrf.js';
-import { allQuery, runQuery, getQuery, createAuditLog } from './database.js';
-import { logInfo, logError } from './logger.js';
-import authRoutes from '../routes/auth.js';
-import analysisRoutes from '../routes/analysis.routes.js';
-import statisticsRoutes from '../routes/statistics.routes.js';
-import adminRoutes from '../routes/admin.routes.js';
-import telegramRoutes from '../routes/telegram.routes.js';
-import aiTestRoutes from '../routes/ai-test.routes.js';
-import searchRoutes from '../routes/search.routes.js';
-import auditRoutes from '../routes/audit.routes.js';
+import { authMiddleware, optionalAuthMiddleware, requestLoggerMiddleware } from './middleware.ts';
+import { csrfProtection, csrfTokenRoute } from './csrf.ts';
+import { allQuery, runQuery, getQuery, createAuditLog } from './database.ts';
+import { logInfo, logError } from './logger.ts';
+import authRoutes from '../routes/auth.ts';
+import analysisRoutes from '../routes/analysis.routes.ts';
+import statisticsRoutes from '../routes/statistics.routes.ts';
+import adminRoutes from '../routes/admin.routes.ts';
+import telegramRoutes from '../routes/telegram.routes.ts';
+import aiTestRoutes from '../routes/ai-test.routes.ts';
+import searchRoutes from '../routes/search.routes.ts';
+import auditRoutes from '../routes/audit.routes.ts';
 
 /**
  * Rate limiters

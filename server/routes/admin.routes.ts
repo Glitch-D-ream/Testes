@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
-import { syncAllPublicData, getSyncStatus } from '../jobs/sync-public-data.js';
-import { logInfo, logError } from '../core/logger.js';
-import { authMiddleware } from '../core/middleware.js';
+import { syncAllPublicData, getSyncStatus } from '../jobs/sync-public-data.ts';
+import { logInfo, logError } from '../core/logger.ts';
+import { authMiddleware } from '../core/middleware.ts';
 
 const router = Router();
 

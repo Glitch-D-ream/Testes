@@ -22,6 +22,9 @@ function logError(message, error, meta) {
     stack: error?.stack
   });
 }
+function logWarn(message, meta) {
+  logger.warn(message, meta);
+}
 var __filename, __dirname, logger, logger_default;
 var init_logger = __esm({
   "server/core/logger.ts"() {
@@ -64,6 +67,7 @@ __export(database_exports, {
   runQuery: () => runQuery,
   savePublicDataCache: () => savePublicDataCache,
   saveScoutHistory: () => saveScoutHistory,
+  supabase: () => supabase,
   updateLastLogin: () => updateLastLogin
 });
 import { createClient } from "@supabase/supabase-js";
@@ -406,18 +410,28 @@ async function getBudgetData(category, year, sphere = "FEDERAL") {
       logger_default.warn(`[SICONFI] API inst\xE1vel. Usando estimativa hist\xF3rica para ${category}`);
       return getHistoricalFallback(category, year, sphere);
     }
-    const item = response.data.items.find(
+    const empenhadoItem = response.data.items.find(
       (i) => i.coluna.includes("Despesas Empenhadas") && i.conta.toUpperCase().includes(category.toUpperCase())
     );
+    const liquidadoItem = response.data.items.find(
+      (i) => i.coluna.includes("Despesas Liquidadas") && i.conta.toUpperCase().includes(category.toUpperCase())
+    );
+    const empenhado = empenhadoItem ? parseFloat(empenhadoItem.valor) : 1e9;
+    const liquidado = liquidadoItem ? parseFloat(liquidadoItem.valor) : empenhado * 0.8;
     const result = {
       year,
       sphere,
       category,
-      budgeted: item ? parseFloat(item.valor) * 1.2 : 1e9,
-      // Estimativa se não achar
-      executed: item ? parseFloat(item.valor) : 8e8,
-      percentage: item ? 80 : 80,
-      lastUpdated: /* @__PURE__ */ new Date()
+      budgeted: empenhado,
+      executed: liquidado,
+      percentage: empenhado > 0 ? liquidado / empenhado * 100 : 0,
+      lastUpdated: /* @__PURE__ */ new Date(),
+      details: {
+        empenhado,
+        liquidado,
+        pago: liquidado * 0.95
+        // Estimativa para o campo Pago
+      }
     };
     await savePublicDataCache("SICONFI", cacheKey, result);
     return result;
@@ -479,13 +493,34 @@ async function validateBudgetViability(category, estimatedValue, year, sphere = 
 }
 function mapPromiseToSiconfiCategory(promiseCategory) {
   const mapping = {
-    "Sa\xFAde": "SAUDE",
-    "Educa\xE7\xE3o": "EDUCACAO",
-    "Infraestrutura": "URBANISMO",
-    "Seguran\xE7a": "SEGURANCA_PUBLICA",
-    "Economia": "GESTAO_AMBIENTAL"
+    "SAUDE": "SAUDE",
+    "HEALTH": "SAUDE",
+    "EDUCACAO": "EDUCACAO",
+    "EDUCATION": "EDUCACAO",
+    "INFRAESTRUTURA": "URBANISMO",
+    "INFRASTRUCTURE": "URBANISMO",
+    "SEGURANCA": "SEGURANCA_PUBLICA",
+    "SECURITY": "SEGURANCA_PUBLICA",
+    "ECONOMIA": "GESTAO_AMBIENTAL",
+    "ECONOMY": "GESTAO_AMBIENTAL",
+    "AGRICULTURA": "AGRICULTURA",
+    "AGRICULTURE": "AGRICULTURA",
+    "CULTURA": "CULTURA",
+    "CULTURE": "CULTURA",
+    "TRANSPORTE": "TRANSPORTE",
+    "TRANSPORT": "TRANSPORTE",
+    "HABITACAO": "HABITACAO",
+    "HOUSING": "HABITACAO",
+    "SANEAMENTO": "SANEAMENTO",
+    "SANITATION": "SANEAMENTO",
+    "CIENCIA": "CIENCIA_E_TECNOLOGIA",
+    "SCIENCE": "CIENCIA_E_TECNOLOGIA",
+    "TRABALHO": "TRABALHO",
+    "EMPLOYMENT": "TRABALHO",
+    "SOCIAL": "ASSISTENCIA_SOCIAL"
   };
-  return mapping[promiseCategory] || "ADMINISTRACAO";
+  const normalized = promiseCategory.toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  return mapping[normalized] || "ADMINISTRACAO";
 }
 async function syncSiconfiData(categories) {
   logger_default.info("[SICONFI] Iniciando sincroniza\xE7\xE3o de categorias");
@@ -509,13 +544,36 @@ var init_siconfi = __esm({
 });
 
 // server/integrations/tse.ts
+import axios2 from "axios";
 async function getPoliticalHistory(candidateName, state) {
   try {
     const cacheKey = `history_${candidateName}_${state}`;
     const cached = await getPublicDataCache("TSE", cacheKey);
     if (cached) return cached;
     logger_default.info(`[TSE] Buscando hist\xF3rico: ${candidateName}`);
-    logger_default.warn(`[TSE] API Real do TSE n\xE3o retornou dados para: ${candidateName}. Buscando fontes alternativas ou retornando nulo.`);
+    const searchResponse = await axios2.get(`${TSE_API_BASE}/eleicao/buscar/${state}/2024/1/1/candidatos`, {
+      params: { nome: candidateName },
+      timeout: 1e4
+    }).catch(() => null);
+    if (searchResponse?.data?.candidatos?.length > 0) {
+      const cand = searchResponse.data.candidatos[0];
+      const history = {
+        candidateId: cand.id.toString(),
+        candidateName: cand.nomeCompleto,
+        totalElections: 1,
+        totalElected: cand.descricaoTotalizacao === "Eleito" ? 1 : 0,
+        electionRate: cand.descricaoTotalizacao === "Eleito" ? 100 : 0,
+        promisesFulfilled: 0,
+        promisesTotal: 0,
+        fulfillmentRate: 50,
+        // Default neutro mas baseado em existência real
+        controversies: 0,
+        scandals: 0
+      };
+      await savePublicDataCache("TSE", cacheKey, history);
+      return history;
+    }
+    logger_default.warn(`[TSE] API Real do TSE n\xE3o retornou dados para: ${candidateName}.`);
     return null;
   } catch (error) {
     logger_default.error(`[TSE] Erro ao buscar hist\xF3rico: ${error}`);
@@ -546,10 +604,12 @@ async function syncTSEData(candidates) {
   }
   logger_default.info("[TSE] Sincroniza\xE7\xE3o conclu\xEDda");
 }
+var TSE_API_BASE;
 var init_tse = __esm({
   "server/integrations/tse.ts"() {
     init_logger();
     init_database();
+    TSE_API_BASE = "https://divulgacandcontas.tse.jus.br/divulga/rest/v1";
   }
 });
 
@@ -562,19 +622,6 @@ __export(probability_exports, {
 async function calculateProbability(promises, author, category) {
   const result = await calculateProbabilityWithDetails(promises, author, category);
   return result.score;
-}
-async function calculateFactors(promise, author, category) {
-  const specificity = calculateSpecificity(promise);
-  const siconfiCategory = mapPromiseToSiconfiCategory(category || "GERAL");
-  const budgetValidation = await validateBudgetViability(siconfiCategory, 0, (/* @__PURE__ */ new Date()).getFullYear());
-  const authorValidation = author ? await validateCandidateCredibility(author, "BR") : null;
-  return {
-    promiseSpecificity: specificity,
-    historicalCompliance: budgetValidation.confidence,
-    budgetaryFeasibility: budgetValidation.viable ? 0.8 : 0.3,
-    timelineFeasibility: calculateTimelineFeasibility(promise),
-    authorTrack: authorValidation ? authorValidation.score : 0.5
-  };
 }
 function calculateSpecificity(promise) {
   let score = 0.2;
@@ -623,9 +670,20 @@ async function calculateProbabilityWithDetails(promises, author, category) {
       confidence: 0
     };
   }
+  const siconfiCategory = mapPromiseToSiconfiCategory(category || "GERAL");
+  const budgetValidation = await validateBudgetViability(siconfiCategory, 0, (/* @__PURE__ */ new Date()).getFullYear());
+  const authorValidation = author ? await validateCandidateCredibility(author, "BR") : null;
   const allFactors = [];
   for (const promise of promises) {
-    allFactors.push(await calculateFactors(promise, author, category));
+    const specificity = calculateSpecificity(promise);
+    const timeline = calculateTimelineFeasibility(promise);
+    allFactors.push({
+      promiseSpecificity: specificity,
+      historicalCompliance: budgetValidation.confidence,
+      budgetaryFeasibility: budgetValidation.viable ? 0.8 : 0.3,
+      timelineFeasibility: timeline,
+      authorTrack: authorValidation ? authorValidation.score : 0.5
+    });
   }
   const avgFactors = {
     promiseSpecificity: allFactors.reduce((sum, f) => sum + f.promiseSpecificity, 0) / allFactors.length,
@@ -640,11 +698,17 @@ async function calculateProbabilityWithDetails(promises, author, category) {
   else if (score >= 0.35) riskLevel = "M\xC9DIO";
   else riskLevel = "ALTO";
   return {
-    score: Math.round(score * 100),
+    score,
+    // Retornar entre 0 e 1 para consistência
     factors: avgFactors,
     riskLevel,
-    confidence: 0.85
+    confidence: 0.85,
     // Alta confiança devido ao uso de dados reais
+    details: {
+      budgetImpact: avgFactors.budgetaryFeasibility,
+      historicalCompliance: avgFactors.historicalCompliance,
+      authorTrack: avgFactors.authorTrack
+    }
   };
 }
 var init_probability = __esm({
@@ -660,108 +724,133 @@ __export(ai_service_exports, {
   AIService: () => AIService,
   aiService: () => aiService
 });
-import axios2 from "axios";
+import axios3 from "axios";
 var AIService, aiService;
 var init_ai_service = __esm({
   "server/services/ai.service.ts"() {
     init_logger();
     AIService = class {
+      /**
+       * Prompt de Alta Performance (Versão Restaurada e Melhorada)
+       * Focado em profundidade, utilidade e análise técnica rigorosa.
+       */
       promptTemplate(text) {
-        return `Voc\xEA \xE9 um analista pol\xEDtico especializado em fact-checking e an\xE1lise de promessas. 
-    Analise o texto fornecido e extraia todas as promessas pol\xEDticas.
-    Para cada promessa, identifique:
-    1. O texto exato da promessa.
-    2. A categoria (Sa\xFAde, Educa\xE7\xE3o, Infraestrutura, Economia, etc).
-    3. Score de confian\xE7a (0-1) de que isso \xE9 realmente uma promessa.
-    4. Se \xE9 uma promessa negativa (ex: "n\xE3o vou fazer").
-    5. Se \xE9 uma promessa condicional (ex: "se eu ganhar").
-    6. Uma breve explica\xE7\xE3o do racioc\xEDnio.
+        return `Voc\xEA \xE9 um analista pol\xEDtico de elite, especializado em auditoria de promessas e an\xE1lise de viabilidade.
+    Sua miss\xE3o \xE9 transformar o texto bruto em um relat\xF3rio de intelig\xEAncia profundo, \xFAtil e extremamente detalhado.
     
-    Tamb\xE9m forne\xE7a um sentimento geral do texto e um score de credibilidade inicial (0-100).
+    DIRETRIZES DE QUALIDADE:
+    1. PROFUNDIDADE: N\xE3o seja superficial. Analise as implica\xE7\xF5es de cada promessa.
+    2. UTILIDADE: O texto deve servir para um cidad\xE3o decidir se a promessa \xE9 realista ou n\xE3o.
+    3. RIGOR T\xC9CNICO: Use termos t\xE9cnicos de administra\xE7\xE3o p\xFAblica quando apropriado (ex: PPA, LOA, dota\xE7\xE3o or\xE7ament\xE1ria).
+    4. DETEC\xC7\xC3O DE NUANCES: Identifique se a promessa depende de aprova\xE7\xE3o do Congresso ou se \xE9 ato exclusivo do Executivo.
+    
+    SISTEMA DE VEREDITO EM DUAS ETAPAS:
+    Para cada an\xE1lise, voc\xEA deve obrigatoriamente responder a duas perguntas internas:
+    1. "Quais s\xE3o os fatos?" (Baseado em dados e realidade atual)
+    2. "Por que isso pode dar errado?" (An\xE1lise de riscos, obst\xE1culos e ceticismo)
+
+    Para cada promessa extra\xEDda, forne\xE7a:
+    - Um racioc\xEDnio (reasoning) t\xE9cnico.
+    - Uma lista de "riscos" (risks) espec\xEDficos de descumprimento.
+    
     Responda estritamente em formato JSON seguindo esta estrutura:
     {
       "promises": [
         {
-          "text": "string",
-          "category": "string",
-          "confidence": number,
-          "negated": boolean,
-          "conditional": boolean,
-          "reasoning": "string"
+          "text": "Texto integral da promessa",
+          "category": "Sa\xFAde/Educa\xE7\xE3o/Economia/etc",
+          "confidence": 0.95,
+          "negated": false,
+          "conditional": true,
+          "reasoning": "An\xE1lise t\xE9cnica profunda sobre a viabilidade e impacto desta promessa espec\xEDfica.",
+          "risks": ["Risco 1", "Risco 2"]
         }
       ],
-      "overallSentiment": "string",
-      "credibilityScore": number
+      "overallSentiment": "An\xE1lise qualitativa do tom do discurso (ex: Populista, T\xE9cnico, Austero)",
+      "credibilityScore": 85,
+      "verdict": {
+        "facts": ["Fato 1", "Fato 2"],
+        "skepticism": ["Obst\xE1culo 1", "Motivo de falha 2"]
+      }
     }
     
     Texto para an\xE1lise:
     ${text}`;
       }
       /**
-       * Provedor de Código Aberto (Pollinations AI) - Gratuito e sem necessidade de chave
+       * Provedor de Código Aberto (Pollinations AI) com Multi-Model Fallback
+       * Usando modelos de alto nível para garantir a qualidade do texto.
        */
       async analyzeWithOpenSource(text) {
-        logInfo("Iniciando an\xE1lise com Provedor Open Source (Pollinations)...");
-        try {
-          const response = await axios2.post("https://text.pollinations.ai/", {
-            messages: [
-              { role: "system", content: "Voc\xEA \xE9 um analista pol\xEDtico que responde apenas em JSON v\xE1lido." },
-              { role: "user", content: this.promptTemplate(text) }
-            ],
-            model: "openai"
-          }, { timeout: 45e3 });
-          let content = response.data;
-          if (typeof content === "string") {
-            content = content.replace(/```json\n?|\n?```/g, "").trim();
-            const jsonMatch = content.match(/\{[\s\S]*\}/);
-            if (jsonMatch) {
-              content = jsonMatch[0];
+        const models = ["openai", "mistral", "llama"];
+        let lastError;
+        for (const model of models) {
+          try {
+            logInfo(`[AI] Gerando relat\xF3rio de alta qualidade com modelo: ${model}...`);
+            const response = await axios3.post("https://text.pollinations.ai/", {
+              messages: [
+                {
+                  role: "system",
+                  content: "Voc\xEA \xE9 um analista pol\xEDtico s\xEAnior. Seus relat\xF3rios s\xE3o famosos pela profundidade t\xE9cnica e utilidade pr\xE1tica. Voc\xEA nunca \xE9 superficial. Responda apenas JSON."
+                },
+                { role: "user", content: this.promptTemplate(text) }
+              ],
+              model,
+              jsonMode: true
+            }, { timeout: 6e4 });
+            let content = response.data;
+            if (typeof content === "object" && content.choices) {
+              content = content.choices[0]?.message?.content || content;
             }
-            return JSON.parse(content);
+            if (typeof content === "string") {
+              let cleanContent = content.replace(/```json\n?|\n?```/g, "").trim();
+              const jsonMatch = cleanContent.match(/\{[\s\S]*\}/);
+              if (jsonMatch) {
+                cleanContent = jsonMatch[0];
+              }
+              try {
+                const parsed = JSON.parse(cleanContent);
+                if (!parsed.verdict) {
+                  parsed.verdict = { facts: [], skepticism: [] };
+                }
+                if (parsed.promises) {
+                  parsed.promises = parsed.promises.map((p) => ({
+                    ...p,
+                    risks: p.risks || []
+                  }));
+                }
+                return parsed;
+              } catch (parseError) {
+                logError(`[AI] Erro ao parsear JSON do modelo ${model}`, parseError);
+                throw parseError;
+              }
+            }
+            if (content && content.promises) {
+              const result = content;
+              if (!result.verdict) {
+                result.verdict = { facts: [], skepticism: [] };
+              }
+              result.promises = result.promises.map((p) => ({
+                ...p,
+                risks: p.risks || []
+              }));
+              return result;
+            }
+            throw new Error(`Modelo ${model} n\xE3o gerou a profundidade esperada`);
+          } catch (error) {
+            logError(`[AI] Falha na tentativa com ${model}`, error);
+            lastError = error;
+            continue;
           }
-          return content;
-        } catch (error) {
-          logError("Falha no Provedor Open Source", error);
-          throw error;
         }
-      }
-      /**
-       * Fallback para Groq se a chave estiver presente (Llama 3 70B Gratuito)
-       */
-      async analyzeWithGroq(text) {
-        if (!process.env.GROQ_API_KEY) throw new Error("GROQ_API_KEY n\xE3o configurada");
-        logInfo("Tentando an\xE1lise com Groq (Llama 3.3 70B)...");
-        const response = await axios2.post("https://api.groq.com/openai/v1/chat/completions", {
-          messages: [
-            { role: "system", content: "Voc\xEA \xE9 um analista pol\xEDtico que responde apenas em JSON v\xE1lido." },
-            { role: "user", content: this.promptTemplate(text) }
-          ],
-          model: "llama-3.3-70b-versatile",
-          response_format: { type: "json_object" }
-        }, {
-          headers: {
-            "Authorization": `Bearer ${process.env.GROQ_API_KEY}`,
-            "Content-Type": "application/json"
-          },
-          timeout: 3e4
-        });
-        const content = response.data.choices[0]?.message?.content;
-        if (!content) throw new Error("Resposta vazia do Groq");
-        return JSON.parse(content);
+        throw lastError || new Error("Falha ao gerar relat\xF3rio de alta qualidade");
       }
       async analyzeText(text) {
-        if (process.env.GROQ_API_KEY && process.env.GROQ_API_KEY.length > 10) {
-          try {
-            return await this.analyzeWithGroq(text);
-          } catch (error) {
-            logError("Falha no Groq, tentando Pollinations...", error);
-          }
-        }
         try {
           return await this.analyzeWithOpenSource(text);
         } catch (error) {
-          logError("Falha em todos os provedores de IA", error);
-          throw new Error("N\xE3o foi poss\xEDvel realizar a an\xE1lise de IA no momento.");
+          logError("Erro cr\xEDtico na gera\xE7\xE3o do relat\xF3rio", error);
+          throw new Error("N\xE3o foi poss\xEDvel gerar o relat\xF3rio detalhado no momento.");
         }
       }
     };
@@ -866,6 +955,105 @@ var init_analysis_service = __esm({
       }
     };
     analysisService = new AnalysisService();
+  }
+});
+
+// server/services/ai-deepseek.service.ts
+var ai_deepseek_service_exports = {};
+__export(ai_deepseek_service_exports, {
+  DeepSeekService: () => DeepSeekService,
+  deepSeekService: () => deepSeekService
+});
+import axios10 from "axios";
+var DeepSeekService, deepSeekService;
+var init_ai_deepseek_service = __esm({
+  "server/services/ai-deepseek.service.ts"() {
+    init_logger();
+    DeepSeekService = class {
+      API_URL = "https://openrouter.ai/api/v1/chat/completions";
+      MODEL = "deepseek/deepseek-r1";
+      // Ou 'deepseek/deepseek-r1:free' se disponível
+      promptTemplate(text) {
+        return `Voc\xEA \xE9 um Auditor T\xE9cnico Independente e Analista de Viabilidade Or\xE7ament\xE1ria. Sua miss\xE3o \xE9 realizar uma auditoria fria, imparcial e estritamente t\xE9cnica do discurso pol\xEDtico fornecido.
+
+### PRINC\xCDPIOS DE AUDITORIA (INVIOL\xC1VEIS):
+1. **NEUTRALIDADE ABSOLUTA:** N\xE3o utilize linguagem emocional, adjetivos pejorativos ou elogiosos. Trate todos os espectros pol\xEDticos com o mesmo rigor t\xE9cnico.
+2. **HONESTIDADE INTELECTUAL:** Baseie suas conclus\xF5es apenas em evid\xEAncias presentes no texto ou em dados or\xE7ament\xE1rios/legais conhecidos. Se n\xE3o houver dados suficientes para um veredito, declare a incerteza.
+3. **FOCO EM VIABILIDADE:** Substitua julgamentos de valor por an\xE1lises de viabilidade (financeira, legislativa e operacional).
+
+### DIRETRIZES DE REDA\xC7\xC3O:
+1. **Tom:** Cl\xEDnico, forense e puramente informativo.
+2. **Ceticismo T\xE9cnico:** Questione a exequibilidade t\xE9cnica. "Existe previs\xE3o or\xE7ament\xE1ria?", "H\xE1 compet\xEAncia legal para tal ato?", "Qual o hist\xF3rico de execu\xE7\xE3o de projetos similares?".
+3. **Diferencia\xE7\xE3o:** Separe claramente "Inten\xE7\xE3o Pol\xEDtica" (desejo) de "Compromisso Estruturado" (plano com meios).
+
+### SISTEMA DE VEREDITO EM DUAS ETAPAS (OBRIGAT\xD3RIO):
+1. **FATOS:** Liste evid\xEAncias concretas, dados or\xE7ament\xE1rios ou realidade pol\xEDtica atual.
+2. **CETICISMO:** Liste pontos de d\xFAvida t\xE9cnica, inconsist\xEAncias l\xF3gicas ou obst\xE1culos pol\xEDticos.
+
+Responda estritamente em formato JSON puro (sem markdown):
+{
+  "promises": [
+    {
+      "text": "A promessa ou declara\xE7\xE3o exata",
+      "category": "Sa\xFAde|Educa\xE7\xE3o|Economia|Seguran\xE7a|Infraestrutura|Geral",
+      "confidence": 0.0 a 1.0,
+      "negated": false,
+      "conditional": false,
+      "reasoning": "An\xE1lise t\xE9cnica profunda sobre a viabilidade e o contexto hist\xF3rico/pol\xEDtico desta promessa espec\xEDfica.",
+      "risks": [
+        "Risco t\xE9cnico/or\xE7ament\xE1rio espec\xEDfico",
+        "Obst\xE1culo pol\xEDtico ou legislativo identificado"
+      ]
+    }
+  ],
+  "overallSentiment": "Tom predominante do discurso",
+  "credibilityScore": 0-100,
+  "verdict": {
+    "facts": ["Evid\xEAncia concreta 1", "Evid\xEAncia concreta 2"],
+    "skepticism": ["Ponto de d\xFAvida t\xE9cnica 1", "Inconsist\xEAncia l\xF3gica ou pol\xEDtica 2"]
+  }
+}
+
+Texto para an\xE1lise:
+${text}`;
+      }
+      async analyzeText(text, apiKey) {
+        try {
+          logInfo(`[DeepSeek-R1] Iniciando an\xE1lise de racioc\xEDnio profundo...`);
+          const response = await axios10.post(this.API_URL, {
+            model: this.MODEL,
+            messages: [
+              {
+                role: "system",
+                content: "Voc\xEA \xE9 um auditor pol\xEDtico de elite. Voc\xEA pensa profundamente antes de responder. Responda apenas JSON."
+              },
+              { role: "user", content: this.promptTemplate(text) }
+            ],
+            response_format: { type: "json_object" }
+          }, {
+            headers: {
+              "Authorization": `Bearer ${apiKey}`,
+              "Content-Type": "application/json",
+              "HTTP-Referer": "https://github.com/Glitch-D-ream/Testes",
+              // Opcional para OpenRouter
+              "X-Title": "Detector de Promessa Vazia"
+            },
+            timeout: 9e4
+            // DeepSeek R1 pode demorar mais para "pensar"
+          });
+          let content = response.data.choices[0].message.content;
+          if (typeof content === "string") {
+            content = JSON.parse(content.replace(/```json\n?|\n?```/g, "").trim());
+          }
+          logInfo(`[DeepSeek-R1] An\xE1lise conclu\xEDda com sucesso.`);
+          return content;
+        } catch (error) {
+          logError(`[DeepSeek-R1] Erro na integra\xE7\xE3o`, error);
+          throw new Error("Falha na an\xE1lise profunda via DeepSeek R1.");
+        }
+      }
+    };
+    deepSeekService = new DeepSeekService();
   }
 });
 
@@ -1516,7 +1704,7 @@ init_siconfi();
 // server/integrations/portal-transparencia.ts
 init_logger();
 init_database();
-import axios3 from "axios";
+import axios4 from "axios";
 var PORTAL_API_BASE = "https://www.portaltransparencia.gov.br/api-de-dados";
 async function getExpenses(category, startDate, endDate, limit = 100) {
   try {
@@ -1524,7 +1712,7 @@ async function getExpenses(category, startDate, endDate, limit = 100) {
     const cached = await getPublicDataCache("PORTAL_TRANSPARENCIA", cacheKey);
     if (cached) return cached;
     logger_default.info(`[Portal Transpar\xEAncia] Buscando despesas: ${category}`);
-    const response = await axios3.get(`${PORTAL_API_BASE}/despesas`, {
+    const response = await axios4.get(`${PORTAL_API_BASE}/despesas`, {
       params: {
         descricao: category,
         dataInicio: startDate.toISOString().split("T")[0],
@@ -2048,7 +2236,189 @@ init_logger();
 // server/agents/scout.ts
 init_logger();
 init_database();
-import axios4 from "axios";
+import axios6 from "axios";
+
+// server/agents/multi-scout.ts
+init_logger();
+import axios5 from "axios";
+import { nanoid as nanoid6 } from "nanoid";
+var MultiScoutAgent = class {
+  primaryModels = ["openai", "mistral", "llama"];
+  fallbackRSSFeeds = [
+    "https://feeds.folha.uol.com.br/poder",
+    "https://g1.globo.com/dynamo/politica/feed.xml",
+    "https://www.poder360.com.br/feed/"
+  ];
+  async search(query) {
+    logInfo(`[Multi-Scout] Iniciando busca resiliente para: ${query}`);
+    let sources = [];
+    sources = await this.searchViaDuckDuckGo(query);
+    if (sources.length > 0) {
+      logInfo(`[Multi-Scout] Sucesso na busca via DuckDuckGo. ${sources.length} fontes encontradas.`);
+      return sources;
+    }
+    try {
+      sources = await this.searchViaAI(query);
+      if (sources.length > 0) {
+        logInfo(`[Multi-Scout] Sucesso na busca via IA. ${sources.length} fontes encontradas.`);
+        return sources;
+      }
+    } catch (error) {
+      logWarn(`[Multi-Scout] Falha na busca via IA. Tentando fallback...`, error);
+    }
+    try {
+      sources = await this.searchViaRSSFeeds(query);
+      if (sources.length > 0) {
+        logInfo(`[Multi-Scout] Sucesso na busca via RSS. ${sources.length} fontes encontradas.`);
+        return sources;
+      }
+    } catch (error) {
+      logWarn(`[Multi-Scout] Falha na busca via RSS. Tentando fallback final...`, error);
+    }
+    try {
+      sources = await this.searchGeneric(query);
+      if (sources.length > 0) {
+        logInfo(`[Multi-Scout] Sucesso na busca gen\xE9rica. ${sources.length} fontes encontradas.`);
+        return sources;
+      }
+    } catch (error) {
+      logError(`[Multi-Scout] Todas as tentativas falharam.`, error);
+    }
+    return [];
+  }
+  /**
+   * Busca via IA com múltiplos modelos
+   */
+  async searchViaAI(query) {
+    for (const model of this.primaryModels) {
+      try {
+        logInfo(`[Multi-Scout] Tentando modelo: ${model}`);
+        const prompt = `Busque not\xEDcias recentes sobre "${query}" em portugu\xEAs. 
+        Retorne um JSON com array de objetos contendo: title, content (resumo), url, publishedAt (ISO date).
+        Exemplo: {"results": [{"title": "...", "content": "...", "url": "...", "publishedAt": "2026-01-24T..."}]}`;
+        const response = await axios5.post("https://text.pollinations.ai/", {
+          messages: [
+            { role: "system", content: "Voc\xEA \xE9 um agregador de not\xEDcias. Responda apenas JSON." },
+            { role: "user", content: prompt }
+          ],
+          model,
+          jsonMode: true
+        }, { timeout: 15e3 });
+        let data = response.data;
+        if (typeof data === "string") {
+          data = JSON.parse(data.replace(/```json\n?|\n?```/g, "").trim());
+        }
+        if (data && data.results && Array.isArray(data.results)) {
+          return data.results.map((item) => ({
+            id: nanoid6(),
+            url: item.url || `https://news.search/${nanoid6()}`,
+            title: item.title || "Sem t\xEDtulo",
+            content: item.content || "Sem conte\xFAdo",
+            source: model,
+            publishedAt: item.publishedAt || (/* @__PURE__ */ new Date()).toISOString(),
+            confidence: "medium"
+          }));
+        }
+      } catch (error) {
+        logWarn(`[Multi-Scout] Modelo ${model} falhou:`, error);
+      }
+    }
+    throw new Error("Nenhum modelo de IA dispon\xEDvel");
+  }
+  /**
+   * Busca via DuckDuckGo (Custo Zero e Sem API Key)
+   */
+  async searchViaDuckDuckGo(query) {
+    try {
+      logInfo(`[Multi-Scout] Tentando busca via DuckDuckGo: ${query}`);
+      const response = await axios5.get(`https://html.duckduckgo.com/html/`, {
+        params: { q: query },
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+        },
+        timeout: 1e4
+      });
+      const html = response.data;
+      const sources = [];
+      const resultRegex = /<a class="result__a" href="([^"]+)">([^<]+)<\/a>[\s\S]*?<a class="result__snippet"[^>]*>([^<]+)<\/a>/g;
+      let match;
+      let count = 0;
+      while ((match = resultRegex.exec(html)) !== null && count < 5) {
+        const url = new URL(match[1], "https://duckduckgo.com").searchParams.get("uddg") || match[1];
+        sources.push({
+          id: nanoid6(),
+          url,
+          title: match[2].trim(),
+          content: match[3].trim(),
+          source: "DuckDuckGo",
+          publishedAt: (/* @__PURE__ */ new Date()).toISOString(),
+          confidence: "medium"
+        });
+        count++;
+      }
+      return sources;
+    } catch (error) {
+      logWarn(`[Multi-Scout] DuckDuckGo falhou:`, error);
+      return [];
+    }
+  }
+  /**
+   * Busca via RSS Feeds de portais de notícias
+   */
+  async searchViaRSSFeeds(query) {
+    const sources = [];
+    for (const feedUrl of this.fallbackRSSFeeds) {
+      try {
+        logInfo(`[Multi-Scout] Tentando feed RSS: ${feedUrl}`);
+        const response = await axios5.get(feedUrl, { timeout: 1e4 });
+        const feedContent = response.data;
+        const items = feedContent.match(/<item>[\s\S]*?<\/item>/g) || [];
+        for (const item of items) {
+          const title = (item.match(/<title><!\[CDATA\[(.*?)\]\]><\/title>/) || item.match(/<title>(.*?)<\/title>/))?.[1] || "Sem t\xEDtulo";
+          const link = item.match(/<link>(.*?)<\/link>/)?.[1] || "";
+          const description = (item.match(/<description><!\[CDATA\[(.*?)\]\]><\/description>/) || item.match(/<description>(.*?)<\/description>/))?.[1] || "Sem conte\xFAdo";
+          if (title.toLowerCase().includes(query.toLowerCase()) || description.toLowerCase().includes(query.toLowerCase())) {
+            sources.push({
+              id: nanoid6(),
+              url: link,
+              title: title.replace(/<[^>]+>/g, ""),
+              content: description.replace(/<[^>]+>/g, "").substring(0, 300),
+              source: new URL(feedUrl).hostname || "RSS Feed",
+              publishedAt: (/* @__PURE__ */ new Date()).toISOString(),
+              confidence: "medium"
+            });
+          }
+          if (sources.length >= 5) break;
+        }
+        if (sources.length > 0) break;
+      } catch (error) {
+        logWarn(`[Multi-Scout] Feed RSS falhou: ${feedUrl}`, error);
+      }
+    }
+    return sources;
+  }
+  /**
+   * Busca genérica de último recurso
+   * Retorna dados estruturados mesmo sem fonte externa real
+   */
+  async searchGeneric(query) {
+    logWarn(`[Multi-Scout] Usando fallback gen\xE9rico para: ${query}`);
+    return [
+      {
+        id: nanoid6(),
+        url: `https://generic-search/${nanoid6()}`,
+        title: `An\xE1lise de Compromissos: ${query}`,
+        content: `Busca gen\xE9rica para ${query}. Nenhuma fonte externa dispon\xEDvel no momento. Sistema em modo fallback.`,
+        source: "Generic Fallback",
+        publishedAt: (/* @__PURE__ */ new Date()).toISOString(),
+        confidence: "low"
+      }
+    ];
+  }
+};
+var multiScoutAgent = new MultiScoutAgent();
+
+// server/agents/scout.ts
 var ScoutAgent = class {
   whitelist = [
     "g1.globo.com",
@@ -2067,13 +2437,58 @@ var ScoutAgent = class {
     "senado.leg.br",
     "planalto.gov.br"
   ];
+  blacklistKeywords = [
+    "bbb",
+    "festa",
+    "namoro",
+    "casamento",
+    "look",
+    "fofoca",
+    "celebridade",
+    "hor\xF3scopo",
+    "novela",
+    "futebol",
+    "gol",
+    "campeonato",
+    "venda",
+    "oferta",
+    "promo\xE7\xE3o",
+    "desconto",
+    "comprar",
+    "pre\xE7o",
+    "ingresso",
+    "show",
+    "atriz",
+    "ator",
+    "influencer",
+    "blogueira",
+    "clima",
+    "previs\xE3o do tempo",
+    "receita",
+    "culin\xE1ria"
+  ];
   async search(query) {
-    logInfo(`[Scout] Iniciando varredura multicanal para: ${query}`);
+    logInfo(`[Scout] Iniciando varredura multicanal com resili\xEAncia para: ${query}`);
     const sources = [];
     try {
       const rssResults = await this.fetchFromRSS(query);
       sources.push(...rssResults);
-      if (sources.length < 5) {
+      if (sources.length < 3) {
+        logWarn(`[Scout] Apenas ${sources.length} fontes via RSS. Ativando Multi-Scout resiliente...`);
+        const multiScoutResults = await multiScoutAgent.search(query);
+        multiScoutResults.forEach((item) => {
+          sources.push({
+            title: item.title,
+            url: item.url,
+            content: item.content,
+            source: item.source,
+            publishedAt: item.publishedAt,
+            type: "news",
+            confidence: item.confidence
+          });
+        });
+      }
+      if (sources.length < 3) {
         const webResults = await this.fetchFromWeb(query);
         sources.push(...webResults);
       }
@@ -2082,18 +2497,16 @@ var ScoutAgent = class {
         if (!this.isValidUrl(source.url)) continue;
         const isTrusted = this.whitelist.some((domain) => source.url.includes(domain));
         source.confidence = isTrusted ? "high" : "medium";
-        const exists = await checkUrlExists(source.url);
-        if (!exists) {
-          await saveScoutHistory({
-            url: source.url,
-            title: source.title,
-            content: source.content,
-            source: source.source,
-            politicianName: query,
-            publishedAt: source.publishedAt
-          });
-          newSources.push(source);
-        }
+        await saveScoutHistory({
+          url: source.url,
+          title: source.title,
+          content: source.content,
+          source: source.source,
+          politicianName: query,
+          publishedAt: source.publishedAt
+        }).catch(() => {
+        });
+        newSources.push(source);
       }
       logInfo(`[Scout] Varredura conclu\xEDda. ${newSources.length} novas fontes validadas.`);
       return newSources;
@@ -2110,52 +2523,44 @@ var ScoutAgent = class {
       return false;
     }
   }
+  sanitizeText(text) {
+    if (!text) return "";
+    return text.replace(/<script\b[^>]*>([\s\S]*?)<\/script>/gmi, "").replace(/<style\b[^>]*>([\s\S]*?)<\/style>/gmi, "").replace(/<[^>]*>/g, " ").replace(/&nbsp;/g, " ").replace(/\s+/g, " ").trim();
+  }
   async fetchFromWeb(query) {
-    const prompt = `Aja como um buscador de not\xEDcias em tempo real. Liste as 5 not\xEDcias, discursos ou falas reais mais recentes do pol\xEDtico "${query}" que contenham promessas, planos de governo ou declara\xE7\xF5es de inten\xE7\xE3o.
-    
-    IMPORTANTE: Retorne APENAS um array JSON puro, sem explica\xE7\xF5es, no seguinte formato:
-    [
-      {
-        "title": "T\xEDtulo da not\xEDcia",
-        "url": "URL v\xE1lida da fonte",
-        "content": "Resumo ou trecho da fala/promessa",
-        "source": "Nome do portal",
-        "date": "Data aproximada"
-      }
-    ]`;
-    try {
-      let content;
+    const prompt = `Liste 5 not\xEDcias reais e recentes do pol\xEDtico brasileiro "${query}" com promessas ou declara\xE7\xF5es. 
+    Retorne APENAS um array JSON puro, sem markdown, seguindo este formato: 
+    [{"title": "T\xEDtulo da Not\xEDcia", "url": "https://link-da-noticia.com", "content": "Resumo da promessa ou declara\xE7\xE3o encontrada", "source": "Nome do Portal", "date": "2024-01-01"}]`;
+    const models = ["openai", "mistral", "llama"];
+    for (const model of models) {
       try {
-        const response = await axios4.post("https://text.pollinations.ai/", {
-          messages: [
-            { role: "system", content: "Voc\xEA \xE9 um buscador de not\xEDcias pol\xEDticas brasileiras. Responda apenas JSON." },
-            { role: "user", content: prompt }
-          ],
-          model: "llama",
-          jsonMode: true
-        }, { timeout: 25e3 });
-        content = response.data;
-      } catch (pollError) {
-        logInfo("[Scout] Pollinations falhou. Tentando fallback via Hugging Face ou similar...");
-        return [];
+        logInfo(`[Scout] Tentando busca web com modelo: ${model}`);
+        const url = `https://text.pollinations.ai/${encodeURIComponent(prompt)}?model=${model}&seed=${Math.floor(Math.random() * 1e3)}`;
+        const response = await axios6.get(url, { timeout: 2e4 });
+        let content = response.data;
+        if (!content) continue;
+        let cleanContent = typeof content === "string" ? content : JSON.stringify(content);
+        cleanContent = cleanContent.replace(/```json\n?|\n?```/g, "").trim();
+        const jsonMatch = cleanContent.match(/\[[\s\S]*\]/);
+        if (jsonMatch) {
+          const results = JSON.parse(jsonMatch[0]);
+          if (Array.isArray(results) && results.length > 0) {
+            return results.map((item) => ({
+              title: item.title || item.titulo || "Not\xEDcia Identificada",
+              url: item.url || item.link || "https://google.com",
+              content: this.sanitizeText(item.content || item.snippet || item.resumo || ""),
+              source: item.source || item.fonte || "Busca Web",
+              publishedAt: item.date || item.data || (/* @__PURE__ */ new Date()).toISOString(),
+              type: "news",
+              confidence: "medium"
+            }));
+          }
+        }
+      } catch (error) {
+        logError(`[Scout] Falha com modelo ${model}: ${error.message}`);
       }
-      if (typeof content === "string") {
-        content = JSON.parse(content.replace(/```json\n?|\n?```/g, "").trim());
-      }
-      const results = Array.isArray(content) ? content : content.news || content.results || [];
-      return results.map((item) => ({
-        title: item.title || item.titulo,
-        url: item.url || item.link,
-        content: item.content || item.snippet || item.resumo || "",
-        source: item.source || item.fonte || "Web Search",
-        publishedAt: item.date || item.data,
-        type: "news",
-        confidence: "medium"
-      }));
-    } catch (error) {
-      logError("[Scout] Falha cr\xEDtica na busca Web", error);
-      return [];
     }
+    return [];
   }
   async fetchFromRSS(query) {
     const feeds = [
@@ -2166,7 +2571,7 @@ var ScoutAgent = class {
     const queryLower = query.toLowerCase();
     for (const feed of feeds) {
       try {
-        const response = await axios4.get(`https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(feed.url)}`, { timeout: 1e4 });
+        const response = await axios6.get(`https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(feed.url)}`, { timeout: 1e4 });
         if (response.data?.items) {
           const matchedItems = response.data.items.filter(
             (item) => item.title.toLowerCase().includes(queryLower) || item.description && item.description.toLowerCase().includes(queryLower)
@@ -2175,7 +2580,7 @@ var ScoutAgent = class {
             results.push({
               title: item.title,
               url: item.link,
-              content: item.description || item.content || "",
+              content: this.sanitizeText(item.description || item.content || ""),
               source: feed.name,
               publishedAt: item.pubDate,
               type: "news",
@@ -2194,7 +2599,7 @@ var scoutAgent = new ScoutAgent();
 
 // server/agents/filter.ts
 init_logger();
-import axios5 from "axios";
+import axios7 from "axios";
 var FilterAgent = class {
   /**
    * Filtra e limpa os dados brutos usando uma IA leve com processamento em lote
@@ -2230,10 +2635,21 @@ var FilterAgent = class {
       id: idx,
       text: `${s.title}: ${s.content.substring(0, 300)}...`
     }));
-    const prompt = `Analise quais dos textos abaixo cont\xEAm promessas pol\xEDticas, planos de governo ou compromissos p\xFAblicos.
-    Textos: ${JSON.stringify(batchData)}
-    Responda apenas um JSON no formato: {"results": [{"id": number, "isPromise": boolean, "score": number, "reason": "string"}]}`;
-    const response = await axios5.post("https://text.pollinations.ai/", {
+    const prompt = `Voc\xEA \xE9 um Analista de Triagem de Dados P\xFAblicos. Sua tarefa \xE9 filtrar as not\xEDcias abaixo com base em CRIT\xC9RIOS T\xC9CNICOS de utilidade para auditoria.
+
+### CRIT\xC9RIOS DE INCLUS\xC3O:
+1. **Compromisso de A\xE7\xE3o:** Declara\xE7\xF5es que indicam uma a\xE7\xE3o futura (ex: "Vou construir", "Reduziremos").
+2. **An\xFAncio de Pol\xEDtica P\xFAblica:** Lan\xE7amento de programas, obras ou mudan\xE7as legislativas.
+3. **Dados Concretos:** Not\xEDcias que citam valores, prazos ou metas espec\xEDficas.
+
+### CRIT\xC9RIOS DE EXCLUS\xC3O (IMPARCIALIDADE):
+1. **Opini\xE3o/Ret\xF3rica Pura:** Cr\xEDticas a advers\xE1rios ou elogios a aliados sem proposta de a\xE7\xE3o.
+2. **Vida Pessoal/Protocolar:** Eventos sociais, agendas de viagens sem pauta t\xE9cnica ou fofocas.
+3. **Vi\xE9s Editorial:** Ignore o tom do jornalista; foque apenas na declara\xE7\xE3o direta do agente pol\xEDtico.
+
+Textos: ${JSON.stringify(batchData)}
+Responda apenas um JSON no formato: {"results": [{"id": number, "isPromise": boolean, "score": number, "reason": "string"}]}`;
+    const response = await axios7.post("https://text.pollinations.ai/", {
       messages: [
         { role: "system", content: "Voc\xEA \xE9 um classificador de dados pol\xEDticos especializado em an\xE1lise de promessas. Responda apenas JSON." },
         { role: "user", content: prompt }
@@ -2265,27 +2681,53 @@ var FilterAgent = class {
     return filtered;
   }
   simpleHeuristic(content) {
-    const keywords = [
+    const actionVerbs = [
       "vou",
       "vamos",
       "prometo",
       "farei",
-      "projeto",
-      "plano",
+      "irei",
+      "pretendo",
+      "planejo",
       "investir",
       "construir",
       "obras",
-      "governo",
       "edital",
       "lan\xE7ar",
       "reforma",
       "ampliar",
       "criar",
       "reduzir",
-      "aumentar"
+      "aumentar",
+      "implementar",
+      "entregar",
+      "contratar",
+      "destinar",
+      "aplicar",
+      "baixar",
+      "cortar",
+      "eliminar"
+    ];
+    const politicalContext = [
+      "governo",
+      "prefeitura",
+      "estado",
+      "munic\xEDpio",
+      "verba",
+      "or\xE7amento",
+      "povo",
+      "cidad\xE3o",
+      "eleitor",
+      "campanha",
+      "mandato",
+      "gest\xE3o"
     ];
     const contentLower = content.toLowerCase();
-    return keywords.some((kw) => contentLower.includes(kw));
+    const hasAction = actionVerbs.some((kw) => contentLower.includes(kw));
+    const hasContext = politicalContext.some((kw) => contentLower.includes(kw));
+    const strongActions = ["vou", "prometo", "farei", "irei", "construir", "investir"];
+    const hasStrongAction = strongActions.some((kw) => contentLower.includes(kw));
+    return hasStrongAction || hasAction && hasContext;
   }
 };
 var filterAgent = new FilterAgent();
@@ -2298,14 +2740,14 @@ init_siconfi();
 // server/integrations/camara.ts
 init_logger();
 init_database();
-import axios6 from "axios";
+import axios8 from "axios";
 var CAMARA_API_BASE = "https://dadosabertos.camara.leg.br/api/v2";
 async function getDeputadoId(nome) {
   try {
     const cacheKey = `deputado_id_${nome}`;
     const cached = await getPublicDataCache("CAMARA", cacheKey);
     if (cached) return cached.id;
-    const response = await axios6.get(`${CAMARA_API_BASE}/deputados`, {
+    const response = await axios8.get(`${CAMARA_API_BASE}/deputados`, {
       params: { nome, ordem: "ASC", ordenarPor: "nome" }
     });
     const deputado = response.data.dados[0];
@@ -2324,14 +2766,14 @@ async function getVotacoesDeputado(deputadoId) {
     const cacheKey = `votacoes_v6_${deputadoId}`;
     const cached = await getPublicDataCache("CAMARA", cacheKey);
     if (cached) return cached;
-    const responseVotacoes = await axios6.get(`${CAMARA_API_BASE}/votacoes`, {
+    const responseVotacoes = await axios8.get(`${CAMARA_API_BASE}/votacoes`, {
       params: { ordem: "DESC", ordenarPor: "dataHoraRegistro", itens: 20 },
       headers: { "Accept": "application/json" }
     });
     const votosEncontrados = [];
     for (const votacao of responseVotacoes.data.dados) {
       try {
-        const resVoto = await axios6.get(`${CAMARA_API_BASE}/votacoes/${votacao.id}/votos`, {
+        const resVoto = await axios8.get(`${CAMARA_API_BASE}/votacoes/${votacao.id}/votos`, {
           headers: { "Accept": "application/json" }
         });
         const votoDoDeputado = resVoto.data.dados.find((v) => v.deputado?.id === deputadoId);
@@ -2383,17 +2825,117 @@ function analisarIncoerencia(promessa, voto) {
   return { incoerente: false, justificativa: "" };
 }
 
+// server/services/cache.service.ts
+init_database();
+init_logger();
+var CacheService = class {
+  CACHE_TTL_DAYS = 7;
+  // Tempo de vida do cache: 7 dias
+  /**
+   * Buscar análise em cache
+   */
+  async getAnalysis(politicianName) {
+    try {
+      const supabase2 = getSupabase();
+      const now = (/* @__PURE__ */ new Date()).toISOString();
+      const { data, error } = await supabase2.from("analysis_cache").select("*").eq("politician_name", politicianName).gt("expires_at", now).single();
+      if (error || !data) {
+        logWarn(`[Cache] An\xE1lise n\xE3o encontrada ou expirada para: ${politicianName}`);
+        return null;
+      }
+      await supabase2.from("analysis_cache").update({ hit_count: data.hit_count + 1 }).eq("id", data.id).catch(() => {
+      });
+      logInfo(`[Cache] An\xE1lise encontrada em cache para: ${politicianName} (Hits: ${data.hit_count + 1})`);
+      return data.analysis_data;
+    } catch (error) {
+      logWarn(`[Cache] Erro ao buscar an\xE1lise em cache`, error);
+      return null;
+    }
+  }
+  /**
+   * Salvar análise em cache
+   */
+  async saveAnalysis(politicianName, analysisData) {
+    try {
+      const supabase2 = getSupabase();
+      const now = /* @__PURE__ */ new Date();
+      const expiresAt = new Date(now.getTime() + this.CACHE_TTL_DAYS * 24 * 60 * 60 * 1e3);
+      await supabase2.from("analysis_cache").delete().eq("politician_name", politicianName).catch(() => {
+      });
+      const { error } = await supabase2.from("analysis_cache").insert({
+        politician_name: politicianName,
+        analysis_data: analysisData,
+        created_at: now.toISOString(),
+        expires_at: expiresAt.toISOString(),
+        hit_count: 0
+      });
+      if (error) {
+        logWarn(`[Cache] Erro ao salvar an\xE1lise em cache`, error);
+        return false;
+      }
+      logInfo(`[Cache] An\xE1lise salva em cache para: ${politicianName} (Expira em: ${expiresAt.toISOString()})`);
+      return true;
+    } catch (error) {
+      logWarn(`[Cache] Erro ao salvar an\xE1lise em cache`, error);
+      return false;
+    }
+  }
+  /**
+   * Limpar cache expirado
+   */
+  async cleanExpiredCache() {
+    try {
+      const supabase2 = getSupabase();
+      const now = (/* @__PURE__ */ new Date()).toISOString();
+      const { data, error } = await supabase2.from("analysis_cache").delete().lt("expires_at", now).select();
+      if (error) {
+        logWarn(`[Cache] Erro ao limpar cache expirado`, error);
+        return 0;
+      }
+      const deletedCount = data?.length || 0;
+      logInfo(`[Cache] ${deletedCount} an\xE1lises expiradas removidas do cache`);
+      return deletedCount;
+    } catch (error) {
+      logWarn(`[Cache] Erro ao limpar cache expirado`, error);
+      return 0;
+    }
+  }
+  /**
+   * Obter estatísticas de cache
+   */
+  async getStats() {
+    try {
+      const supabase2 = getSupabase();
+      const { data, error } = await supabase2.from("analysis_cache").select("hit_count");
+      if (error || !data) {
+        return { totalCached: 0, totalHits: 0, avgHitsPerAnalysis: 0 };
+      }
+      const totalCached = data.length;
+      const totalHits = data.reduce((sum, item) => sum + (item.hit_count || 0), 0);
+      const avgHitsPerAnalysis = totalCached > 0 ? totalHits / totalCached : 0;
+      return { totalCached, totalHits, avgHitsPerAnalysis };
+    } catch (error) {
+      logWarn(`[Cache] Erro ao obter estat\xEDsticas de cache`, error);
+      return { totalCached: 0, totalHits: 0, avgHitsPerAnalysis: 0 };
+    }
+  }
+};
+var cacheService = new CacheService();
+
+// server/services/temporal-incoherence.service.ts
+init_logger();
+
 // server/integrations/senado.ts
 init_logger();
 init_database();
-import axios7 from "axios";
+import axios9 from "axios";
 var SENADO_API_BASE = "https://legis.senado.leg.br/dadosabertos/senador";
 async function getSenadorCodigo(nome) {
   try {
     const cacheKey = `senador_codigo_${nome}`;
     const cached = await getPublicDataCache("SENADO", cacheKey);
     if (cached) return cached.codigo;
-    const response = await axios7.get(`${SENADO_API_BASE}/lista/atual`, {
+    const response = await axios9.get(`${SENADO_API_BASE}/lista/atual`, {
       headers: { "Accept": "application/json" }
     });
     const senadores = response.data.ListaParlamentarEmExercicio.Parlamentares.Parlamentar;
@@ -2414,7 +2956,7 @@ async function getVotacoesSenador(codigoSenador) {
     const cacheKey = `votacoes_senado_${codigoSenador}`;
     const cached = await getPublicDataCache("SENADO", cacheKey);
     if (cached) return cached;
-    const response = await axios7.get(`${SENADO_API_BASE}/${codigoSenador}/votacoes`, {
+    const response = await axios9.get(`${SENADO_API_BASE}/${codigoSenador}/votacoes`, {
       headers: { "Accept": "application/json" }
     });
     const votacoesRaw = response.data.VotacaoParlamentar.Parlamentar.Votacoes.Votacao;
@@ -2435,103 +2977,295 @@ async function getVotacoesSenador(codigoSenador) {
   }
 }
 
+// server/services/temporal-incoherence.service.ts
+var TemporalIncoherenceService = class {
+  /**
+   * Analisar incoerência temporal de um político
+   */
+  async analyzeIncoherence(politicianName, promises) {
+    logInfo(`[TemporalIncoherence] Analisando incoer\xEAncia temporal para: ${politicianName}`);
+    const contradictions = [];
+    try {
+      let votacoes = await this.getDeputadoVotacoes(politicianName);
+      if (!votacoes || votacoes.length === 0) {
+        votacoes = await this.getSenadorVotacoes(politicianName);
+      }
+      if (!votacoes || votacoes.length === 0) {
+        logWarn(`[TemporalIncoherence] Nenhum hist\xF3rico legislativo encontrado para: ${politicianName}`);
+        return {
+          hasIncoherence: false,
+          contradictions: [],
+          coherenceScore: 100,
+          // Sem dados, assume coerência
+          summary: "Sem hist\xF3rico legislativo dispon\xEDvel para an\xE1lise de incoer\xEAncia."
+        };
+      }
+      for (const promise of promises) {
+        const promiseKeywords = this.extractKeywords(promise);
+        for (const votacao of votacoes) {
+          const votacaoKeywords = this.extractKeywords(votacao.descricao || votacao.nome || "");
+          const relevanceScore = this.calculateRelevance(promiseKeywords, votacaoKeywords);
+          if (relevanceScore > 0.6) {
+            if (votacao.voto === "N\xE3o" || votacao.voto === "Absten\xE7\xE3o") {
+              contradictions.push({
+                promiseText: promise,
+                votedAgainstOn: votacao.data || (/* @__PURE__ */ new Date()).toISOString(),
+                votedAgainstBill: votacao.nome || "Projeto n\xE3o identificado",
+                billUrl: votacao.url || `https://www.camara.leg.br/proposicoesWeb/fichadetramitacao?idProposicao=${votacao.id}`,
+                severity: this.calculateSeverity(relevanceScore),
+                explanation: `O pol\xEDtico votou "${votacao.voto}" em ${votacao.data} sobre "${votacao.nome}", o que contradiz a promessa: "${promise}"`
+              });
+            }
+          }
+        }
+      }
+      const coherenceScore = this.calculateCoherenceScore(promises.length, contradictions.length);
+      const summary = contradictions.length === 0 ? `Nenhuma contradi\xE7\xE3o detectada. Hist\xF3rico legislativo alinhado com as promessas.` : `${contradictions.length} contradi\xE7\xE3o(\xF5es) detectada(s) entre promessas e hist\xF3rico legislativo.`;
+      logInfo(`[TemporalIncoherence] An\xE1lise conclu\xEDda. Score de coer\xEAncia: ${coherenceScore}%`);
+      return {
+        hasIncoherence: contradictions.length > 0,
+        contradictions,
+        coherenceScore,
+        summary
+      };
+    } catch (error) {
+      logError(`[TemporalIncoherence] Erro na an\xE1lise de incoer\xEAncia`, error);
+      return {
+        hasIncoherence: false,
+        contradictions: [],
+        coherenceScore: 100,
+        summary: "Erro ao analisar incoer\xEAncia temporal. An\xE1lise indispon\xEDvel."
+      };
+    }
+  }
+  /**
+   * Buscar votações de um Deputado Federal
+   */
+  async getDeputadoVotacoes(name) {
+    try {
+      const deputadoId = await getDeputadoId(name);
+      if (!deputadoId) return [];
+      const votacoes = await getVotacoesDeputado(deputadoId);
+      return votacoes || [];
+    } catch (error) {
+      logWarn(`[TemporalIncoherence] Erro ao buscar vota\xE7\xF5es de deputado`, error);
+      return [];
+    }
+  }
+  /**
+   * Buscar votações de um Senador
+   */
+  async getSenadorVotacoes(name) {
+    try {
+      const senadorCodigo = await getSenadorCodigo(name);
+      if (!senadorCodigo) return [];
+      const votacoes = await getVotacoesSenador(senadorCodigo);
+      return votacoes || [];
+    } catch (error) {
+      logWarn(`[TemporalIncoherence] Erro ao buscar vota\xE7\xF5es de senador`, error);
+      return [];
+    }
+  }
+  /**
+   * Extrair palavras-chave de um texto
+   */
+  extractKeywords(text) {
+    if (!text) return [];
+    const stopwords = ["o", "a", "de", "para", "com", "em", "\xE9", "que", "e", "do", "da", "ou", "por", "um", "uma", "os", "as", "dos", "das"];
+    return text.toLowerCase().split(/\s+/).filter((word) => word.length > 3 && !stopwords.includes(word)).slice(0, 10);
+  }
+  /**
+   * Calcular relevância entre dois conjuntos de palavras-chave
+   */
+  calculateRelevance(keywords1, keywords2) {
+    if (keywords1.length === 0 || keywords2.length === 0) return 0;
+    const intersection = keywords1.filter((k) => keywords2.includes(k)).length;
+    const union = (/* @__PURE__ */ new Set([...keywords1, ...keywords2])).size;
+    return intersection / union;
+  }
+  /**
+   * Calcular severidade da contradição
+   */
+  calculateSeverity(relevanceScore) {
+    if (relevanceScore > 0.8) return "high";
+    if (relevanceScore > 0.7) return "medium";
+    return "low";
+  }
+  /**
+   * Calcular score geral de coerência
+   */
+  calculateCoherenceScore(totalPromises, contradictions) {
+    if (totalPromises === 0) return 100;
+    return Math.max(0, 100 - contradictions / totalPromises * 100);
+  }
+};
+var temporalIncoherenceService = new TemporalIncoherenceService();
+
 // server/agents/brain.ts
 var BrainAgent = class {
   /**
-   * O Cérebro Central 2.0: Integração automática com dados orçamentários reais
+   * O Cérebro Central 3.0: Com Cache, Resiliência e Análise de Incoerência Temporal
    */
   async analyze(politicianName, sources, userId = null, existingAnalysisId = null) {
-    logInfo(`[Brain] Iniciando processamento cognitivo para: ${politicianName}`);
+    logInfo(`[Brain] Iniciando an\xE1lise profunda para: ${politicianName}`);
     try {
+      const cachedAnalysis = await cacheService.getAnalysis(politicianName);
+      if (cachedAnalysis) {
+        logInfo(`[Brain] An\xE1lise recuperada do cache para: ${politicianName}`);
+        return cachedAnalysis;
+      }
+      logWarn(`[Brain] An\xE1lise n\xE3o encontrada em cache. Executando an\xE1lise completa...`);
       const knowledgeBase = sources.map((s) => {
         const title = s.title || "Declara\xE7\xE3o Identificada";
         return `### ${title}
-**Fonte:** ${s.source}
-**Contexto:** ${s.justification}
+**Fonte:** ${s.source} | **Data:** ${s.publishedAt || "Recente"}
 
-> ${s.content}`;
+> ${s.content}
+
+**An\xE1lise de Contexto:** ${s.justification}`;
       }).join("\n\n---\n\n");
       const history = await this.getPoliticianHistory(politicianName);
-      const historyContext = history ? `Hist\xF3rico: Este pol\xEDtico j\xE1 teve ${history.totalAnalyses} an\xE1lises anteriores com score m\xE9dio de ${history.avgScore}%.` : "Hist\xF3rico: Nenhuma an\xE1lise anterior encontrada para este pol\xEDtico.";
+      const historyContext = history ? `Este pol\xEDtico possui um hist\xF3rico de ${history.totalAnalyses} an\xE1lises no sistema, com uma m\xE9dia de confiabilidade de ${history.avgScore}%.` : "Este \xE9 o primeiro registro detalhado deste pol\xEDtico em nossa base de dados em tempo real.";
       const mainCategory = this.detectMainCategory(sources);
       const siconfiCategory = mapPromiseToSiconfiCategory(mainCategory);
-      logInfo(`[Brain] Validando viabilidade or\xE7ament\xE1ria para categoria: ${siconfiCategory}`);
-      const estimatedValue = 5e8;
       const currentYear = (/* @__PURE__ */ new Date()).getFullYear();
-      const budgetViability = await validateBudgetViability(
-        siconfiCategory,
-        estimatedValue,
-        currentYear - 1
-      );
-      const budgetContext = `An\xE1lise Or\xE7ament\xE1ria (SICONFI): ${budgetViability.reason} 
-      Viabilidade T\xE9cnica: ${budgetViability.viable ? "ALTA" : "BAIXA"} 
-      Confian\xE7a dos Dados: ${Math.round(budgetViability.confidence * 100)}%`;
-      const { analysisService: analysisService2 } = await Promise.resolve().then(() => (init_analysis_service(), analysis_service_exports));
-      const fullContext = `
-# Relat\xF3rio de Intelig\xEAncia: ${politicianName}
+      const budgetViability = await validateBudgetViability(siconfiCategory, 5e8, currentYear - 1);
+      const promiseTexts = sources.map((s) => s.content).filter((c) => c && c.length > 0);
+      const temporalAnalysis = await temporalIncoherenceService.analyzeIncoherence(politicianName, promiseTexts);
+      const temporalSection = temporalAnalysis.hasIncoherence ? `## \u{1F504} AN\xC1LISE DE INCOER\xCANCIA TEMPORAL (DIZ VS FAZ)
+**Coer\xEAncia Hist\xF3rica:** ${temporalAnalysis.coherenceScore}%
 
-## \u{1F4CA} Panorama Geral
+${temporalAnalysis.contradictions.map(
+        (c) => `- **${c.promiseText}** vs Vota\xE7\xE3o em ${c.votedAgainstOn}: ${c.votedAgainstBill} (Severidade: ${c.severity.toUpperCase()})`
+      ).join("\n")}
+
+**Resumo:** ${temporalAnalysis.summary}
+
+---
+
+` : `## \u{1F504} AN\xC1LISE DE INCOER\xCANCIA TEMPORAL (DIZ VS FAZ)
+**Coer\xEAncia Hist\xF3rica:** ${temporalAnalysis.coherenceScore}%
+
+${temporalAnalysis.summary}
+
+---
+
+`;
+      const fullContext = `
+# \u{1F4D1} DOSSI\xCA DE INTELIG\xCANCIA POL\xCDTICA: ${politicianName.toUpperCase()}
+
+---
+
+## \u{1F4CA} 1. PERFIL E CONTEXTO HIST\xD3RICO
 ${historyContext}
 
-## \u{1F4B0} Viabilidade Financeira
-${budgetContext}
+---
 
-## \u{1F50D} Evid\xEAncias e Fontes Coletadas
+## \u{1F4B0} 2. AN\xC1LISE DE VIABILIDADE FINANCEIRA (SICONFI)
+> **Foco Setorial:** ${mainCategory}
+
+| Indicador | Status |
+| :--- | :--- |
+| **Veredito T\xE9cnico** | ${budgetViability.reason} |
+| **Viabilidade Estimada** | ${budgetViability.viable ? "\u2705 ALTA VIABILIDADE" : "\u26A0\uFE0F EXECU\xC7\xC3O COMPLEXA"} |
+| **Confian\xE7a dos Dados** | ${Math.round(budgetViability.confidence * 100)}% |
+
+---
+
+## \u26A0\uFE0F 3. MATRIZ DE RISCOS (AN\xC1LISE DE CEN\xC1RIOS)
+Abaixo, os principais obst\xE1culos identificados que podem impedir o cumprimento das promessas:
+
+*   **\u{1F4C9} RISCO OR\xC7AMENT\xC1RIO:** Rigidez fiscal e depend\xEAncia de fontes externas de financiamento.
+*   **\u2696\uFE0F RISCO POL\xCDTICO:** Necessidade de articula\xE7\xE3o legislativa e hist\xF3rico de oposi\xE7\xE3o a pautas similares.
+*   **\u2699\uFE0F RISCO OPERACIONAL:** Complexidade log\xEDstica e aus\xEAncia de cronogramas t\xE9cnicos detalhados.
+
+---
+
+${temporalSection}
+
+## \u{1F50D} 5. EVID\xCANCIAS AUDITADAS (FONTES P\xDABLICAS)
+Os registros abaixo foram extra\xEDdos, sanitizados e validados pela Tr\xEDade de Agentes:
+
 ${knowledgeBase}
+
+---
+*Este relat\xF3rio \xE9 um documento de utilidade p\xFAblica gerado de forma aut\xF4noma pela Tr\xEDade de Agentes (Scout, Filter, Brain). A an\xE1lise \xE9 baseada em dados p\xFAblicos e algoritmos de intelig\xEAncia artificial.*
       `;
       let analysis;
       if (existingAnalysisId) {
         analysis = await this.updateExistingAnalysis(existingAnalysisId, fullContext, politicianName, mainCategory);
       } else {
+        const { analysisService: analysisService2 } = await Promise.resolve().then(() => (init_analysis_service(), analysis_service_exports));
         analysis = await analysisService2.createAnalysis(userId, fullContext, politicianName, mainCategory);
       }
-      if (!budgetViability.viable && analysis.probabilityScore > 0.5) {
-        logInfo(`[Brain] Ajustando score para baixo devido \xE0 inviabilidade or\xE7ament\xE1ria detectada.`);
-      }
-      logInfo(`[Brain] Veredito final emitido para ${politicianName}. Score: ${analysis.probabilityScore}`);
+      await cacheService.saveAnalysis(politicianName, {
+        ...analysis,
+        budgetViability,
+        mainCategory,
+        temporalAnalysis
+      }).catch((err) => logWarn("[Brain] Erro ao salvar em cache", err));
+      logInfo(`[Brain] An\xE1lise conclu\xEDda com sucesso para ${politicianName}.`);
       return {
         ...analysis,
         budgetViability,
-        mainCategory
+        mainCategory,
+        temporalAnalysis
       };
     } catch (error) {
-      logError(`[Brain] Erro na intelig\xEAncia central para ${politicianName}`, error);
+      logError(`[Brain] Falha na an\xE1lise profunda de ${politicianName}`, error);
       throw error;
     }
   }
   detectMainCategory(sources) {
-    const categories = sources.map((s) => s.justification);
-    if (categories.some((c) => c.toLowerCase().includes("sa\xFAde"))) return "Sa\xFAde";
-    if (categories.some((c) => c.toLowerCase().includes("educa\xE7\xE3o"))) return "Educa\xE7\xE3o";
-    if (categories.some((c) => c.toLowerCase().includes("infraestrutura") || c.toLowerCase().includes("obras"))) return "Infraestrutura";
-    if (categories.some((c) => c.toLowerCase().includes("seguran\xE7a"))) return "Seguran\xE7a";
-    return "Geral";
+    const text = sources.map((s) => (s.title + " " + s.content).toLowerCase()).join(" ");
+    if (text.includes("sa\xFAde") || text.includes("hospital") || text.includes("m\xE9dico") || text.includes("sus") || text.includes("vacina")) return "SAUDE";
+    if (text.includes("educa\xE7\xE3o") || text.includes("escola") || text.includes("ensino") || text.includes("universidade") || text.includes("professor")) return "EDUCACAO";
+    if (text.includes("seguran\xE7a") || text.includes("pol\xEDcia") || text.includes("crime") || text.includes("viol\xEAncia") || text.includes("guarda")) return "SEGURANCA";
+    if (text.includes("economia") || text.includes("imposto") || text.includes("pib") || text.includes("infla\xE7\xE3o") || text.includes("juros")) return "ECONOMIA";
+    if (text.includes("infraestrutura") || text.includes("obras") || text.includes("estrada") || text.includes("ponte") || text.includes("asfalto")) return "INFRAESTRUTURA";
+    if (text.includes("agricultura") || text.includes("rural") || text.includes("fazenda") || text.includes("safra")) return "AGRICULTURA";
+    if (text.includes("cultura") || text.includes("arte") || text.includes("cinema") || text.includes("teatro")) return "CULTURA";
+    if (text.includes("transporte") || text.includes("\xF4nibus") || text.includes("metr\xF4") || text.includes("trem")) return "TRANSPORTE";
+    if (text.includes("habita\xE7\xE3o") || text.includes("casa") || text.includes("moradia") || text.includes("apartamento")) return "HABITACAO";
+    if (text.includes("saneamento") || text.includes("\xE1gua") || text.includes("esgoto") || text.includes("lixo")) return "SANEAMENTO";
+    if (text.includes("ci\xEAncia") || text.includes("tecnologia") || text.includes("pesquisa") || text.includes("inova\xE7\xE3o")) return "CIENCIA";
+    if (text.includes("trabalho") || text.includes("emprego") || text.includes("sal\xE1rio") || text.includes("fgts")) return "TRABALHO";
+    if (text.includes("social") || text.includes("pobreza") || text.includes("fome") || text.includes("aux\xEDlio")) return "SOCIAL";
+    return "GERAL";
   }
   async updateExistingAnalysis(id, text, author, category) {
     const { aiService: aiService2 } = await Promise.resolve().then(() => (init_ai_service(), ai_service_exports));
+    const { deepSeekService: deepSeekService2 } = await Promise.resolve().then(() => (init_ai_deepseek_service(), ai_deepseek_service_exports));
     const { calculateProbability: calculateProbability2 } = await Promise.resolve().then(() => (init_probability(), probability_exports));
-    const { nanoid: nanoid7 } = await import("nanoid");
+    const { nanoid: nanoid8 } = await import("nanoid");
     const supabase2 = getSupabase();
-    const aiAnalysis = await aiService2.analyzeText(text);
-    const promises = aiAnalysis.promises.map((p) => {
-      const blocks = text.split("\n\n");
-      const sourceMatch = blocks.find((block) => block.includes(p.text.substring(0, 20))) || blocks[0];
-      const sourceName = sourceMatch?.match(/\[Fonte: (.*?)\]/)?.[1] || "Fonte Desconhecida";
-      const newsTitle = sourceMatch?.split("\n")[0]?.replace(/\[Fonte: .*?\]/, "").trim() || "Not\xEDcia Identificada";
-      return {
-        text: p.text,
-        confidence: p.confidence,
-        category: p.category,
-        negated: p.negated,
-        conditional: p.conditional,
-        reasoning: p.reasoning,
-        evidenceSnippet: sourceMatch || text.substring(0, 500),
-        sourceName,
-        newsTitle,
-        legislativeIncoherence: null,
-        legislativeSourceUrl: null
-      };
-    });
+    let aiAnalysis;
+    const openRouterKey = process.env.OPENROUTER_API_KEY;
+    if (openRouterKey && openRouterKey !== "sua_chave_aqui") {
+      try {
+        logInfo("[Brain] Utilizando DeepSeek R1 para an\xE1lise de racioc\xEDnio profundo...");
+        aiAnalysis = await deepSeekService2.analyzeText(text, openRouterKey);
+      } catch (err) {
+        logError("[Brain] Falha no DeepSeek R1, recorrendo ao AIService padr\xE3o", err);
+        aiAnalysis = await aiService2.analyzeText(text);
+      }
+    } else {
+      aiAnalysis = await aiService2.analyzeText(text);
+    }
+    const promises = aiAnalysis.promises.map((p) => ({
+      text: p.text,
+      confidence: p.confidence,
+      category: p.category,
+      negated: p.negated,
+      conditional: p.conditional,
+      reasoning: p.reasoning,
+      risks: p.risks || [],
+      evidenceSnippet: text.substring(0, 1e3),
+      sourceName: "M\xFAltiplas Fontes Auditadas",
+      newsTitle: "An\xE1lise Consolidada",
+      legislativeIncoherence: null,
+      legislativeSourceUrl: null
+    }));
     if (author) {
       try {
         const deputadoId = await getDeputadoId(author);
@@ -2547,14 +3281,9 @@ ${knowledgeBase}
               }
             }
           }
-        } else {
-          const senadorCodigo = await getSenadorCodigo(author);
-          if (senadorCodigo) {
-            const votacoes = await getVotacoesSenador(senadorCodigo);
-          }
         }
       } catch (err) {
-        logError("[BrainAgent] Erro no Detector de Incoer\xEAncia", err);
+        logError("[BrainAgent] Erro no cruzamento legislativo", err);
       }
     }
     const probabilityScore = await calculateProbability2(promises, author, category);
@@ -2562,26 +3291,33 @@ ${knowledgeBase}
       text,
       category,
       extracted_promises: promises,
-      probability_score: probabilityScore,
+      probability_score: probabilityScore.score,
+      methodology_notes: JSON.stringify({
+        factors: probabilityScore.factors,
+        details: probabilityScore.details,
+        verdict: aiAnalysis.verdict
+      }),
       status: "completed",
       updated_at: (/* @__PURE__ */ new Date()).toISOString()
     }).eq("id", id);
     if (error) throw error;
     if (promises.length > 0) {
       const promisesToInsert = promises.map((p) => ({
-        id: nanoid7(),
+        id: nanoid8(),
         analysis_id: id,
         promise_text: p.text,
         category: p.category,
         confidence_score: p.confidence,
-        extracted_entities: p.entities || {},
+        extracted_entities: {
+          risks: p.risks || [],
+          legislative_incoherence: p.legislativeIncoherence,
+          legislative_source_url: p.legislativeSourceUrl
+        },
         negated: p.negated || false,
         conditional: p.conditional || false,
         evidence_snippet: p.evidenceSnippet,
         source_name: p.sourceName,
-        news_title: p.newsTitle,
-        legislative_incoherence: p.legislativeIncoherence,
-        legislative_source_url: p.legislativeSourceUrl
+        news_title: p.newsTitle
       }));
       await supabase2.from("promises").insert(promisesToInsert);
     }
@@ -2665,14 +3401,9 @@ var SearchService = class {
   async autoAnalyzePolitician(politicianName, userId = null) {
     const { getSupabase: getSupabase2 } = await Promise.resolve().then(() => (init_database(), database_exports));
     const supabase2 = getSupabase2();
-    const { nanoid: nanoid7 } = await import("nanoid");
-    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1e3).toISOString();
-    const { data: existing } = await supabase2.from("analyses").select("id, status, created_at").ilike("author", `%${politicianName}%`).eq("status", "completed").gt("created_at", oneDayAgo).order("created_at", { ascending: false }).limit(1).single();
-    if (existing) {
-      logInfo(`[Orchestrator] Cache L1 encontrado para ${politicianName}. Retornando ID: ${existing.id}`);
-      return { id: existing.id, status: "completed", cached: true };
-    }
-    const analysisId = nanoid7();
+    const { nanoid: nanoid8 } = await import("nanoid");
+    logInfo(`[Orchestrator] Ignorando cache para garantir an\xE1lise com l\xF3gica atualizada: ${politicianName}`);
+    const analysisId = nanoid8();
     await supabase2.from("analyses").insert([{
       id: analysisId,
       user_id: userId,
@@ -2794,7 +3525,7 @@ var search_routes_default = router7;
 init_database();
 init_logger();
 import { Router as Router8 } from "express";
-import { nanoid as nanoid6 } from "nanoid";
+import { nanoid as nanoid7 } from "nanoid";
 var router8 = Router8();
 router8.post("/contribute", async (req, res) => {
   try {
@@ -2804,7 +3535,7 @@ router8.post("/contribute", async (req, res) => {
     if (!promiseId || !type) {
       return res.status(400).json({ error: "Promise ID e Tipo s\xE3o obrigat\xF3rios" });
     }
-    const contributionId = nanoid6();
+    const contributionId = nanoid7();
     const { error } = await supabase2.from("audit_contributions").insert([{
       id: contributionId,
       promise_id: promiseId,

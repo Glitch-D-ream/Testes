@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
-import { getSupabase } from '../core/database.js';
-import { logError } from '../core/logger.js';
+import { getSupabase } from '../core/database.ts';
+import { logError } from '../core/logger.ts';
 
 export class StatisticsController {
   async getGlobalStats(req: Request, res: Response) {

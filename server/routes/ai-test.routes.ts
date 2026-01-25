@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
-import { aiService } from '../services/ai.service.js';
-import { logInfo, logError } from '../core/logger.js';
+import { aiService } from '../services/ai.service.ts';
+import { logInfo, logError } from '../core/logger.ts';
 
 const router = Router();
 

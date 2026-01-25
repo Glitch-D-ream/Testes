@@ -6,10 +6,10 @@
  * - TSE (histórico político)
  */
 
-import logger from '../core/logger.js';
-import { syncSiconfiData } from '../integrations/siconfi.js';
-import { syncPortalData } from '../integrations/portal-transparencia.js';
-import { syncTSEData } from '../integrations/tse.js';
+import logger from '../core/logger.ts';
+import { syncSiconfiData } from '../integrations/siconfi.ts';
+import { syncPortalData } from '../integrations/portal-transparencia.ts';
+import { syncTSEData } from '../integrations/tse.ts';
 
 /**
  * Categorias de promessas para sincronizar com SICONFI

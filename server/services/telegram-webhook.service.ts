@@ -1,7 +1,7 @@
 import { Telegraf } from 'telegraf';
 import { Update } from 'telegraf/types';
-import { analysisService } from './analysis.service.js';
-import { logInfo, logError } from '../core/logger.js';
+import { analysisService } from './analysis.service.ts';
+import { logInfo, logError } from '../core/logger.ts';
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
 const WEBHOOK_DOMAIN = process.env.WEBHOOK_DOMAIN || '';

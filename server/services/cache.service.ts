@@ -1,5 +1,5 @@
-import { getSupabase } from '../core/database.js';
-import { logInfo, logWarn } from '../core/logger.js';
+import { getSupabase } from '../core/database.ts';
+import { logInfo, logWarn } from '../core/logger.ts';
 
 export interface CachedAnalysis {
   id: string;

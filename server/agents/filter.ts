@@ -1,6 +1,6 @@
 import axios from 'axios';
-import { RawSource } from './scout.js';
-import { logInfo, logError } from '../core/logger.js';
+import { RawSource } from './scout.ts';
+import { logInfo, logError } from '../core/logger.ts';
 
 export interface FilteredSource extends RawSource {
   relevanceScore: number;

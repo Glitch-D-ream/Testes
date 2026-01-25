@@ -1,6 +1,6 @@
 import { Router } from 'express';
-import { searchController } from '../controllers/search.controller.js';
-import { optionalAuthMiddleware } from '../core/middleware.js';
+import { searchController } from '../controllers/search.controller.ts';
+import { optionalAuthMiddleware } from '../core/middleware.ts';
 
 const router = Router();
 

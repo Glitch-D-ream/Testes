@@ -1,8 +1,8 @@
-import { allQuery } from '../core/database.js';
-import { logInfo, logError } from '../core/logger.js';
-import { scoutAgent } from '../agents/scout.js';
-import { filterAgent } from '../agents/filter.js';
-import { brainAgent } from '../agents/brain.js';
+import { allQuery } from '../core/database.ts';
+import { logInfo, logError } from '../core/logger.ts';
+import { scoutAgent } from '../agents/scout.ts';
+import { filterAgent } from '../agents/filter.ts';
+import { brainAgent } from '../agents/brain.ts';
 
 export interface SearchResult {
   title: string;

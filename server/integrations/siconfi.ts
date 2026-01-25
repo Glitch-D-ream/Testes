@@ -4,8 +4,8 @@
  */
 
 import axios from 'axios';
-import logger from '../core/logger.js';
-import { savePublicDataCache, getPublicDataCache } from '../core/database.js';
+import logger from '../core/logger.ts';
+import { savePublicDataCache, getPublicDataCache } from '../core/database.ts';
 
 // Endpoint real do Tesouro Nacional (Data Lake)
 const SICONFI_API_BASE = 'https://apidatalake.tesouro.gov.br/api/siconfi/index.php/conteudo';
@@ -185,13 +185,34 @@ export async function validateBudgetViability(
 
 export function mapPromiseToSiconfiCategory(promiseCategory: string): string {
   const mapping: Record<string, string> = {
-    'Saúde': 'SAUDE',
-    'Educação': 'EDUCACAO',
-    'Infraestrutura': 'URBANISMO',
-    'Segurança': 'SEGURANCA_PUBLICA',
-    'Economia': 'GESTAO_AMBIENTAL',
+    'SAUDE': 'SAUDE',
+    'HEALTH': 'SAUDE',
+    'EDUCACAO': 'EDUCACAO',
+    'EDUCATION': 'EDUCACAO',
+    'INFRAESTRUTURA': 'URBANISMO',
+    'INFRASTRUCTURE': 'URBANISMO',
+    'SEGURANCA': 'SEGURANCA_PUBLICA',
+    'SECURITY': 'SEGURANCA_PUBLICA',
+    'ECONOMIA': 'GESTAO_AMBIENTAL',
+    'ECONOMY': 'GESTAO_AMBIENTAL',
+    'AGRICULTURA': 'AGRICULTURA',
+    'AGRICULTURE': 'AGRICULTURA',
+    'CULTURA': 'CULTURA',
+    'CULTURE': 'CULTURA',
+    'TRANSPORTE': 'TRANSPORTE',
+    'TRANSPORT': 'TRANSPORTE',
+    'HABITACAO': 'HABITACAO',
+    'HOUSING': 'HABITACAO',
+    'SANEAMENTO': 'SANEAMENTO',
+    'SANITATION': 'SANEAMENTO',
+    'CIENCIA': 'CIENCIA_E_TECNOLOGIA',
+    'SCIENCE': 'CIENCIA_E_TECNOLOGIA',
+    'TRABALHO': 'TRABALHO',
+    'EMPLOYMENT': 'TRABALHO',
+    'SOCIAL': 'ASSISTENCIA_SOCIAL',
   };
-  return mapping[promiseCategory] || 'ADMINISTRACAO';
+  const normalized = promiseCategory.toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  return mapping[normalized] || 'ADMINISTRACAO';
 }
 
 /**

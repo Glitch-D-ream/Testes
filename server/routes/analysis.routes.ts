@@ -1,6 +1,6 @@
 import { Router } from 'express';
-import { analysisController } from '../controllers/analysis.controller.js';
-import { optionalAuthMiddleware } from '../core/middleware.js';
+import { analysisController } from '../controllers/analysis.controller.ts';
+import { optionalAuthMiddleware } from '../core/middleware.ts';
 import rateLimit from 'express-rate-limit';
 
 const router = Router();

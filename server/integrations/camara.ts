@@ -3,8 +3,8 @@
  * Documentação: https://dadosabertos.camara.leg.br/swagger/recursos.html
  */
 import axios from 'axios';
-import logger from '../core/logger.js';
-import { savePublicDataCache, getPublicDataCache } from '../core/database.js';
+import logger from '../core/logger.ts';
+import { savePublicDataCache, getPublicDataCache } from '../core/database.ts';
 
 const CAMARA_API_BASE = 'https://dadosabertos.camara.leg.br/api/v2';
 

@@ -1,7 +1,7 @@
 import axios from 'axios';
-import { logInfo, logError, logWarn } from '../core/logger.js';
-import { saveScoutHistory, checkUrlExists } from '../core/database.js';
-import { multiScoutAgent } from './multi-scout.js';
+import { logInfo, logError, logWarn } from '../core/logger.ts';
+import { saveScoutHistory, checkUrlExists } from '../core/database.ts';
+import { multiScoutAgent } from './multi-scout.ts';
 
 export interface RawSource {
   title: string;

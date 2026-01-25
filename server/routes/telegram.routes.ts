@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
-import { telegramWebhookService } from '../services/telegram-webhook.service.js';
-import { logInfo, logError } from '../core/logger.js';
+import { telegramWebhookService } from '../services/telegram-webhook.service.ts';
+import { logInfo, logError } from '../core/logger.ts';
 
 const router = Router();
 

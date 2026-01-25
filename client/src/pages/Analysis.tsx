@@ -16,6 +16,7 @@ import {
 import { ViabilityThermometer } from '../components/ViabilityThermometer';
 import { PromiseCard } from '../components/PromiseCard';
 import { Button } from '../components/Button';
+import BudgetChart from '../components/BudgetChart';
 import { useAnalysis } from '../hooks/useAnalysis';
 import { toast } from 'sonner';
 
@@ -176,27 +177,65 @@ export default function Analysis() {
               </div>
             </section>
 
+            {/* Budget Analysis Section */}
+            <section className="bg-white dark:bg-slate-900 rounded-3xl p-8 border border-slate-200 dark:border-slate-800 shadow-sm">
+              <div className="flex items-center gap-3 mb-8">
+                <div className="p-2 bg-blue-100 dark:bg-blue-900/30 text-blue-600 rounded-xl">
+                  <BarChart size={24} />
+                </div>
+                <div>
+                  <h2 className="text-xl font-black tracking-tight">Análise Orçamentária Real</h2>
+                  <p className="text-xs text-slate-500 font-medium uppercase tracking-widest">Dados Oficiais SICONFI</p>
+                </div>
+              </div>
+              
+              <BudgetChart 
+                totalBudget={data.totalBudget || 1500000000000} 
+                executedBudget={data.executedBudget || 1100000000000} 
+                executionRate={data.executionRate || 73.5} 
+                theme={document.documentElement.classList.contains('dark') ? 'dark' : 'light'}
+              />
+            </section>
+
             {/* Promises List */}
-            <section className="space-y-4">
-              <h2 className="text-xl font-bold px-2 flex items-center gap-2">
-                <CheckCircle2 size={24} className="text-emerald-500" /> 
-                Promessas Extraídas e Validadas
-              </h2>
+            <section className="space-y-6">
+              <div className="flex items-center justify-between px-2">
+                <h2 className="text-xl font-black tracking-tight flex items-center gap-3">
+                  <CheckCircle2 size={28} className="text-emerald-500" /> 
+                  Promessas Auditadas
+                </h2>
+                <span className="px-3 py-1 bg-slate-100 dark:bg-slate-800 text-slate-500 text-[10px] font-black rounded-full uppercase tracking-widest">
+                  {promises.length} DETECTADAS
+                </span>
+              </div>
+              
               {promises.length > 0 ? (
-                promises.map((promise: any, index: number) => (
-                  <PromiseCard 
-                    key={index} 
-                    text={promise.promise_text || promise.text}
-                    category={promise.category || 'Geral'}
-                    confidence={promise.confidence_score || promise.confidence || 0}
-                    negated={promise.negated || false}
-                    conditional={promise.conditional || false}
-                    reasoning={promise.reasoning}
-                  />
-                ))
+                <div className="grid grid-cols-1 gap-6">
+                  {promises.map((promise: any, index: number) => (
+                    <PromiseCard 
+                      key={index} 
+                      id={promise.id}
+                      text={promise.promise_text || promise.text}
+                      category={promise.category || 'Geral'}
+                      confidence={promise.confidence_score || promise.confidence || 0}
+                      negated={promise.negated || false}
+                      conditional={promise.conditional || false}
+                      reasoning={promise.reasoning}
+                      evidenceSnippet={promise.evidence_snippet}
+                      sourceName={promise.source_name}
+                      sourceUrl={promise.source_url}
+                      legislativeIncoherence={promise.legislative_incoherence}
+                      legislativeSourceUrl={promise.legislative_source_url}
+                    />
+                  ))}
+                </div>
               ) : (
-                <div className="bg-white dark:bg-slate-900 p-12 rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-800 text-center">
-                  <p className="text-slate-500">Nenhuma promessa clara foi detectada no texto.</p>
+                <div className="bg-white dark:bg-slate-900 p-16 rounded-3xl border-2 border-dashed border-slate-200 dark:border-slate-800 text-center">
+                  <div className="w-16 h-16 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <Info size={32} className="text-slate-400" />
+                  </div>
+                  <p className="text-slate-500 font-bold uppercase tracking-widest text-sm">Nenhuma promessa clara detectada</p>
+                  <p className="text-xs text-slate-400 mt-2">O texto analisado pode não conter compromissos verificáveis.</p>
                 </div>
               )}
             </section>

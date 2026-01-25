@@ -1,10 +1,10 @@
 
 import { nanoid } from 'nanoid';
-import { getSupabase } from '../core/database.js';
-import { extractPromises } from '../modules/nlp.js';
-import { calculateProbability } from '../modules/probability.js';
-import { aiService } from './ai.service.js';
-import { logError, logInfo } from '../core/logger.js';
+import { getSupabase } from '../core/database.ts';
+import { extractPromises } from '../modules/nlp.ts';
+import { calculateProbability } from '../modules/probability.ts';
+import { aiService } from './ai.service.ts';
+import { logError, logInfo } from '../core/logger.ts';
 
 export class AnalysisService {
   async createAnalysis(userId: string | null, text: string, author: string, category: string) {

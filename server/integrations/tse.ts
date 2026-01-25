@@ -3,8 +3,8 @@
  */
 
 import axios from 'axios';
-import logger from '../core/logger.js';
-import { savePublicDataCache, getPublicDataCache } from '../core/database.js';
+import logger from '../core/logger.ts';
+import { savePublicDataCache, getPublicDataCache } from '../core/database.ts';
 
 const TSE_API_BASE = 'https://divulgacandcontas.tse.jus.br/divulga/rest/v1';
 

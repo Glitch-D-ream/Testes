@@ -1,6 +1,6 @@
 import { Router } from 'express';
-import { getSupabase } from '../core/database.js';
-import { logError, logInfo } from '../core/logger.js';
+import { getSupabase } from '../core/database.ts';
+import { logError, logInfo } from '../core/logger.ts';
 import { nanoid } from 'nanoid';
 
 const router = Router();

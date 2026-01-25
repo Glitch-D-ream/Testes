@@ -1,11 +1,11 @@
-import { FilteredSource } from './filter.js';
-import { logInfo, logError, logWarn } from '../core/logger.js';
-import { getSupabase } from '../core/database.js';
-import { validateBudgetViability, mapPromiseToSiconfiCategory } from '../integrations/siconfi.js';
-import { getDeputadoId, getVotacoesDeputado, analisarIncoerencia } from '../integrations/camara.js';
-import { getSenadorCodigo, getVotacoesSenador } from '../integrations/senado.js';
-import { cacheService } from '../services/cache.service.js';
-import { temporalIncoherenceService } from '../services/temporal-incoherence.service.js';
+import { FilteredSource } from './filter.ts';
+import { logInfo, logError, logWarn } from '../core/logger.ts';
+import { getSupabase } from '../core/database.ts';
+import { validateBudgetViability, mapPromiseToSiconfiCategory } from '../integrations/siconfi.ts';
+import { getDeputadoId, getVotacoesDeputado, analisarIncoerencia } from '../integrations/camara.ts';
+import { getSenadorCodigo, getVotacoesSenador } from '../integrations/senado.ts';
+import { cacheService } from '../services/cache.service.ts';
+import { temporalIncoherenceService } from '../services/temporal-incoherence.service.ts';
 
 export class BrainAgent {
   /**
@@ -145,12 +145,20 @@ ${knowledgeBase}
 
   private detectMainCategory(sources: FilteredSource[]): string {
     const text = sources.map(s => (s.title + ' ' + s.content).toLowerCase()).join(' ');
-    if (text.includes('saúde') || text.includes('hospital') || text.includes('médico')) return 'Saúde';
-    if (text.includes('educação') || text.includes('escola') || text.includes('ensino')) return 'Educação';
-    if (text.includes('segurança') || text.includes('polícia') || text.includes('crime')) return 'Segurança';
-    if (text.includes('economia') || text.includes('imposto') || text.includes('pib')) return 'Economia';
-    if (text.includes('infraestrutura') || text.includes('obras') || text.includes('estrada')) return 'Infraestrutura';
-    return 'Geral';
+    if (text.includes('saúde') || text.includes('hospital') || text.includes('médico') || text.includes('sus') || text.includes('vacina')) return 'SAUDE';
+    if (text.includes('educação') || text.includes('escola') || text.includes('ensino') || text.includes('universidade') || text.includes('professor')) return 'EDUCACAO';
+    if (text.includes('segurança') || text.includes('polícia') || text.includes('crime') || text.includes('violência') || text.includes('guarda')) return 'SEGURANCA';
+    if (text.includes('economia') || text.includes('imposto') || text.includes('pib') || text.includes('inflação') || text.includes('juros')) return 'ECONOMIA';
+    if (text.includes('infraestrutura') || text.includes('obras') || text.includes('estrada') || text.includes('ponte') || text.includes('asfalto')) return 'INFRAESTRUTURA';
+    if (text.includes('agricultura') || text.includes('rural') || text.includes('fazenda') || text.includes('safra')) return 'AGRICULTURA';
+    if (text.includes('cultura') || text.includes('arte') || text.includes('cinema') || text.includes('teatro')) return 'CULTURA';
+    if (text.includes('transporte') || text.includes('ônibus') || text.includes('metrô') || text.includes('trem')) return 'TRANSPORTE';
+    if (text.includes('habitação') || text.includes('casa') || text.includes('moradia') || text.includes('apartamento')) return 'HABITACAO';
+    if (text.includes('saneamento') || text.includes('água') || text.includes('esgoto') || text.includes('lixo')) return 'SANEAMENTO';
+    if (text.includes('ciência') || text.includes('tecnologia') || text.includes('pesquisa') || text.includes('inovação')) return 'CIENCIA';
+    if (text.includes('trabalho') || text.includes('emprego') || text.includes('salário') || text.includes('fgts')) return 'TRABALHO';
+    if (text.includes('social') || text.includes('pobreza') || text.includes('fome') || text.includes('auxílio')) return 'SOCIAL';
+    return 'GERAL';
   }
 
   private async updateExistingAnalysis(id: string, text: string, author: string, category: string) {

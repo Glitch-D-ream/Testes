@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { nanoid } from 'nanoid';
-import { logInfo, logError, logWarn } from '../core/logger.js';
+import { logInfo, logError, logWarn } from '../core/logger.ts';
 
 export interface RawSource {
   id: string;
@@ -29,7 +29,14 @@ export class MultiScoutAgent {
     
     let sources: RawSource[] = [];
 
-    // Tentativa 1: Busca via IA (Pollinations)
+    // Tentativa 1: Busca via DuckDuckGo (Custo Zero, Rápido)
+    sources = await this.searchViaDuckDuckGo(query);
+    if (sources.length > 0) {
+      logInfo(`[Multi-Scout] Sucesso na busca via DuckDuckGo. ${sources.length} fontes encontradas.`);
+      return sources;
+    }
+
+    // Tentativa 2: Busca via IA (Pollinations - Fallback)
     try {
       sources = await this.searchViaAI(query);
       if (sources.length > 0) {
@@ -40,7 +47,7 @@ export class MultiScoutAgent {
       logWarn(`[Multi-Scout] Falha na busca via IA. Tentando fallback...`, error as Error);
     }
 
-    // Tentativa 2: Busca via RSS Feeds
+    // Tentativa 3: Busca via RSS Feeds
     try {
       sources = await this.searchViaRSSFeeds(query);
       if (sources.length > 0) {
@@ -51,7 +58,7 @@ export class MultiScoutAgent {
       logWarn(`[Multi-Scout] Falha na busca via RSS. Tentando fallback final...`, error as Error);
     }
 
-    // Tentativa 3: Busca genérica (fallback de último recurso)
+    // Tentativa 4: Busca genérica (fallback de último recurso)
     try {
       sources = await this.searchGeneric(query);
       if (sources.length > 0) {
@@ -110,6 +117,50 @@ export class MultiScoutAgent {
   }
 
   /**
+   * Busca via DuckDuckGo (Custo Zero e Sem API Key)
+   */
+  private async searchViaDuckDuckGo(query: string): Promise<RawSource[]> {
+    try {
+      logInfo(`[Multi-Scout] Tentando busca via DuckDuckGo: ${query}`);
+      // Usando a versão HTML simples do DuckDuckGo para evitar bloqueios de JS
+      const response = await axios.get(`https://html.duckduckgo.com/html/`, {
+        params: { q: query },
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        },
+        timeout: 10000
+      });
+
+      const html = response.data;
+      const sources: RawSource[] = [];
+      
+      // Regex simples para extrair resultados do DuckDuckGo HTML
+      const resultRegex = /<a class="result__a" href="([^"]+)">([^<]+)<\/a>[\s\S]*?<a class="result__snippet"[^>]*>([^<]+)<\/a>/g;
+      let match;
+      let count = 0;
+
+      while ((match = resultRegex.exec(html)) !== null && count < 5) {
+        const url = new URL(match[1], 'https://duckduckgo.com').searchParams.get('uddg') || match[1];
+        sources.push({
+          id: nanoid(),
+          url: url,
+          title: match[2].trim(),
+          content: match[3].trim(),
+          source: 'DuckDuckGo',
+          publishedAt: new Date().toISOString(),
+          confidence: 'medium'
+        });
+        count++;
+      }
+
+      return sources;
+    } catch (error) {
+      logWarn(`[Multi-Scout] DuckDuckGo falhou:`, error as Error);
+      return [];
+    }
+  }
+
+  /**
    * Busca via RSS Feeds de portais de notícias
    */
   private async searchViaRSSFeeds(query: string): Promise<RawSource[]> {
@@ -122,36 +173,33 @@ export class MultiScoutAgent {
         const response = await axios.get(feedUrl, { timeout: 10000 });
         const feedContent = response.data;
 
-        // Parsing simples de RSS (em produção, usar xml2js ou similar)
-        const titleMatches = feedContent.match(/<title>([^<]+)<\/title>/g) || [];
-        const descMatches = feedContent.match(/<description>([^<]+)<\/description>/g) || [];
-        const linkMatches = feedContent.match(/<link>([^<]+)<\/link>/g) || [];
+        // Parsing de RSS mais robusto com regex
+        const items = feedContent.match(/<item>[\s\S]*?<\/item>/g) || [];
 
-        for (let i = 0; i < Math.min(3, titleMatches.length); i++) {
-          const title = titleMatches[i]?.replace(/<[^>]+>/g, '') || 'Sem título';
+        for (const item of items) {
+          const title = (item.match(/<title><!\[CDATA\[(.*?)\]\]><\/title>/) || item.match(/<title>(.*?)<\/title>/))?.[1] || 'Sem título';
+          const link = (item.match(/<link>(.*?)<\/link>/))?.[1] || '';
+          const description = (item.match(/<description><!\[CDATA\[(.*?)\]\]><\/description>/) || item.match(/<description>(.*?)<\/description>/))?.[1] || 'Sem conteúdo';
           
-          // Verificar se a notícia é relevante para a query
-          if (title.toLowerCase().includes(query.toLowerCase())) {
+          // Verificar relevância
+          if (title.toLowerCase().includes(query.toLowerCase()) || description.toLowerCase().includes(query.toLowerCase())) {
             sources.push({
               id: nanoid(),
-              url: linkMatches[i]?.replace(/<[^>]+>/g, '') || `https://news/${nanoid()}`,
-              title: title,
-              content: descMatches[i]?.replace(/<[^>]+>/g, '') || 'Sem conteúdo',
+              url: link,
+              title: title.replace(/<[^>]+>/g, ''),
+              content: description.replace(/<[^>]+>/g, '').substring(0, 300),
               source: new URL(feedUrl).hostname || 'RSS Feed',
               publishedAt: new Date().toISOString(),
               confidence: 'medium'
             });
           }
+          if (sources.length >= 5) break;
         }
 
         if (sources.length > 0) break;
       } catch (error) {
         logWarn(`[Multi-Scout] Feed RSS falhou: ${feedUrl}`, error as Error);
       }
-    }
-
-    if (sources.length === 0) {
-      throw new Error('Nenhum feed RSS disponível');
     }
 
     return sources;

@@ -3,8 +3,8 @@
  * Documentação: https://www12.senado.leg.br/dados-abertos/docs/ui-v2/
  */
 import axios from 'axios';
-import logger from '../core/logger.js';
-import { savePublicDataCache, getPublicDataCache } from '../core/database.js';
+import logger from '../core/logger.ts';
+import { savePublicDataCache, getPublicDataCache } from '../core/database.ts';
 
 const SENADO_API_BASE = 'https://legis.senado.leg.br/dadosabertos/senador';
 

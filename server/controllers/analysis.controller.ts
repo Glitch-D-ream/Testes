@@ -1,9 +1,9 @@
 import { Request, Response } from 'express';
-import { analysisService } from '../services/analysis.service.js';
-import { exportService } from '../services/export.service.js';
-import { validate, AnalysisSchema } from '../core/schemas.js';
-import { logInfo, logError } from '../core/logger.js';
-import { createAuditLog } from '../core/database.js';
+import { analysisService } from '../services/analysis.service.ts';
+import { exportService } from '../services/export.service.ts';
+import { validate, AnalysisSchema } from '../core/schemas.ts';
+import { logInfo, logError } from '../core/logger.ts';
+import { createAuditLog } from '../core/database.ts';
 import { nanoid } from 'nanoid';
 
 export class AnalysisController {

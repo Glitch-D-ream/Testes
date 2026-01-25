@@ -1,6 +1,6 @@
-import { logInfo, logWarn, logError } from '../core/logger.js';
-import { getDeputadoId, getVotacoesDeputado } from '../integrations/camara.js';
-import { getSenadorCodigo, getVotacoesSenador } from '../integrations/senado.js';
+import { logInfo, logWarn, logError } from '../core/logger.ts';
+import { getDeputadoId, getVotacoesDeputado } from '../integrations/camara.ts';
+import { getSenadorCodigo, getVotacoesSenador } from '../integrations/senado.ts';
 
 export interface IncoherenceAnalysis {
   hasIncoherence: boolean;

@@ -3,8 +3,8 @@
  * Baseado em dados históricos, viabilidade orçamentária e contexto
  */
 
-import { validateBudgetViability, mapPromiseToSiconfiCategory } from '../integrations/siconfi.js';
-import { validateCandidateCredibility } from '../integrations/tse.js';
+import { validateBudgetViability, mapPromiseToSiconfiCategory } from '../integrations/siconfi.ts';
+import { validateCandidateCredibility } from '../integrations/tse.ts';
 
 export interface ProbabilityFactors {
   promiseSpecificity: number;

@@ -1,6 +1,6 @@
 import axios from 'axios';
-import { logInfo, logError } from '../core/logger.js';
-import { AIAnalysisResult } from './ai.service.js';
+import { logInfo, logError } from '../core/logger.ts';
+import { AIAnalysisResult } from './ai.service.ts';
 
 /**
  * Protótipo de Integração DeepSeek R1

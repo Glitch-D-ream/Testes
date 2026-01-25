@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { logInfo, logError } from '../core/logger.js';
+import { logInfo, logError } from '../core/logger.ts';
 
 export interface AIAnalysisResult {
   promises: Array<{

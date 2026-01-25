@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
-import { getSupabase } from '../core/database.js';
-import { logError, logInfo } from '../core/logger.js';
-import { searchService } from '../services/search.service.js';
+import { getSupabase } from '../core/database.ts';
+import { logError, logInfo } from '../core/logger.ts';
+import { searchService } from '../services/search.service.ts';
 
 export class SearchController {
   async searchPoliticians(req: Request, res: Response) {

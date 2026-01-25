@@ -1,10 +1,10 @@
 import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { initializeDatabase } from './core/database.js';
-import { setupRoutes } from './core/routes.js';
+import { initializeDatabase } from './core/database.ts';
+import { setupRoutes } from './core/routes.ts';
 import cookieParser from 'cookie-parser';
-import { telegramWebhookService } from './services/telegram-webhook.service.js';
+import { telegramWebhookService } from './services/telegram-webhook.service.ts';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

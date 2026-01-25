@@ -1,14 +1,14 @@
 import { Router, Request, Response } from 'express';
 import { nanoid } from 'nanoid';
-import { authMiddleware } from '../core/middleware.js';
-import { validate, LoginSchema, RegisterSchema, RefreshTokenSchema } from '../core/schemas.js';
+import { authMiddleware } from '../core/middleware.ts';
+import { validate, LoginSchema, RegisterSchema, RefreshTokenSchema } from '../core/schemas.ts';
 import {
   hashPassword,
   comparePassword,
   generateJWT,
   generateRefreshToken,
   verifyRefreshToken,
-} from '../core/auth.js';
+} from '../core/auth.ts';
 import {
   getUserByEmail,
   getUserById,
@@ -19,8 +19,8 @@ import {
   getRefreshToken,
   deleteRefreshToken,
   createConsent,
-} from '../core/database.js';
-import { logInfo, logError } from '../core/logger.js';
+} from '../core/database.ts';
+import { logInfo, logError } from '../core/logger.ts';
 
 const router = Router();
 

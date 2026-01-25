@@ -1,5 +1,5 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import { logInfo, logError } from './logger.js';
+import { logInfo, logError } from './logger.ts';
 import { nanoid } from 'nanoid';
 import * as dotenv from 'dotenv';
 
@@ -8,7 +8,7 @@ dotenv.config();
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
 
-let supabase: SupabaseClient | null = null;
+export let supabase: SupabaseClient | null = null;
 
 export async function initializeDatabase(): Promise<void> {
   if (!SUPABASE_URL || !SUPABASE_KEY) {
