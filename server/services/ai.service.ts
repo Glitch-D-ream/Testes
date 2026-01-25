@@ -106,7 +106,9 @@ export class AIService {
 
         if (typeof content === 'string') {
           // Limpeza agressiva de markdown e textos extras
-          let cleanContent = content.replace(/```json\n?|\n?```/g, '').trim();
+          let cleanContent = content.trim();
+          
+          // Se o conteúdo começar com markdown, extrair apenas o JSON
           const jsonMatch = cleanContent.match(/\{[\s\S]*\}/);
           if (jsonMatch) {
             cleanContent = jsonMatch[0];
@@ -162,6 +164,46 @@ export class AIService {
       logError('Erro crítico na geração do relatório', error as Error);
       throw new Error('Não foi possível gerar o relatório detalhado no momento.');
     }
+  }
+
+  /**
+   * Geração de texto livre (Markdown) para relatórios profissionais
+   */
+  async generateReport(prompt: string): Promise<string> {
+    const models = ['openai', 'mistral', 'llama', 'deepseek-r1'];
+    let lastError: any;
+
+    for (const model of models) {
+      try {
+        logInfo(`[AI] Gerando relatório profissional com modelo: ${model}...`);
+        const response = await axios.post('https://text.pollinations.ai/', {
+          messages: [
+            { 
+              role: 'system', 
+              content: 'Você é um auditor político sênior. Seus relatórios são famosos pela profundidade técnica, imparcialidade e formatação elegante em Markdown.' 
+            },
+            { role: 'user', content: prompt }
+          ],
+          model: model
+        }, { timeout: 90000 });
+
+        if (response.data && typeof response.data === 'string') {
+          return response.data;
+        }
+        
+        if (response.data && response.data.choices) {
+          return response.data.choices[0]?.message?.content || "";
+        }
+
+        throw new Error(`Modelo ${model} não gerou texto válido`);
+      } catch (error) {
+        logError(`[AI] Falha na geração de relatório com ${model}`, error as Error);
+        lastError = error;
+        continue;
+      }
+    }
+
+    throw lastError || new Error('Falha ao gerar relatório profissional');
   }
 }
 

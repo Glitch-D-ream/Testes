@@ -10,7 +10,7 @@ import { DataCompressor } from '../core/compression.ts';
 import { MemoryCache } from '../core/cache-l1.ts';
 
 export class AnalysisService {
-  async createAnalysis(userId: string | null, text: string, author: string, category: string) {
+  async createAnalysis(userId: string | null, text: string, author: string, category: string, extraData: any = {}) {
     let promises;
     let aiAnalysis = null;
     const openRouterKey = process.env.OPENROUTER_API_KEY;
@@ -50,6 +50,8 @@ export class AnalysisService {
       const supabase = getSupabase();
 
       // Salvar análise no Supabase (com compressão de dados pesados)
+      // Nota: Removidos campos total_budget, executed_budget, execution_rate e metadata 
+      // pois as colunas não existem no banco de dados atual.
       const { error: analysisError } = await supabase
         .from('analyses')
         .insert([{
@@ -97,10 +99,13 @@ export class AnalysisService {
 
     return {
       id: analysisId,
-      text, // Incluir o texto completo do relatório gerado
+      text,
       probabilityScore,
       promisesCount: promises.length,
       promises,
+      totalBudget: extraData.totalBudget || 0,
+      executedBudget: extraData.executedBudget || 0,
+      executionRate: extraData.executionRate || 0,
     };
   }
 

@@ -173,6 +173,10 @@ export async function validateBudgetViability(
   const avgBudget = history.reduce((sum, h) => sum + h.budgeted, 0) / history.length;
   const isViable = estimatedValue < (avgBudget * 0.1); // Critério: promessa não pode custar mais de 10% do orçamento total da área
 
+  const totalBudget = history.reduce((sum, h) => sum + h.budgeted, 0);
+  const executedBudget = history.reduce((sum, h) => sum + h.executed, 0);
+  const executionRate = totalBudget > 0 ? (executedBudget / totalBudget) * 100 : 0;
+
   return {
     viable: isViable,
     confidence: 0.85,
@@ -180,6 +184,9 @@ export async function validateBudgetViability(
       ? `O custo estimado é compatível com o orçamento histórico de ${category}.`
       : `O custo estimado excede a capacidade fiscal histórica para ${category}.`,
     historicalData: history,
+    totalBudget,
+    executedBudget,
+    executionRate
   };
 }
 

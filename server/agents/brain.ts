@@ -87,55 +87,54 @@ ${temporalAnalysis.summary}
 
 `;
 
-      // 5. Construção do Relatório de Inteligência (O "Dossiê")
-      const fullContext = `
-# 📑 RELATÓRIO DE AUDITORIA TÉCNICA: ${politicianName.toUpperCase()}
+      // 5. Preparação do Prompt para a IA gerar o Relatório Final Profissional
+      const reportPrompt = `
+Gere um RELATÓRIO DE AUDITORIA TÉCNICA profissional para o político ${politicianName}.
+Use os dados reais abaixo para fundamentar sua análise. Não invente dados.
 
----
+### DADOS REAIS COLETADOS:
+- **Histórico:** ${historyContext}
+- **Categoria Principal:** ${mainCategory}
+- **Viabilidade Orçamentária (SICONFI):** ${budgetViability.reason} (Status: ${budgetViability.viable ? 'Compatível' : 'Complexo'})
+- **Impacto Macro (IBGE):** ${pibViability.context}
+- **Análise Legislativa:** ${temporalAnalysis.summary}
 
-## 📊 1. CONTEXTO E HISTÓRICO DE DADOS
-${historyContext}
-
----
-
-## 💰 2. ANÁLISE DE VIABILIDADE ORÇAMENTÁRIA (SICONFI/TESOURO)
-> **Área Analisada:** ${mainCategory}
-
-| Indicador Técnico | Avaliação |
-| :--- | :--- |
-| **Análise de Capacidade** | ${budgetViability.reason} |
-| **Status de Viabilidade** | ${budgetViability.viable ? '✅ COMPATÍVEL COM HISTÓRICO' : '⚠️ COMPLEXIDADE FISCAL ELEVADA'} |
-| **Índice de Confiança** | ${Math.round(budgetViability.confidence * 100)}% |
-| **Impacto Macro (PIB)** | ${pibViability.context} |
-		
-		---
-
-## ⚠️ 3. MATRIZ DE RISCOS E OBSTÁCULOS TÉCNICOS
-Análise imparcial dos desafios estruturais para a execução das declarações identificadas:
-
-*   **📉 LIMITAÇÃO FISCAL:** O teto de gastos e a dotação orçamentária anual impõem limites rígidos à execução.
-*   **⚖️ TRÂMITE LEGISLATIVO:** Dependência de aprovação em comissões e plenário para promessas que exigem alteração legal.
-*   **⚙️ CAPACIDADE OPERACIONAL:** Necessidade de estrutura administrativa prévia e processos licitatórios complexos.
-
----
-
-${temporalSection}
-
-## 🔍 5. EVIDÊNCIAS COLETADAS EM FONTES PÚBLICAS
-Dados brutos auditados e processados pela Tríade de Agentes:
-
+### FONTES E EVIDÊNCIAS:
 ${knowledgeBase}
 
----
-**NOTA DE TRANSPARÊNCIA:** Este relatório é gerado de forma autônoma pelo sistema **Seth VII**. A análise é estritamente técnica, baseada em dados oficiais do Tesouro Nacional (SICONFI), IBGE e portais de transparência. Não reflete opiniões políticas, mas sim uma avaliação de exequibilidade baseada em evidências.
-      `;
+### INSTRUÇÕES DE FORMATO:
+1. Use Markdown elegante com títulos (##), negrito e tabelas.
+2. O tom deve ser de um auditor do Tribunal de Contas: frio, técnico e imparcial.
+3. Divida em: Contexto, Análise Orçamentária, Matriz de Riscos e Veredito Técnico.
+4. Adicione uma "Nota de Transparência" ao final citando o sistema Seth VII.
+`;
+
+      const { aiService } = await import('../services/ai.service.js');
+      let fullContext;
+      try {
+        fullContext = await aiService.generateReport(reportPrompt);
+      } catch (reportError) {
+        logError('[Brain] Falha ao gerar relatório profissional, tentando fallback estruturado', reportError as Error);
+        const aiResponse = await aiService.analyzeText(reportPrompt);
+        fullContext = aiResponse.text || aiResponse.analysisData?.text || "Falha ao gerar relatório detalhado.";
+      }
       
       let analysis;
+      const extraData = {
+        totalBudget: (budgetViability as any).totalBudget || 0,
+        executedBudget: (budgetViability as any).executedBudget || 0,
+        executionRate: (budgetViability as any).executionRate || 0,
+        metadata: {
+          pibContext: pibViability.context,
+          temporalSummary: temporalAnalysis.summary
+        }
+      };
+
       if (existingAnalysisId) {
         analysis = await this.updateExistingAnalysis(existingAnalysisId, fullContext, politicianName, mainCategory);
       } else {
         const { analysisService } = await import('../services/analysis.service.js');
-        analysis = await analysisService.createAnalysis(userId, fullContext, politicianName, mainCategory);
+        analysis = await analysisService.createAnalysis(userId, fullContext, politicianName, mainCategory, extraData);
       }
 
       const result = {
