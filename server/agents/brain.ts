@@ -87,26 +87,41 @@ ${temporalAnalysis.summary}
 
 `;
 
-      // 5. Preparação do Prompt para a IA gerar o Relatório Final Profissional
+      // 5. Preparação do Prompt com Blindagem Anti-Alucinação e Neutralidade
       const reportPrompt = `
-Gere um RELATÓRIO DE AUDITORIA TÉCNICA profissional para o político ${politicianName}.
-Use os dados reais abaixo para fundamentar sua análise. Não invente dados.
+### DIRETRIZES DE AUDITORIA (RIGOR MÁXIMO):
+1. **ANCORAGEM EM DADOS:** Você é um sistema de auditoria fria. É terminantemente proibido inventar números, datas ou fatos. Se um dado não estiver nos "DADOS REAIS COLETADOS" abaixo, você deve declarar "Dados insuficientes para análise" em vez de especular.
+2. **NEUTRALIDADE ABSOLUTA:** Elimine qualquer adjetivo emocional (ex: "brilhante", "terrível", "esperançoso"). Use linguagem técnica e burocrática. Sua inclinação política deve ser inexistente.
+3. **CETICISMO TÉCNICO:** Sua função não é validar o político, mas sim auditar a exequibilidade das declarações dele frente ao orçamento real.
+4. **DETECÇÃO DE ALUCINAÇÃO:** Antes de escrever cada parágrafo, verifique se a informação existe nas "FONTES E EVIDÊNCIAS".
 
-### DADOS REAIS COLETADOS:
+### DADOS REAIS COLETADOS (ÚNICA FONTE DE VERDADE):
+- **Político:** ${politicianName}
 - **Histórico:** ${historyContext}
 - **Categoria Principal:** ${mainCategory}
 - **Viabilidade Orçamentária (SICONFI):** ${budgetViability.reason} (Status: ${budgetViability.viable ? 'Compatível' : 'Complexo'})
 - **Impacto Macro (IBGE):** ${pibViability.context}
 - **Análise Legislativa:** ${temporalAnalysis.summary}
 
-### FONTES E EVIDÊNCIAS:
+### FONTES E EVIDÊNCIAS AUDITADAS:
 ${knowledgeBase}
 
-### INSTRUÇÕES DE FORMATO:
-1. Use Markdown elegante com títulos (##), negrito e tabelas.
-2. O tom deve ser de um auditor do Tribunal de Contas: frio, técnico e imparcial.
-3. Divida em: Contexto, Análise Orçamentária, Matriz de Riscos e Veredito Técnico.
-4. Adicione uma "Nota de Transparência" ao final citando o sistema Seth VII.
+### ESTRUTURA DO RELATÓRIO:
+## 📑 RELATÓRIO DE AUDITORIA TÉCNICA
+## 📊 1. CONTEXTO E BASE DE DADOS
+(Resumo factual sem adjetivos)
+
+## 💰 2. ANÁLISE DE VIABILIDADE ORÇAMENTÁRIA
+(Cruze a categoria ${mainCategory} com os dados do SICONFI fornecidos)
+
+## ⚠️ 3. MATRIZ DE RISCOS E OBSTÁCULOS
+(Liste apenas obstáculos técnicos, fiscais ou legislativos reais)
+
+## ⚖️ 4. VEREDITO TÉCNICO FINAL
+(Conclusão baseada em evidências sobre a exequibilidade)
+
+---
+**NOTA DE TRANSPARÊNCIA:** Este relatório foi gerado pelo sistema **Seth VII** através de análise algorítmica de dados oficiais. A IA foi instruída a manter neutralidade absoluta e ancoragem estrita em evidências.
 `;
 
       const { aiService } = await import('../services/ai.service.js');
