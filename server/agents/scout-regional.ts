@@ -91,9 +91,9 @@ export class ScoutRegional {
     } else if (level === 'municipal' && context.city?.toUpperCase() === 'SÃO PAULO') {
       logInfo(`[ScoutRegional] Buscando em fontes municipais (CMSP, Querido Diário)...`);
       const [vereadores, projetos, diarios] = await Promise.all([
-        camaraSPIntegration.searchVereador(context.name),
-        camaraSPIntegration.searchProjetos(context.name),
-        queridoDiarioIntegration.searchMentions(context.name, context.city)
+        camaraSPIntegration.searchVereador(context.name).catch(() => []),
+        camaraSPIntegration.searchProjetos(context.name).catch(() => []),
+        queridoDiarioIntegration.searchMentions(context.name, context.city).catch(() => [])
       ]);
       sources.push(...vereadores, ...projetos, ...diarios);
     } else if (level === 'municipal') {
