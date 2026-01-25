@@ -74,24 +74,26 @@ export class FilterAgent {
     const hasContext = politicalContext.some(kw => combinedText.includes(kw));
 
     // MODO REFINADO: Exige ação OU contexto político forte, e ignora textos curtos ou puramente biográficos
-    const isTooShort = content.length < 100;
+    const isTooShort = content.length < 60; // Reduzido de 100 para 60 para aceitar snippets curtos mas densos
     
     // Verifica se o conteúdo ou o título indicam um perfil biográfico sem ação
-    const isBiographical = (combinedText.includes('deputado') || combinedText.includes('perfil:')) && 
+    // Tornamos a detecção de biografia mais específica para não pegar notícias que mencionam "deputado"
+    const isBiographical = (combinedText.includes('perfil:') || combinedText.includes('biografia')) && 
                           (combinedText.includes('email') || combinedText.includes('partido') || combinedText.includes('sigla'));
     
-    // Se for biográfico ou muito curto, SÓ aceita se tiver uma ação MUITO clara (não apenas verbos comuns)
-    const hasStrongAction = ['prometo', 'vou investir', 'farei', 'projeto de lei', 'candidato', 'eleição', 'voto'].some(kw => combinedText.includes(kw));
+    // Se for biográfico, SÓ aceita se tiver uma ação MUITO clara
+    const hasStrongAction = ['prometo', 'vou investir', 'farei', 'projeto de lei', 'candidato', 'eleição', 'voto', 'anunciou', 'garantiu'].some(kw => combinedText.includes(kw));
 
     if (isBiographical && !hasStrongAction) return false;
     
-    // Para políticos sem mandato, aceitamos textos um pouco menores se tiverem contexto político
+    // Se for muito curto e não tiver nada de útil, descarta
     if (isTooShort && !hasAction && !hasContext) return false;
 
-    // Se o conteúdo for puramente informativo/biográfico da Câmara, descarta
-    if (combinedText.includes('perfil:') && combinedText.includes('deputado') && !hasStrongAction) return false;
+    // Se o conteúdo for puramente informativo/biográfico da Câmara (URL oficial de perfil), descarta
+    if (titleLower.includes('perfil oficial') && combinedText.includes('deputado') && !hasStrongAction) return false;
 
-    return hasAction || (hasContext && content.length > 100);
+    // Aceita se tiver ação OU se tiver contexto político e tamanho razoável
+    return hasAction || (hasContext && content.length > 80);
   }
 }
 
