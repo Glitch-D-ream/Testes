@@ -16,7 +16,19 @@ export class BrainAgent {
     logInfo(`[Brain] Iniciando análise profunda para: ${politicianName}`);
     
     try {
-      // 0. Verificar Cache
+      // 0. Validação de Qualidade de Dados (Anti-Ruído)
+      const validSources = sources.filter(s => {
+        const isGeneric = s.source === 'Generic Fallback' || s.content.includes('Busca genérica');
+        const isTooShort = s.content.length < 50;
+        return !isGeneric && !isTooShort;
+      });
+
+      if (validSources.length === 0 && sources.length > 0) {
+        logWarn(`[Brain] Todas as fontes fornecidas foram identificadas como ruído ou genéricas. Abortando análise para evitar dados inúteis.`);
+        throw new Error('Nenhuma fonte de informação confiável ou específica foi encontrada para este político. O sistema evitou gerar uma análise baseada em dados genéricos.');
+      }
+
+      // 0.1. Verificar Cache
       const cachedAnalysis = await cacheService.getAnalysis(politicianName);
       if (cachedAnalysis) {
         logInfo(`[Brain] Análise recuperada do cache para: ${politicianName}`);
@@ -25,8 +37,8 @@ export class BrainAgent {
       
       logWarn(`[Brain] Análise não encontrada em cache. Executando análise completa...`);
 
-      // 1. Base de Conhecimento Rica
-      const knowledgeBase = sources
+      // 1. Base de Conhecimento Rica (Usando apenas fontes validadas)
+      const knowledgeBase = validSources
         .map(s => {
           const title = s.title || 'Declaração Identificada';
           return `### ${title}\n**Fonte:** ${s.source} | **Data:** ${s.publishedAt || 'Recente'}\n\n> ${s.content}\n\n**Análise de Contexto:** ${s.justification}`;
@@ -151,7 +163,9 @@ ${knowledgeBase}
   }
 
   private detectMainCategory(sources: FilteredSource[]): string {
-    const text = sources.map(s => (s.title + ' ' + s.content).toLowerCase()).join(' ');
+    const validSources = sources.filter(s => s.source !== 'Generic Fallback');
+    const targetSources = validSources.length > 0 ? validSources : sources;
+    const text = targetSources.map(s => (s.title + ' ' + s.content).toLowerCase()).join(' ');
     if (text.includes('saúde') || text.includes('hospital') || text.includes('médico') || text.includes('sus') || text.includes('vacina')) return 'SAUDE';
     if (text.includes('educação') || text.includes('escola') || text.includes('ensino') || text.includes('universidade') || text.includes('professor')) return 'EDUCACAO';
     if (text.includes('segurança') || text.includes('polícia') || text.includes('crime') || text.includes('violência') || text.includes('guarda')) return 'SEGURANCA';

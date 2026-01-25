@@ -128,16 +128,27 @@ Responda apenas um JSON no formato: {"results": [{"id": number, "isPromise": boo
       'ampliar', 'criar', 'reduzir', 'aumentar', 'implementar', 'entregar',
       'contratar', 'destinar', 'aplicar', 'baixar', 'cortar', 'eliminar',
       'defendo', 'proponho', 'apresento', 'queremos', 'objetivo', 'meta',
-      'projeto', 'lei', 'votação', 'parlamentar', 'deputado', 'senador'
+      'projeto', 'lei', 'votação', 'parlamentar', 'deputado', 'senador',
+      'anunciou', 'garantiu', 'assegurou', 'firmou', 'compromisso'
     ];
     
     const politicalContext = [
       'governo', 'prefeitura', 'estado', 'município', 'verba', 'orçamento',
       'povo', 'cidadão', 'eleitor', 'campanha', 'mandato', 'gestão',
-      'política', 'pública', 'direitos', 'social', 'saúde', 'educação'
+      'política', 'pública', 'direitos', 'social', 'saúde', 'educação',
+      'parlamentar', 'congresso', 'câmara', 'senado', 'ministério'
     ];
 
     const contentLower = content.toLowerCase();
+
+    // Bloqueio de Ruído (Blacklist)
+    const noiseKeywords = [
+      'publicidade', 'anúncio', 'cookies', 'privacidade', 'todos os direitos',
+      'clique aqui', 'assine já', 'newsletter', 'fallback', 'generic search',
+      'não encontrado', 'erro 404', 'página não encontrada'
+    ];
+    const isNoise = noiseKeywords.some(kw => contentLower.includes(kw));
+    if (isNoise) return false;
     
     // Heurística mais robusta: Verbo de ação + Contexto Político OU Verbo de ação forte
     const hasAction = actionVerbs.some(kw => contentLower.includes(kw));
