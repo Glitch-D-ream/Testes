@@ -87,45 +87,45 @@ ${temporalAnalysis.summary}
 
       // 5. Construção do Relatório de Inteligência (O "Dossiê")
       const fullContext = `
-# 📑 DOSSIÊ DE INTELIGÊNCIA POLÍTICA: ${politicianName.toUpperCase()}
+# 📑 RELATÓRIO DE AUDITORIA TÉCNICA: ${politicianName.toUpperCase()}
 
 ---
 
-## 📊 1. PERFIL E CONTEXTO HISTÓRICO
+## 📊 1. CONTEXTO E HISTÓRICO DE DADOS
 ${historyContext}
 
 ---
 
-## 💰 2. ANÁLISE DE VIABILIDADE FINANCEIRA (SICONFI)
-> **Foco Setorial:** ${mainCategory}
+## 💰 2. ANÁLISE DE VIABILIDADE ORÇAMENTÁRIA (SICONFI/TESOURO)
+> **Área Analisada:** ${mainCategory}
 
-| Indicador | Status |
+| Indicador Técnico | Avaliação |
 | :--- | :--- |
-| **Veredito Técnico** | ${budgetViability.reason} |
-| **Viabilidade Estimada** | ${budgetViability.viable ? '✅ ALTA VIABILIDADE' : '⚠️ EXECUÇÃO COMPLEXA'} |
-| **Confiança dos Dados** | ${Math.round(budgetViability.confidence * 100)}% |
-| **Contexto Macro (PIB)** | ${pibViability.context} |
-	
-	---
+| **Análise de Capacidade** | ${budgetViability.reason} |
+| **Status de Viabilidade** | ${budgetViability.viable ? '✅ COMPATÍVEL COM HISTÓRICO' : '⚠️ COMPLEXIDADE FISCAL ELEVADA'} |
+| **Índice de Confiança** | ${Math.round(budgetViability.confidence * 100)}% |
+| **Impacto Macro (PIB)** | ${pibViability.context} |
+		
+		---
 
-## ⚠️ 3. MATRIZ DE RISCOS (ANÁLISE DE CENÁRIOS)
-Abaixo, os principais obstáculos identificados que podem impedir o cumprimento das promessas:
+## ⚠️ 3. MATRIZ DE RISCOS E OBSTÁCULOS TÉCNICOS
+Análise imparcial dos desafios estruturais para a execução das declarações identificadas:
 
-*   **📉 RISCO ORÇAMENTÁRIO:** Rigidez fiscal e dependência de fontes externas de financiamento.
-*   **⚖️ RISCO POLÍTICO:** Necessidade de articulação legislativa e histórico de oposição a pautas similares.
-*   **⚙️ RISCO OPERACIONAL:** Complexidade logística e ausência de cronogramas técnicos detalhados.
+*   **📉 LIMITAÇÃO FISCAL:** O teto de gastos e a dotação orçamentária anual impõem limites rígidos à execução.
+*   **⚖️ TRÂMITE LEGISLATIVO:** Dependência de aprovação em comissões e plenário para promessas que exigem alteração legal.
+*   **⚙️ CAPACIDADE OPERACIONAL:** Necessidade de estrutura administrativa prévia e processos licitatórios complexos.
 
 ---
 
 ${temporalSection}
 
-## 🔍 5. EVIDÊNCIAS AUDITADAS (FONTES PÚBLICAS)
-Os registros abaixo foram extraídos, sanitizados e validados pela Tríade de Agentes:
+## 🔍 5. EVIDÊNCIAS COLETADAS EM FONTES PÚBLICAS
+Dados brutos auditados e processados pela Tríade de Agentes:
 
 ${knowledgeBase}
 
 ---
-*Este relatório é um documento de utilidade pública gerado de forma autônoma pela Tríade de Agentes (Scout, Filter, Brain). A análise é baseada em dados públicos e algoritmos de inteligência artificial.*
+**NOTA DE TRANSPARÊNCIA:** Este relatório é gerado de forma autônoma pelo sistema **Seth VII**. A análise é estritamente técnica, baseada em dados oficiais do Tesouro Nacional (SICONFI), IBGE e portais de transparência. Não reflete opiniões políticas, mas sim uma avaliação de exequibilidade baseada em evidências.
       `;
       
       let analysis;

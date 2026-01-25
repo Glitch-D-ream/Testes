@@ -24,7 +24,8 @@ export class ScoutHybrid {
     'g1.globo.com', 'folha.uol.com.br', 'estadao.com.br', 'cnnbrasil.com.br',
     'valor.globo.com', 'bbc.com', 'elpais.com', 'uol.com.br', 'r7.com',
     'metropoles.com', 'poder360.com.br', 'agenciabrasil.ebc.com.br',
-    'camara.leg.br', 'senado.leg.br', 'planalto.gov.br'
+    'camara.leg.br', 'senado.leg.br', 'planalto.gov.br', 'gazetadopovo.com.br',
+    'cartacapital.com.br', 'veja.abril.com.br', 'exame.com', 'infomoney.com.br'
   ];
 
   /**
@@ -70,18 +71,15 @@ export class ScoutHybrid {
       logInfo(`[ScoutHybrid] Scraping direto encontrou: ${directResults.length}`);
     }
 
-    // FASE 3: Deep Search com variações de query
-    if (sources.length < 3 && deepSearch) {
-      logInfo(`[ScoutHybrid] FASE 3: Deep Search com variações...`);
-      const variations = [
-        `${query} notícias`,
-        `${query} político`,
-        `${query} declarações`,
-        `${query} promessas`
-      ];
-
-      for (const variation of variations) {
-        const varResults = await directSearchImproved.search(variation);
+    // FASE 3: Deep Search com variações de query focadas em portais de elite
+    if (sources.length < 5 && deepSearch) {
+      logInfo(`[ScoutHybrid] FASE 3: Deep Search em portais de elite...`);
+      const elitePortals = ['g1.globo.com', 'folha.uol.com.br', 'estadao.com.br', 'poder360.com.br'];
+      
+      for (const portal of elitePortals) {
+        const eliteQuery = `site:${portal} ${query} promessa OR anunciou OR projeto`;
+        const varResults = await directSearchImproved.search(eliteQuery);
+        
         varResults.forEach(r => {
           if (!sources.some(s => s.url === r.url)) {
             sources.push({
@@ -91,11 +89,11 @@ export class ScoutHybrid {
               source: r.source,
               publishedAt: r.publishedAt,
               type: 'news',
-              confidence: 'medium'
+              confidence: 'high'
             });
           }
         });
-        if (sources.length >= 5) break;
+        if (sources.length >= 10) break;
       }
     }
 
