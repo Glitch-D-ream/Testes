@@ -1,6 +1,7 @@
 import axios from 'axios';
-import { logInfo, logError } from '../core/logger.js';
+import { logInfo, logError, logWarn } from '../core/logger.js';
 import { saveScoutHistory, checkUrlExists } from '../core/database.js';
+import { multiScoutAgent } from './multi-scout.js';
 
 export interface RawSource {
   title: string;
@@ -28,16 +29,36 @@ export class ScoutAgent {
   ];
 
   async search(query: string): Promise<RawSource[]> {
-    logInfo(`[Scout] Iniciando varredura multicanal para: ${query}`);
+    logInfo(`[Scout] Iniciando varredura multicanal com resiliência para: ${query}`);
     
     const sources: RawSource[] = [];
     
     try {
+      // Tentar busca local (RSS + Web) primeiro
       const rssResults = await this.fetchFromRSS(query);
       sources.push(...rssResults);
 
-      // Sempre tentar busca web se RSS falhar ou for insuficiente
-      if (sources.length < 5) {
+      // Se insuficiente, usar Multi-Scout resiliente
+      if (sources.length < 3) {
+        logWarn(`[Scout] Apenas ${sources.length} fontes via RSS. Ativando Multi-Scout resiliente...`);
+        const multiScoutResults = await multiScoutAgent.search(query);
+        
+        // Converter para formato RawSource
+        multiScoutResults.forEach(item => {
+          sources.push({
+            title: item.title,
+            url: item.url,
+            content: item.content,
+            source: item.source,
+            publishedAt: item.publishedAt,
+            type: 'news',
+            confidence: item.confidence
+          });
+        });
+      }
+      
+      // Fallback final: busca web
+      if (sources.length < 3) {
         const webResults = await this.fetchFromWeb(query);
         sources.push(...webResults);
       }
@@ -82,16 +103,15 @@ export class ScoutAgent {
   private sanitizeText(text: string): string {
     if (!text) return '';
     return text
-      .replace(/<script\b[^>]*>([\s\S]*?)<\/script>/gmi, '') // Remover scripts
-      .replace(/<style\b[^>]*>([\s\S]*?)<\/style>/gmi, '')   // Remover estilos
-      .replace(/<[^>]*>/g, ' ')                             // Remover tags HTML
-      .replace(/&nbsp;/g, ' ')                              // Remover entidades HTML comuns
-      .replace(/\s+/g, ' ')                                 // Normalizar espaços
+      .replace(/<script\b[^>]*>([\s\S]*?)<\/script>/gmi, '')
+      .replace(/<style\b[^>]*>([\s\S]*?)<\/style>/gmi, '')
+      .replace(/<[^>]*>/g, ' ')
+      .replace(/&nbsp;/g, ' ')
+      .replace(/\s+/g, ' ')
       .trim();
   }
 
   private async fetchFromWeb(query: string): Promise<RawSource[]> {
-    // Prompt simplificado para evitar erros de parse JSON complexos
     const prompt = `Liste 5 notícias reais e recentes do político brasileiro "${query}" com promessas ou declarações. 
     Retorne APENAS um array JSON puro, sem markdown, seguindo este formato: 
     [{"title": "Título da Notícia", "url": "https://link-da-noticia.com", "content": "Resumo da promessa ou declaração encontrada", "source": "Nome do Portal", "date": "2024-01-01"}]`;
@@ -109,7 +129,6 @@ export class ScoutAgent {
         
         if (!content) continue;
 
-        // Limpeza robusta de Markdown e textos extras
         let cleanContent = typeof content === 'string' ? content : JSON.stringify(content);
         cleanContent = cleanContent.replace(/```json\n?|\n?```/g, '').trim();
         const jsonMatch = cleanContent.match(/\[[\s\S]*\]/);
