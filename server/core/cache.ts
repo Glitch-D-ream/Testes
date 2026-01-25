@@ -1,51 +1,83 @@
 import Redis from 'ioredis';
-import { logInfo, logError } from './logger.js';
+import { logInfo, logError } from './logger.ts';
+import { MemoryCache } from './cache-l1.ts';
 
-const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
+const REDIS_URL = process.env.REDIS_URL;
 
 class CacheService {
-  private client: Redis | null = null;
+  private redis: Redis | null = null;
 
   constructor() {
-    if (process.env.NODE_ENV !== 'test') {
-      this.client = new Redis(REDIS_URL, {
-        maxRetriesPerRequest: null,
-        retryStrategy: (times) => Math.min(times * 50, 2000),
-      });
+    if (REDIS_URL && process.env.NODE_ENV !== 'test') {
+      try {
+        this.redis = new Redis(REDIS_URL, {
+          maxRetriesPerRequest: null,
+          retryStrategy: (times) => Math.min(times * 50, 2000),
+        });
 
-      this.client.on('error', (err) => {
-        logError('Erro na conexão com Redis', err);
-      });
+        this.redis.on('error', (err) => {
+          logError('Erro na conexão com Redis', err);
+        });
 
-      this.client.on('connect', () => {
-        logInfo('Conectado ao Redis com sucesso');
-      });
+        this.redis.on('connect', () => {
+          logInfo('Conectado ao Redis com sucesso');
+        });
+      } catch (err) {
+        logError('Falha ao inicializar cliente Redis', err as Error);
+      }
+    } else {
+      logInfo('[CacheService] Redis não configurado. Operando apenas com Cache L1 (Memória).');
     }
   }
 
   async get(key: string): Promise<string | null> {
-    if (!this.client) return null;
-    return this.client.get(key);
+    // 1. Tenta Memória (L1)
+    const l1Data = MemoryCache.get<string>(key);
+    if (l1Data) return l1Data;
+
+    // 2. Tenta Redis (L2)
+    if (this.redis) {
+      const l2Data = await this.redis.get(key);
+      if (l2Data) {
+        // Sincroniza L1 para próxima vez
+        MemoryCache.set(key, l2Data);
+        return l2Data;
+      }
+    }
+
+    return null;
   }
 
   async set(key: string, value: string, ttlSeconds: number = 3600): Promise<void> {
-    if (!this.client) return;
-    await this.client.set(key, value, 'EX', ttlSeconds);
+    // 1. Salva na Memória (L1)
+    MemoryCache.set(key, value, ttlSeconds * 1000);
+
+    // 2. Salva no Redis (L2) se disponível
+    if (this.redis) {
+      await this.redis.set(key, value, 'EX', ttlSeconds);
+    }
   }
 
   async del(key: string): Promise<void> {
-    if (!this.client) return;
-    await this.client.del(key);
+    MemoryCache.delete(key);
+    if (this.redis) {
+      await this.redis.del(key);
+    }
   }
 
   async getOrSet<T>(key: string, fetchFn: () => Promise<T>, ttlSeconds: number = 3600): Promise<T> {
     const cached = await this.get(key);
     if (cached) {
-      return JSON.parse(cached) as T;
+      try {
+        return JSON.parse(cached) as T;
+      } catch {
+        return cached as unknown as T;
+      }
     }
 
     const freshData = await fetchFn();
-    await this.set(key, JSON.stringify(freshData), ttlSeconds);
+    const stringData = JSON.stringify(freshData);
+    await this.set(key, stringData, ttlSeconds);
     return freshData;
   }
 }

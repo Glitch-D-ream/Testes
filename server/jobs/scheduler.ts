@@ -116,8 +116,16 @@ function scheduleCleanup(): void {
     logger.info('[Scheduler] Executando limpeza de cache agendada');
 
     try {
-      // TODO: Implementar limpeza de dados com mais de 30 dias
-      logger.info('[Scheduler] Limpeza de cache concluída');
+      logger.info('[Scheduler] Iniciando limpeza de dados via Supabase RPC...');
+      const { getSupabase } = await import('../core/database.ts');
+      const supabase = getSupabase();
+      const { error: rpcError } = await supabase.rpc('cleanup_old_data');
+      
+      if (rpcError) {
+        logger.error(`[Scheduler] Erro ao executar cleanup_old_data: ${rpcError.message}`);
+      } else {
+        logger.info('[Scheduler] Limpeza de cache e logs concluída com sucesso via RPC');
+      }
     } catch (error) {
       logger.error(`[Scheduler] Erro na limpeza: ${error}`);
     }
