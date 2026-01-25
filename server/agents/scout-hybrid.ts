@@ -8,6 +8,7 @@ import { logInfo, logError, logWarn } from '../core/logger.ts';
 import { directSearchImproved } from '../modules/direct-search-improved.ts';
 import { officialSourcesSearch } from '../modules/official-sources-search.ts';
 import { multiScoutAgent } from './multi-scout.ts';
+import { contentScraper } from '../modules/content-scraper.ts';
 
 export interface RawSource {
   title: string;
@@ -55,19 +56,20 @@ export class ScoutHybrid {
       logInfo(`[ScoutHybrid] FASE 2: Buscando via scraping direto...`);
       const directResults = await directSearchImproved.search(query);
       
-      directResults.forEach(r => {
+      for (const r of directResults) {
         if (!sources.some(s => s.url === r.url)) {
+          const fullContent = await contentScraper.scrape(r.url);
           sources.push({
             title: r.title,
             url: r.url,
-            content: r.snippet,
+            content: fullContent || r.snippet, // Usa conteúdo completo, com fallback para snippet
             source: r.source,
             publishedAt: r.publishedAt,
             type: 'news',
             confidence: this.whitelist.some(d => r.url.includes(d)) ? 'high' : 'medium'
           });
         }
-      });
+      }
       logInfo(`[ScoutHybrid] Scraping direto encontrou: ${directResults.length}`);
     }
 
@@ -80,19 +82,20 @@ export class ScoutHybrid {
         const eliteQuery = `site:${portal} ${query} promessa OR anunciou OR projeto`;
         const varResults = await directSearchImproved.search(eliteQuery);
         
-        varResults.forEach(r => {
+        for (const r of varResults) {
           if (!sources.some(s => s.url === r.url)) {
+            const fullContent = await contentScraper.scrape(r.url);
             sources.push({
               title: r.title,
               url: r.url,
-              content: r.snippet,
+              content: fullContent || r.snippet, // Usa conteúdo completo, com fallback para snippet
               source: r.source,
               publishedAt: r.publishedAt,
               type: 'news',
               confidence: 'high'
             });
           }
-        });
+        }
         if (sources.length >= 10) break;
       }
     }

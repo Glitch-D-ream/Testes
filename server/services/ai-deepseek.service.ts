@@ -69,7 +69,8 @@ ${text}`;
           },
           { role: 'user', content: this.promptTemplate(text) }
         ],
-        response_format: { type: 'json_object' }
+        response_format: { type: 'json_object' },
+        max_tokens: 2000
       }, {
         headers: {
           'Authorization': `Bearer ${apiKey}`,

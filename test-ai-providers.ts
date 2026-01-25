@@ -46,7 +46,7 @@ async function testAIProviders() {
 
   console.log('\n-------------------\n');
 
-  // Testar Provedores via Manus (OpenAI SDK)
+  // Testar Provedores via Seth VII (OpenAI SDK)
   if (process.env.OPENAI_API_KEY) {
     const openai = new (await import('openai')).default({ apiKey: process.env.OPENAI_API_KEY });
     

@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@sentry/node": "^10.36.0",
+    "cheerio": "^1.2.0",
     "chromium-bidi": "^13.0.1",
     "compromise": "^14.14.5",
     "cookie-parser": "^1.4.7",

@@ -1,5 +1,5 @@
 /**
- * Manus Debug Collector (agent-friendly)
+ * Seth VII Debug Collector (agent-friendly)
  *
  * Captures:
  * 1) Console logs
@@ -807,7 +807,7 @@
   try {
     installUiEventListeners();
   } catch (e) {
-    console.warn("[Manus] Failed to install UI listeners:", e);
+    console.warn("[Seth VII] Failed to install UI listeners:", e);
   }
 
   // Mark as initialized
@@ -817,5 +817,5 @@
     forceReport: reportLogs,
   };
 
-  console.debug("[Manus] Debug collector initialized (no rrweb, UI events only)");
+  console.debug("[Seth VII] Debug collector initialized (no rrweb, UI events only)");
 })();

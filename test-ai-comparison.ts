@@ -10,7 +10,7 @@ async function runComparison() {
   const sampleText = "Eu prometo que vou construir 50 novas escolas em São Paulo até o final de 2026 e reduzir o desemprego em 10%.";
   const prompt = (aiService as any).promptTemplate(sampleText);
 
-  // Usando o cliente OpenAI do Manus que suporta múltiplos modelos
+  // Usando o cliente OpenAI do Seth VII que suporta múltiplos modelos
   const manusClient = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
   const models = [
