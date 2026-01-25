@@ -47,9 +47,16 @@ export class FilterAgent {
     // 1. Bloqueio de Ruído Óbvio (Blacklist)
     const noiseKeywords = [
       'cookies', 'privacidade', 'todos os direitos', 'clique aqui', 
-      'assine já', 'newsletter', 'erro 404', 'página não encontrada'
+      'assine já', 'newsletter', 'erro 404', 'página não encontrada',
+      'just a moment', 'enable javascript'
     ];
     if (noiseKeywords.some(kw => combinedText.includes(kw))) return false;
+    
+    // 1.1. Prioridade para Google News (Sempre aceitar se tiver contexto político)
+    if (titleLower.includes('google news') || combinedText.includes('google news')) {
+      const politicalKeywords = ['governo', 'política', 'projeto', 'lei', 'lula', 'bolsonaro', 'eleição', 'estado'];
+      if (politicalKeywords.some(kw => combinedText.includes(kw))) return true;
+    }
     
     // 2. Bloqueio de Perfis Estáticos (Câmara/Senado) sem conteúdo de ação
     const isStaticProfile = titleLower.includes('perfil oficial') || 
@@ -59,7 +66,7 @@ export class FilterAgent {
     if (isStaticProfile && !hasAction) return false;
 
     // 3. Critério de Tamanho Mínimo
-    if (combinedText.length < 50) return false;
+    if (combinedText.length < 40) return false;
 
     // 4. Critério de Relevância Política Básica (Expandido)
     const politicalKeywords = [
@@ -67,10 +74,16 @@ export class FilterAgent {
       'eleição', 'candidato', 'partido', 'ministro', 'deputado', 'senador',
       'brasileiro', 'brasil', 'estado', 'público', 'social', 'história',
       'comunista', 'militante', 'escritor', 'professor', 'pernambuco',
-      'youtuber', 'marxista', 'pcb', 'candidatura'
+      'youtuber', 'marxista', 'pcb', 'candidatura', 'investimento', 'anúncio'
     ];
     
-    return politicalKeywords.some(kw => combinedText.includes(kw));
+    const hasPoliticalContext = politicalKeywords.some(kw => combinedText.includes(kw));
+    
+    // Se for de um portal de elite conhecido, aceitamos com menos rigor
+    const eliteDomains = ['estadao.com.br', 'folha.uol.com.br', 'g1.globo.com', 'cnnbrasil.com.br', 'veja.abril.com.br', 'jovempan.com.br', 'gazetadopovo.com.br'];
+    const isElite = eliteDomains.some(d => combinedText.includes(d));
+
+    return hasPoliticalContext || (isElite && combinedText.length > 30);
   }
 }
 

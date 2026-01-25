@@ -1,4 +1,4 @@
-import { ScoutAgent as SmartScoutAgent } from './scoutAgent.ts';
+import { scoutHybrid } from './scout-hybrid.ts';
 import { logInfo, logError } from '../core/logger.ts';
 
 export interface RawSource {
@@ -12,33 +12,27 @@ export interface RawSource {
 }
 
 export class ScoutAgent {
-  private smartScout: SmartScoutAgent;
-
-  constructor() {
-    this.smartScout = new SmartScoutAgent();
-  }
-
   async search(query: string, isDeepSearch: boolean = false): Promise<RawSource[]> {
-    logInfo(`[Scout] Iniciando busca inteligente para: ${query}`);
+    logInfo(`[Scout] Iniciando busca híbrida para: ${query} (Deep: ${isDeepSearch})`);
     
     try {
-      const results = await this.smartScout.execute(query);
+      const results = await scoutHybrid.search(query, isDeepSearch);
       
-      if (!results || !results.results) {
+      if (!results || results.length === 0) {
         return [];
       }
 
-      return results.results.map((r: any) => ({
+      return results.map((r: any) => ({
         title: r.title,
         url: r.url,
         content: r.content,
         source: r.source,
-        publishedAt: r.date,
+        publishedAt: r.publishedAt,
         type: r.source === 'government' ? 'official' : 'news',
-        confidence: r.metadata.relevance > 0.7 ? 'high' : 'medium'
+        confidence: 'medium'
       }));
     } catch (error: any) {
-      logError(`[Scout] Erro na busca inteligente de ${query}`, error);
+      logError(`[Scout] Erro na busca híbrida de ${query}`, error);
       return [];
     }
   }

@@ -155,18 +155,58 @@ export class DirectSearchImproved {
   }
 
   /**
+   * Busca via Google News RSS (Extremamente confiável para notícias)
+   */
+  async searchGoogleNews(query: string): Promise<DirectSearchResult[]> {
+    logInfo(`[DirectSearchImproved] Buscando via Google News RSS: ${query}`);
+    try {
+      const url = `https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=pt-BR&gl=BR&ceid=BR:pt-419`;
+      const response = await axios.get(url, { timeout: 10000 });
+      const xml = response.data;
+      
+      const results: DirectSearchResult[] = [];
+      const items = xml.match(/<item>[\s\S]*?<\/item>/g) || [];
+      
+      for (const item of items.slice(0, 10)) {
+        const title = (item.match(/<title>(.*?)<\/title>/))?.[1] || 'Sem título';
+        const link = (item.match(/<link>(.*?)<\/link>/))?.[1] || '';
+        const pubDate = (item.match(/<pubDate>(.*?)<\/pubDate>/))?.[1] || new Date().toISOString();
+        const source = (item.match(/<source[^>]*>(.*?)<\/source>/))?.[1] || 'Google News';
+        
+        results.push({
+          title: title.replace(/&amp;/g, '&'),
+          url: link,
+          snippet: title, // No RSS o título costuma ser o resumo
+          source: source,
+          publishedAt: new Date(pubDate).toISOString()
+        });
+      }
+      return results;
+    } catch (error) {
+      logWarn(`[DirectSearchImproved] Falha no Google News RSS`, error as Error);
+      return [];
+    }
+  }
+
+  /**
    * Orquestra a busca direta
    */
   async search(query: string): Promise<DirectSearchResult[]> {
-    // Tentar DuckDuckGo API primeiro (mais confiável)
-    let results = await this.searchDuckDuckGoAPI(query);
+    // 1. Tentar Google News primeiro para notícias políticas (Alta Qualidade)
+    let results = await this.searchGoogleNews(query);
     
-    // Se não encontrar nada, tentar alternativa
+    // 2. Tentar DuckDuckGo API como complemento
+    const ddgResults = await this.searchDuckDuckGoAPI(query);
+    results = [...results, ...ddgResults];
+    
+    // 3. Se ainda estiver vazio, tentar alternativa
     if (results.length === 0) {
       results = await this.searchBingAlternative(query);
     }
 
-    return results;
+    // Remover duplicatas por URL
+    const uniqueResults = Array.from(new Map(results.map(item => [item.url, item])).values());
+    return uniqueResults;
   }
 }
 

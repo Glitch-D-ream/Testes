@@ -34,17 +34,9 @@ export class OrchestratorService {
       try {
         logInfo(`[Orchestrator] [Job:${analysisId}] Iniciando Tríade para: ${politicianName}`);
         
-        // FASE 1: Scout - Busca Inicial
-        let rawSources = await scoutAgent.search(politicianName, false);
+        // FASE 1: Scout - Busca Inicial (Sempre Deep para garantir qualidade)
+        let rawSources = await scoutAgent.search(politicianName, true);
         logInfo(`[Orchestrator] [Job:${analysisId}] Scout encontrou ${rawSources.length} fontes`);
-        
-        // FASE 2: Deep Search se necessário
-        if (rawSources.length < 2) {
-          logWarn(`[Orchestrator] [Job:${analysisId}] Poucos resultados (${rawSources.length}). Ativando Deep Search...`);
-          const deepResults = await scoutAgent.search(politicianName, true);
-          rawSources = [...rawSources, ...deepResults];
-          logInfo(`[Orchestrator] [Job:${analysisId}] Deep Search adicionou ${deepResults.length} fontes`);
-        }
         
         if (rawSources.length === 0) {
           throw new Error(`Nenhuma fonte encontrada para "${politicianName}". Tente adicionar contexto (cargo, estado) ou verificar o nome.`);
