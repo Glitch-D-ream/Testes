@@ -65,7 +65,9 @@ export class FilterAgent {
     const politicalKeywords = [
       'governo', 'política', 'projeto', 'lei', 'verba', 'orçamento', 
       'eleição', 'candidato', 'partido', 'ministro', 'deputado', 'senador',
-      'brasileiro', 'brasil', 'estado', 'público', 'social', 'história'
+      'brasileiro', 'brasil', 'estado', 'público', 'social', 'história',
+      'comunista', 'militante', 'escritor', 'professor', 'pernambuco',
+      'youtuber', 'marxista', 'pcb', 'candidatura'
     ];
     
     return politicalKeywords.some(kw => combinedText.includes(kw));
