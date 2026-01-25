@@ -11,10 +11,11 @@ CREATE TABLE IF NOT EXISTS public.scout_history (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Habilitar RLS (Row Level Security) - Opcional, mas recomendado
+-- Habilitar RLS (Row Level Security)
 ALTER TABLE public.scout_history ENABLE ROW LEVEL SECURITY;
 
--- Criar política para permitir acesso total com a service role key
+-- Criar politica para permitir acesso total com a service role key
+DROP POLICY IF EXISTS "Allow full access for service role" ON public.scout_history;
 CREATE POLICY "Allow full access for service role" ON public.scout_history
     FOR ALL
     USING (true)
