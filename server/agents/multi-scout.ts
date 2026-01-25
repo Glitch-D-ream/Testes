@@ -17,7 +17,7 @@ export interface RawSource {
  * Implementa um sistema de fallback para garantir que a busca nunca falhe completamente
  */
 export class MultiScoutAgent {
-  private readonly primaryModels = ['deepseek-r1', 'llama-3.3-70b', 'mistral-large'];
+  private readonly primaryModels = ['openai', 'mistral', 'llama'];
   private readonly fallbackRSSFeeds = [
     'https://feeds.folha.uol.com.br/poder',
     'https://g1.globo.com/dynamo/politica/feed.xml',

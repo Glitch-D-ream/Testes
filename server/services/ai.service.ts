@@ -76,8 +76,8 @@ export class AIService {
    * Usando modelos de alto nível para garantir a qualidade do texto.
    */
   private async analyzeWithOpenSource(text: string): Promise<AIAnalysisResult> {
-    // Modelos de Elite Gratuitos (Sem Chave): DeepSeek-R1 e Llama-3.3-70B são o topo atual
-    const models = ['deepseek-r1', 'llama-3.3-70b', 'mistral-large'];
+    // Focando nos modelos que demonstraram melhor capacidade de escrita profunda
+    const models = ['openai', 'mistral', 'llama'];
     let lastError: any;
 
     for (const model of models) {
