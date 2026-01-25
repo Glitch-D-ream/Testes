@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "build": "vite build && node scripts/build-server.js",
-    "start": "node dist/index.js"
+    "start": "node dist/index.js",
+    "worker:scout": "tsx server/scripts/scout-worker.ts"
   },
   "dependencies": {
     "@sentry/node": "^10.36.0",

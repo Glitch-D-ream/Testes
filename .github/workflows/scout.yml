@@ -1,0 +1,42 @@
+name: Scout Worker (Autônomo)
+
+on:
+  schedule:
+    - cron: '0 */6 * * *' # Roda a cada 6 horas
+  workflow_dispatch: # Permite rodar manualmente pelo painel do GitHub
+
+jobs:
+  scout:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout Repositório
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Instalar pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 9
+
+      - name: Instalar Dependências
+        run: pnpm install --frozen-lockfile
+
+      - name: Executar Scout Worker
+        env:
+          NODE_ENV: production
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+        run: pnpm tsx server/scripts/scout-worker.ts
+
+      - name: Salvar Logs de Execução (Cold Storage)
+        if: always()
+        run: |
+          mkdir -p logs/scout
+          echo "Execução em $(date)" > logs/scout/last_run.log
+          # Aqui poderíamos commitar os logs se quiséssemos manter histórico no Git
