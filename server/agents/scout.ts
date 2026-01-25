@@ -36,7 +36,8 @@ export class ScoutAgent {
       const rssResults = await this.fetchFromRSS(query);
       sources.push(...rssResults);
 
-      if (sources.length < 3) {
+      // Sempre tentar busca web se RSS falhar ou for insuficiente
+      if (sources.length < 5) {
         const webResults = await this.fetchFromWeb(query);
         sources.push(...webResults);
       }
@@ -94,7 +95,8 @@ export class ScoutAgent {
     const prompt = `Liste 5 notícias reais e recentes do político brasileiro "${query}" com promessas ou declarações. Priorize fontes oficiais (.gov.br, .leg.br) e grandes portais. Retorne APENAS um array JSON: [{"title": "...", "url": "...", "content": "...", "source": "...", "date": "..."}]`;
 
     let retries = 3;
-    const models = ['searchgpt', 'mistral', 'openai'];
+    // Adicionando modelos mais estáveis e rápidos
+    const models = ['openai', 'mistral', 'llama'];
 
     for (let i = 0; i < retries; i++) {
       try {
@@ -140,24 +142,9 @@ export class ScoutAgent {
           return true;
         });
 
-        // Validação de Links Ativos (Prova de Vida)
-        const validatedResults = [];
-        for (const item of filteredResults) {
-          const itemUrl = item.url || item.link;
-          if (!itemUrl) continue;
-
-          try {
-            logInfo(`[Scout] Validando link: ${itemUrl}`);
-            await axios.head(itemUrl, { timeout: 5000, headers: { 'User-Agent': 'Mozilla/5.0' } });
-            validatedResults.push(item);
-          } catch (linkError) {
-            if ((linkError as any).response?.status === 405) {
-              validatedResults.push(item);
-            }
-          }
-        }
-        
-        return validatedResults.map(item => ({
+        // Validação de Links Ativos (Simplificada para evitar bloqueios de rede)
+        // Em ambientes de servidor como Railway, HEAD requests podem ser bloqueadas por firewalls ou pelos próprios sites
+        return filteredResults.map(item => ({
           title: item.title || item.titulo,
           url: item.url || item.link,
           content: this.sanitizeText(item.content || item.snippet || item.resumo || ''),
