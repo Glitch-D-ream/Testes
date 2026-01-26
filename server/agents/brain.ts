@@ -39,12 +39,73 @@ export class BrainAgent {
       DIRETRIZ: Use estas promessas técnicas para mostrar que o político está agindo (ou não) de forma concreta através de leis.`;
       
       logInfo(`[Brain] Gerando parecer técnico via IA para ${cleanName}...`);
-      const aiAnalysis = await aiService.generateReport(reportPrompt);
       
-      await this.saveAnalysis(userId, existingId, {
+      // Adicionar instrução de JSON ao prompt para garantir extração estruturada
+      const enhancedPrompt = `${reportPrompt}
+      
+      IMPORTANTE: Sua resposta deve ser OBRIGATORIAMENTE um objeto JSON válido. 
+      Não inclua textos fora do JSON.
+      
+      Estrutura esperada:
+      {
+        "report": "Seu parecer técnico completo em Markdown aqui...",
+        "promises": [
+          {
+            "text": "Descrição da promessa ou compromisso identificado",
+            "category": "SAUDE/EDUCACAO/ECONOMIA/etc",
+            "confidence": 0.85,
+            "reasoning": "Explicação técnica da viabilidade"
+          }
+        ]
+      }
+      
+      Se não encontrar promessas explícitas, identifique compromissos implícitos baseados no histórico e cargo.`;
+
+      const aiResponseRaw = await aiService.generateReport(enhancedPrompt);
+      let aiAnalysis = aiResponseRaw;
+      let extractedPromisesFromAI = [];
+
+      try {
+        const jsonMatch = aiResponseRaw.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          const parsed = JSON.parse(jsonMatch[0]);
+          aiAnalysis = parsed.report || aiResponseRaw;
+          extractedPromisesFromAI = parsed.promises || [];
+        }
+      } catch (e) {
+        logWarn('[Brain] Falha ao parsear resposta estruturada da IA. Usando texto bruto.');
+      }
+
+      // FALLBACK FINAL: Se a IA falhar completamente ou não retornar promessas, usar o extrator local (NLP)
+      if (extractedPromisesFromAI.length === 0 && sources.length > 0) {
+        logWarn('[Brain] IA não retornou promessas. Ativando fallback de NLP local...');
+        const { extractPromises } = await import('../modules/nlp.ts');
+        const allContent = sources.map(s => s.content).join('\n\n');
+        const nlpPromises = extractPromises(allContent);
+        if (nlpPromises.length > 0) {
+          logInfo(`[Brain] NLP local extraiu ${nlpPromises.length} promessas candidatas.`);
+          extractedPromisesFromAI = nlpPromises.map(p => ({ ...p, reasoning: 'Extraído via análise de padrões linguísticos locais.' }));
+        }
+      }
+      
+      // Usar promessas extraídas da IA ou as técnicas dos projetos
+    let finalPromises = extractedPromisesFromAI;
+
+    // Se não houver promessas da IA, usar as técnicas extraídas dos projetos como fallback
+    if (finalPromises.length === 0 && dataSources.technicalPromises) {
+      finalPromises = dataSources.technicalPromises.map((p: any) => ({
+        text: p.text,
+        category: p.category,
+        confidence: 0.8,
+        reasoning: `Extraído automaticamente do projeto ${p.projectTitle}. Intenção: ${p.intent}`
+      }));
+    }
+
+    await this.saveAnalysis(userId, existingId, {
         politicianName: cleanName,
         aiAnalysis,
         mainCategory: dataSources.mainCategory,
+        promises: finalPromises,
         dataSources
       });
 
@@ -253,6 +314,9 @@ export class BrainAgent {
       consistencyScore: data.dataSources.consistencyScore || 0
     };
 
+    const { DataCompressor } = await import('../core/compression.ts');
+    const { nanoid } = await import('nanoid');
+
     // Criar objeto de dados garantindo compatibilidade com schemas antigos e novos
     const analysisData: any = {
       user_id: userId,
@@ -260,6 +324,8 @@ export class BrainAgent {
       text: data.aiAnalysis,
       category: data.mainCategory,
       data_sources: legacyDataSources,
+      extracted_promises: DataCompressor.compress(data.promises || []),
+      probability_score: data.dataSources.consistencyScore || 0,
       status: 'completed',
       updated_at: new Date().toISOString(),
       total_budget: data.dataSources.budgetViability?.totalBudget || 0,
@@ -277,12 +343,13 @@ export class BrainAgent {
         logInfo(`[Brain] Atualizando análise existente: ${existingId}`);
         const { error } = await supabase.from('analyses').update(analysisData).eq('id', existingId);
         saveError = error;
-      } else {
-        const newId = Math.random().toString(36).substring(7);
-        logInfo(`[Brain] Criando nova análise: ${newId}`);
-        const { error } = await supabase.from('analyses').insert([{ ...analysisData, id: newId }]);
-        saveError = error;
-      }
+        } else {
+          const newId = Math.random().toString(36).substring(7);
+          (analysisData as any).id = newId;
+          logInfo(`[Brain] Criando nova análise: ${newId}`);
+          const { error } = await supabase.from('analyses').insert([{ ...analysisData }]);
+          saveError = error;
+        }
 
       // Se falhar por causa da coluna politician_name (erro de cache do Supabase), tentar sem ela
       if (saveError && saveError.message.includes('politician_name')) {
@@ -293,12 +360,34 @@ export class BrainAgent {
           saveError = error;
         } else {
           const newId = Math.random().toString(36).substring(7);
-          const { error } = await supabase.from('analyses').insert([{ ...analysisData, id: newId }]);
+          (analysisData as any).id = newId;
+          const { error } = await supabase.from('analyses').insert([{ ...analysisData }]);
           saveError = error;
         }
       }
 
       if (saveError) throw saveError;
+
+      // Salvar promessas individuais para a tabela 'promises'
+      const finalAnalysisId = existingId || (analysisData as any).id;
+      if (finalAnalysisId && data.promises && data.promises.length > 0) {
+        logInfo(`[Brain] Salvando ${data.promises.length} promessas individuais para análise ${finalAnalysisId}`);
+        const promisesToInsert = data.promises.map((p: any) => ({
+          id: nanoid(),
+          analysis_id: finalAnalysisId,
+          promise_text: p.text,
+          category: p.category || data.mainCategory,
+          confidence_score: p.confidence || 0.5,
+          negated: p.negated || false,
+          conditional: p.conditional || false
+        }));
+
+        const { error: promisesError } = await supabase.from('promises').insert(promisesToInsert);
+        if (promisesError) {
+          logError(`[Brain] Erro ao salvar promessas individuais: ${promisesError.message}`);
+        }
+      }
+
       logInfo(`[Brain] Status da análise atualizado para 'completed' com sucesso.`);
     } catch (err: any) {
       logError(`[Brain] Erro fatal ao salvar análise: ${err.message}`);
