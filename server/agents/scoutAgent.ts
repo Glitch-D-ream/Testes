@@ -79,7 +79,7 @@ export class ScoutAgent {
       politician: {
         id: politician.id,
         full_name: politician.full_name,
-        role: politician.current_role,
+        role: politician.official_role,
         party: politician.party,
         state: politician.state
       },
