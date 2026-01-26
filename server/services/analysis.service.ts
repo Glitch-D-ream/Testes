@@ -14,20 +14,14 @@ export class AnalysisService {
     let promises;
     let aiAnalysis = null;
     const openRouterKey = process.env.OPENROUTER_API_KEY;
+
+    // Validar se o userId é um UUID válido para o Supabase
+    const validUserId = (userId && userId.length === 36) ? userId : null;
     
     try {
-      if (openRouterKey && openRouterKey !== 'sua_chave_aqui') {
-        try {
-          logInfo('[AnalysisService] Tentando DeepSeek R1 via OpenRouter...');
-          aiAnalysis = await deepSeekService.analyzeText(text, openRouterKey);
-        } catch (dsError) {
-          logError('[AnalysisService] Falha no DeepSeek R1, tentando fallback para AIService padrão', dsError as Error);
-          aiAnalysis = await aiService.analyzeText(text);
-        }
-      } else {
-        logInfo('[AnalysisService] Utilizando AIService padrão (Pollinations)...');
-        aiAnalysis = await aiService.analyzeText(text);
-      }
+      // Priorizar Groq via aiService.analyzeText (que já foi otimizado)
+      logInfo('[AnalysisService] Iniciando análise estruturada...');
+      aiAnalysis = await aiService.analyzeText(text);
 
       promises = aiAnalysis.promises.map(p => ({
         text: p.text,
@@ -56,7 +50,7 @@ export class AnalysisService {
         .from('analyses')
         .insert([{
           id: analysisId,
-          user_id: userId,
+          user_id: validUserId,
           text,
           author,
           category,

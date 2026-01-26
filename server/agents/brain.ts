@@ -160,6 +160,10 @@ ${knowledgeBase}
       } else {
         const { analysisService } = await import('../services/analysis.service.ts');
         analysis = await analysisService.createAnalysis(userId, fullContext, politicianName, mainCategory, extraData);
+        
+        // Garantir que o status seja atualizado para completed se for uma nova análise
+        const supabase = getSupabase();
+        await supabase.from('analyses').update({ status: 'completed' }).eq('id', analysis.id);
       }
 
       const result = {
