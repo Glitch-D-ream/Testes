@@ -103,22 +103,32 @@ export class SearchService {
     // Usamos setImmediate para liberar a thread do Express
     setImmediate(async () => {
       try {
-        logInfo(`[Orchestrator] [Job:${analysisId}] Iniciando Tríade para: ${politicianName}`);
+        logInfo(`[Orchestrator] [Job:${analysisId}] [DEBUG] Iniciando Tríade para: ${politicianName}`);
         
         // Scout
+        logInfo(`[Orchestrator] [Job:${analysisId}] [DEBUG] Chamando Scout...`);
         const rawSources = await scoutAgent.search(politicianName);
+        logInfo(`[Orchestrator] [Job:${analysisId}] [DEBUG] Scout retornou ${rawSources.length} fontes.`);
+        
         if (rawSources.length === 0) {
           throw new Error('O Agente Buscador não encontrou notícias ou fontes recentes para este político. Tente um nome mais conhecido.');
         }
 
         // Filter (Habilitando modo flexível para evitar que a análise falhe por excesso de rigor)
+        logInfo(`[Orchestrator] [Job:${analysisId}] [DEBUG] Chamando Filter...`);
         const filteredSources = await filterAgent.filter(rawSources, true);
+        logInfo(`[Orchestrator] [Job:${analysisId}] [DEBUG] Filter retornou ${filteredSources.length} fontes.`);
+        
         if (filteredSources.length === 0) {
           throw new Error('Nenhuma promessa ou compromisso político claro foi detectado nas notícias encontradas.');
         }
 
         // Brain (O Brain já salva os dados finais no banco)
+        logInfo(`[Orchestrator] [Job:${analysisId}] [DEBUG] Chamando Brain...`);
         await brainAgent.analyze(politicianName, filteredSources, userId, analysisId);
+        
+        logInfo(`[Orchestrator] [Job:${analysisId}] [DEBUG] Brain concluído. Atualizando status final...`);
+        await supabase.from('analyses').update({ status: 'completed' }).eq('id', analysisId);
         
         logInfo(`[Orchestrator] [Job:${analysisId}] Concluído com sucesso.`);
       } catch (error: any) {

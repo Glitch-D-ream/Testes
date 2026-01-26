@@ -32,8 +32,16 @@ export function getSupabase() {
   if (!supabase) {
     // Inicialização tardia se as variáveis estiverem disponíveis agora
     if (SUPABASE_URL && SUPABASE_KEY) {
-      supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
-      return supabase;
+      try {
+        supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
+          auth: { persistSession: false },
+          global: { fetch: (url, options) => fetch(url, { ...options, signal: AbortSignal.timeout(15000) }) } // Timeout de 15s
+        });
+        return supabase;
+      } catch (e) {
+        logError('[Database] Erro fatal ao criar cliente Supabase', e as Error);
+        throw e;
+      }
     }
     throw new Error('Database not initialized and credentials missing');
   }
