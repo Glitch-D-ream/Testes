@@ -36,6 +36,7 @@ export class AIService {
     3. RIGOR TÉCNICO: Use termos como dotação orçamentária e viabilidade fiscal.
     4. RESILIÊNCIA: Se não houver promessas explícitas, identifique a principal intenção política ou projeto mencionado.
     5. ESPECIFICIDADE: Identifique riscos concretos de descumprimento.
+    6. FOCO EM CONTRASTE: Se houver dados de histórico legislativo, use-os para validar ou refutar a promessa.
     
     SISTEMA DE VEREDITO:
     Para cada análise, identifique os fatos principais e os obstáculos (por que isso pode dar errado).
@@ -94,7 +95,7 @@ export class AIService {
           ],
           model: model,
           jsonMode: true
-        }, { timeout: 10000 }); // Reduzido para 10s para acelerar fallback entre modelos gratuitos
+        }, { timeout: 15000 });
 
         let content = response.data;
         
@@ -103,10 +104,7 @@ export class AIService {
         }
 
         if (typeof content === 'string') {
-          // Limpeza agressiva de markdown e textos extras
           let cleanContent = content.trim();
-          
-          // Se o conteúdo começar com markdown, extrair apenas o JSON
           const jsonMatch = cleanContent.match(/\{[\s\S]*\}/);
           if (jsonMatch) {
             cleanContent = jsonMatch[0];
@@ -114,7 +112,6 @@ export class AIService {
           
           try {
             const parsed = JSON.parse(cleanContent);
-            // Garantir que os novos campos existam
             if (!parsed.verdict) {
               parsed.verdict = { facts: [], skepticism: [] };
             }
@@ -132,7 +129,6 @@ export class AIService {
         }
         
         if (content && content.promises) {
-          // Garantir que os novos campos existam
           const result = content as AIAnalysisResult;
           if (!result.verdict) {
             result.verdict = { facts: [], skepticism: [] };
@@ -147,12 +143,13 @@ export class AIService {
         throw new Error(`Modelo ${model} não gerou a profundidade esperada`);
       } catch (error) {
         logError(`[AI] Falha na tentativa com ${model}`, error as Error);
+        lastError = error;
         continue;
       }
     }
 
-    logError('[AI] Todos os modelos de alta qualidade falharam. Abortando análise para evitar dados imprecisos.');
-    throw new Error('Não foi possível gerar uma análise técnica precisa devido à instabilidade nos provedores de IA. Por favor, tente novamente em instantes.');
+    logError('[AI] Todos os modelos de alta qualidade falharam.');
+    throw new Error('Não foi possível gerar uma análise técnica precisa devido à instabilidade nos provedores de IA.');
   }
 
   async analyzeText(text: string): Promise<AIAnalysisResult> {
@@ -178,7 +175,6 @@ export class AIService {
         const jsonMatch = result.match(/\{[\s\S]*\}/);
         if (jsonMatch) {
           const parsed = JSON.parse(jsonMatch[0]);
-          // Garantir campos obrigatórios
           if (!parsed.verdict) parsed.verdict = { facts: [], skepticism: [] };
           if (parsed.promises) {
             parsed.promises = parsed.promises.map((p: any) => ({
@@ -245,7 +241,7 @@ export class AIService {
             { role: 'user', content: prompt }
           ],
           model: model
-        }, { timeout: 10000 }); // Reduzido para 10s para acelerar fallback entre modelos gratuitos
+        }, { timeout: 15000 });
 
         if (response.data && typeof response.data === 'string') {
           return response.data;

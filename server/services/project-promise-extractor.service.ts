@@ -17,14 +17,19 @@ export interface ExtractedProjectPromise {
  */
 export class ProjectPromiseExtractorService {
   
-  async extractFromProject(project: { id: string, sigla: string, numero: string, ano: string, ementa: string }): Promise<ExtractedProjectPromise[]> {
-    logInfo(`[ProjectExtractor] Extraindo promessas do projeto: ${project.sigla} ${project.numero}/${project.ano}`);
+  async extractFromProject(project: any): Promise<ExtractedProjectPromise[]> {
+    const sigla = project.sigla || project.siglaTipo || 'PL';
+    const numero = project.numero || project.id || 'S/N';
+    const ano = project.ano || new Date().getFullYear();
+    const ementa = project.ementa || project.descricao || 'Sem ementa disponível';
+
+    logInfo(`[ProjectExtractor] Extraindo promessas do projeto: ${sigla} ${numero}/${ano}`);
 
     const prompt = `
       Analise a ementa deste Projeto de Lei e extraia a principal "promessa" ou "compromisso público" que o autor está assumindo ao propor esta lei.
       
-      Projeto: ${project.sigla} ${project.numero}/${project.ano}
-      Ementa: ${project.ementa}
+      Projeto: ${sigla} ${numero}/${ano}
+      Ementa: ${ementa}
       
       Responda em formato JSON:
       {
@@ -49,8 +54,8 @@ export class ProjectPromiseExtractorService {
       return aiResponse.promises.map((p: any) => ({
         text: p.text,
         category: p.category,
-        projectId: project.id,
-        projectTitle: `${project.sigla} ${project.numero}/${project.ano}`,
+        projectId: String(project.id || numero),
+        projectTitle: `${sigla} ${numero}/${ano}`,
         intent: p.intent || 'N/A',
         impact: p.impact || 'N/A'
       }));

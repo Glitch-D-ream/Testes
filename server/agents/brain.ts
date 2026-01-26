@@ -154,11 +154,18 @@ export class BrainAgent {
     if (projects.length > 0) {
       logInfo(`[Brain] Extraindo promessas técnicas de ${projects.length} projetos para ${cleanName}`);
       // Processar sequencialmente para evitar rate limit em provedores gratuitos
-      for (const p of projects.slice(0, 2)) {
+      const projectsToAnalyze = projects.slice(0, 2);
+      for (let i = 0; i < projectsToAnalyze.length; i++) {
+        const p = projectsToAnalyze[i];
         try {
+          logInfo(`[Brain] Processando projeto ${i + 1}/${projectsToAnalyze.length}: ${p.sigla || 'PL'} ${p.numero || p.id}`);
           const extracted = await projectPromiseExtractorService.extractFromProject(p);
           if (extracted && extracted.length > 0) {
             technicalPromises.push(...extracted);
+          }
+          // Pequeno delay para evitar rate limit agressivo
+          if (i < projectsToAnalyze.length - 1) {
+            await new Promise(resolve => setTimeout(resolve, 2000));
           }
         } catch (e) {
           logWarn(`[Brain] Falha ao extrair promessas do projeto ${p.id}. Pulando...`);
