@@ -26,7 +26,7 @@ export interface Vote {
 export async function getDeputadoId(nome: string): Promise<number | null> {
   try {
     const cacheKey = `deputado_id_${nome}`;
-    const cached = await getPublicDataCache('CAMARA', cacheKey);
+    const cached = await getPublicDataCache(cacheKey, 'CAMARA');
     if (cached) return cached.id;
 
     const response = await axios.get(`${CAMARA_API_BASE}/deputados`, {
@@ -35,7 +35,7 @@ export async function getDeputadoId(nome: string): Promise<number | null> {
 
     const deputado = response.data.dados[0];
     if (deputado) {
-      await savePublicDataCache('CAMARA', cacheKey, { id: deputado.id });
+      await savePublicDataCache(cacheKey, 'CAMARA', { id: deputado.id });
       return deputado.id;
     }
     return null;
@@ -51,7 +51,7 @@ export async function getDeputadoId(nome: string): Promise<number | null> {
 export async function getVotacoesDeputado(deputadoId: number): Promise<Vote[]> {
   try {
     const cacheKey = `votacoes_v6_${deputadoId}`;
-    const cached = await getPublicDataCache('CAMARA', cacheKey);
+    const cached = await getPublicDataCache(cacheKey, 'CAMARA');
     if (cached) return cached;
 
     // Buscar votações recentes (sem filtro de data para evitar erro 400)
@@ -95,7 +95,7 @@ export async function getVotacoesDeputado(deputadoId: number): Promise<Vote[]> {
     }
 
     if (votosEncontrados.length > 0) {
-      await savePublicDataCache('CAMARA', cacheKey, votosEncontrados);
+      await savePublicDataCache(cacheKey, 'CAMARA', votosEncontrados);
     }
     return votosEncontrados;
   } catch (error) {
@@ -144,7 +144,7 @@ export function analisarIncoerencia(promessa: string, voto: Vote): { incoerente:
 export async function getProposicoesDeputado(deputadoId: number): Promise<any[]> {
   try {
     const cacheKey = `proposicoes_camara_${deputadoId}`;
-    const cached = await getPublicDataCache('CAMARA', cacheKey);
+    const cached = await getPublicDataCache(cacheKey, 'CAMARA');
     if (cached) return cached;
 
     const response = await axios.get(`${CAMARA_API_BASE}/proposicoes`, {
@@ -161,7 +161,7 @@ export async function getProposicoesDeputado(deputadoId: number): Promise<any[]>
       url: `https://www.camara.leg.br/proposicoesWeb/fichadetramitacao?idProposicao=${p.id}`
     }));
 
-    await savePublicDataCache('CAMARA', cacheKey, proposicoes);
+    await savePublicDataCache(cacheKey, 'CAMARA', proposicoes);
     return proposicoes;
   } catch (error) {
     logger.error(`[Camara] Erro ao buscar proposições do deputado ${deputadoId}: ${error}`);

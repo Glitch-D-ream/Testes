@@ -82,10 +82,15 @@ export class BrainAgent {
           state = data.IdentificacaoParlamentar.UfParlamentar;
         } catch (e) { logWarn(`[Brain] Erro ao buscar perfil no Senado para ${politicianName}`); }
       } else {
-        office = canonical.office;
-        party = canonical.party;
-        state = canonical.state;
+        office = canonical.office || office;
+        party = canonical.party || party;
+        state = canonical.state || state;
       }
+      
+      // Fallback final: Se as APIs falharam mas temos dados no canônico, use-os
+      if (party === 'N/A' && canonical.party) party = canonical.party;
+      if (state === 'N/A' && canonical.state) state = canonical.state;
+      if (office === 'Político' && canonical.office) office = canonical.office;
     }
 
     const mainCategory = this.detectMainCategory(sources);
@@ -222,12 +227,21 @@ export class BrainAgent {
 
   private async saveAnalysis(data: any, userId: string | null, existingId: string | null) {
     const supabase = getSupabase();
+    
+    // Garantir que a estrutura de data_sources seja compatível com o frontend
+    const legacyDataSources = {
+      ...data,
+      politician: data.politician || { office: 'Político', party: 'N/A', state: 'N/A' },
+      budgetVerdict: data.budgetVerdict || 'N/A',
+      consistencyScore: data.consistencyScore || 0
+    };
+
     const analysisData = {
       user_id: userId,
       author: data.politicianName,
       text: data.aiAnalysis,
       category: data.mainCategory,
-      data_sources: data,
+      data_sources: legacyDataSources,
       status: 'completed',
       updated_at: new Date().toISOString()
     };
