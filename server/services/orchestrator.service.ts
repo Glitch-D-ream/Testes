@@ -6,7 +6,7 @@
 import { logInfo, logError, logWarn } from '../core/logger.ts';
 import { scoutAgent } from '../agents/scout.ts';
 import { filterAgent } from '../agents/filter.ts';
-import { brainAgent } from '../agents/brain.ts';
+import { BrainAgent } from '../agents/brain.ts';
 import { getSupabase } from '../core/database.ts';
 
 export class OrchestratorService {
@@ -61,6 +61,7 @@ export class OrchestratorService {
         logInfo(`[Orchestrator] [Job:${analysisId}] Filter selecionou ${filteredSources.length} fontes relevantes`);
 
         // FASE 4: Brain - Análise Profunda
+        const brainAgent = new BrainAgent();
         await brainAgent.analyze(politicianName, filteredSources, userId, analysisId);
         
         logInfo(`[Orchestrator] [Job:${analysisId}] Análise concluída com sucesso.`);
@@ -135,6 +136,7 @@ export class OrchestratorService {
           throw new Error('Nenhuma promessa foi detectada nos resultados.');
         }
 
+        const brainAgent = new BrainAgent();
         await brainAgent.analyze(politicianName, filteredSources, userId, analysisId);
         
         logInfo(`[Orchestrator] [Job:${analysisId}] Análise contextualizada concluída.`);

@@ -35,7 +35,8 @@ export class BrainAgent {
   }
 
   private async generateOfficialProfile(politicianName: string, sources: FilteredSource[]) {
-    logInfo(`[Brain] Gerando Perfil Oficial para ${politicianName}`);
+    const cleanName = politicianName.trim();
+    logInfo(`[Brain] Gerando Perfil Oficial para ${cleanName}`);
     
     const supabase = getSupabase();
     
@@ -43,7 +44,7 @@ export class BrainAgent {
     let { data: canonical } = await supabase
       .from('canonical_politicians')
       .select('*')
-      .ilike('name', politicianName)
+      .ilike('name', cleanName)
       .single();
 
     // Se não encontrar, tentar uma busca mais flexível
@@ -51,7 +52,7 @@ export class BrainAgent {
       const { data: searchResults } = await supabase
         .from('canonical_politicians')
         .select('*')
-        .ilike('name', `%${politicianName}%`)
+        .ilike('name', `%${cleanName}%`)
         .limit(1);
       if (searchResults && searchResults.length > 0) {
         canonical = searchResults[0];
@@ -186,7 +187,7 @@ export class BrainAgent {
       integrityHash: Math.random().toString(36).substring(7).toUpperCase()
     };
 
-    const finalName = canonical?.name || politicianName;
+    const finalName = canonical?.name || cleanName;
 
     return {
       politicianName: finalName,
