@@ -11,9 +11,7 @@ import {
   Calendar,
   User as UserIcon,
   Tag as TagIcon,
-  Image as ImageIcon,
-  ShieldCheck,
-  ZapOff
+  ShieldCheck
 } from 'lucide-react';
 import { ViabilityThermometer } from '../components/ViabilityThermometer';
 import { PromiseCard } from '../components/PromiseCard';
@@ -90,11 +88,10 @@ export default function Analysis() {
         </div>
       </div>
     );
-  const results = analysis?.data_sources || analysis?.results || {};
-  // A GRANDE SIMPLIFICAÇÃO: Sempre tratar como perfil oficial por enquanto
-  const isOfficialOnly = true; 
-  const promises = data.promises || [];
+  }
 
+  const results = data.data_sources || data.results || {};
+  
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 pb-20">
       {/* Top Bar */}
@@ -153,7 +150,7 @@ export default function Analysis() {
                   <ShieldCheck size={12} /> Perfil Validado
                 </span>
                 <span className="px-3 py-1 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 text-xs font-bold rounded-full uppercase tracking-wider flex items-center gap-1">
-                  <Calendar size={12} /> {new Date(data.createdAt || '').toLocaleDateString('pt-BR')}
+                  <Calendar size={12} /> {new Date(data.created_at || '').toLocaleDateString('pt-BR')}
                 </span>
               </div>
 
@@ -164,7 +161,7 @@ export default function Analysis() {
               <div className="flex flex-wrap gap-6 text-sm text-slate-500 mb-8 border-y border-slate-100 dark:border-slate-800 py-4">
                 <div className="flex items-center gap-2">
                   <UserIcon size={16} className="text-blue-500" />
-                  <span className="font-medium">{results.politician?.role || 'N/A'}</span>
+                  <span className="font-medium">{results.politician?.office || 'N/A'}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <TagIcon size={16} className="text-blue-500" />
@@ -250,7 +247,7 @@ export default function Analysis() {
           {/* Sidebar Column */}
           <div className="lg:col-span-4 space-y-6">
             <div className="sticky top-24">
-              <ViabilityThermometer score={(data.probabilityScore || 0) / 100} />
+              <ViabilityThermometer score={(data.probability_score || 0) / 100} />
               
               <div className="mt-6 bg-white dark:bg-slate-900 rounded-2xl p-6 border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
                 <h3 className="font-bold text-sm uppercase tracking-wider text-slate-400">Confiança dos Dados</h3>
