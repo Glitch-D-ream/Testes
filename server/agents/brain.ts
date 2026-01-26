@@ -1,9 +1,9 @@
-import { logInfo, logError, logWarn } from '../core/logger.ts';
 import { getSupabase } from '../core/database.ts';
 import { aiService } from '../services/ai.service.ts';
 import { validateBudgetViability, mapPromiseToSiconfiCategory } from '../integrations/siconfi.ts';
 import { temporalIncoherenceService } from '../services/temporal-incoherence.service.ts';
 import { FilteredSource } from './filter.ts';
+import { logInfo, logError, logWarn } from '../core/logger.ts';
 import axios from 'axios';
 
 export class BrainAgent {
@@ -50,7 +50,7 @@ export class BrainAgent {
         .eq('status', 'completed')
         .order('created_at', { ascending: false })
         .limit(1)
-        .single();
+        .maybeSingle();
 
       if (cachedAnalysis) {
         const ageInHours = (new Date().getTime() - new Date(cachedAnalysis.created_at).getTime()) / (1000 * 60 * 60);
@@ -67,7 +67,7 @@ export class BrainAgent {
       .from('canonical_politicians')
       .select('*')
       .eq('name', cleanName)
-      .single();
+      .maybeSingle();
 
     if (!canonical) {
       const { data: searchResults } = await supabase
@@ -183,11 +183,12 @@ export class BrainAgent {
   }
 
   private detectMainCategory(sources: FilteredSource[]): string {
-    const text = sources.map(s => s.content).join(' ').toLowerCase();
-    if (text.includes('saúde') || text.includes('médico') || text.includes('hospital')) return 'SAUDE';
-    if (text.includes('educação') || text.includes('escola') || text.includes('ensino')) return 'EDUCACAO';
-    if (text.includes('segurança') || text.includes('polícia') || text.includes('crime')) return 'SEGURANCA';
-    if (text.includes('economia') || text.includes('imposto') || text.includes('emprego')) return 'ECONOMIA';
+    const text = sources.map(s => (s.content || '') + ' ' + (s.title || '')).join(' ').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    if (text.includes('saude') || text.includes('medico') || text.includes('hospital') || text.includes('clinica') || text.includes('sus')) return 'SAUDE';
+    if (text.includes('educacao') || text.includes('escola') || text.includes('ensino') || text.includes('universidade') || text.includes('creche')) return 'EDUCACAO';
+    if (text.includes('seguranca') || text.includes('policia') || text.includes('crime') || text.includes('violencia') || text.includes('guarda')) return 'SEGURANCA';
+    if (text.includes('economia') || text.includes('imposto') || text.includes('emprego') || text.includes('fiscal') || text.includes('tributo') || text.includes('investimento')) return 'ECONOMIA';
+    if (text.includes('infraestrutura') || text.includes('obra') || text.includes('estrada') || text.includes('ponte') || text.includes('asfalto')) return 'INFRAESTRUTURA';
     return 'GERAL';
   }
 

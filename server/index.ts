@@ -53,19 +53,19 @@ app.use(express.static(clientBuildPath));
 
 // Inicializar aplicação
 (async () => {
-  console.log('[Detector de Promessa Vazia] Iniciando processo de inicialização...');
-  console.log(`[Detector de Promessa Vazia] NODE_ENV: ${process.env.NODE_ENV}`);
-  console.log(`[Detector de Promessa Vazia] PORT: ${PORT}`);
-  console.log(`[Detector de Promessa Vazia] Client Build Path: ${clientBuildPath}`);
+  console.log('[Seth VII] Iniciando processo de inicialização...');
+  console.log(`[Seth VII] NODE_ENV: ${process.env.NODE_ENV}`);
+  console.log(`[Seth VII] PORT: ${PORT}`);
+  console.log(`[Seth VII] Client Build Path: ${clientBuildPath}`);
 
   try {
     // Inicializar banco de dados
-    console.log('[Detector de Promessa Vazia] Inicializando banco de dados...');
+    console.log('[Seth VII] Inicializando banco de dados...');
     await initializeDatabase();
-    console.log('[Detector de Promessa Vazia] Banco de dados inicializado.');
+    console.log('[Seth VII] Banco de dados inicializado.');
 
     // Configurar rotas da API
-    console.log('[Detector de Promessa Vazia] Configurando rotas...');
+    console.log('[Seth VII] Configurando rotas...');
     setupRoutes(app);
 
     // Rota de teste direto para verificar se o Express responde
@@ -82,11 +82,11 @@ app.use(express.static(clientBuildPath));
 
     // Iniciar servidor - Forçando 0.0.0.0 para garantir que o Railway consiga rotear o tráfego
     const server = app.listen(Number(PORT), '0.0.0.0', () => {
-      console.log(`[Detector de Promessa Vazia] Servidor ouvindo em 0.0.0.0:${PORT}`);
+      console.log(`[Seth VII] Servidor ouvindo em 0.0.0.0:${PORT}`);
       
       // Configurar webhook do Telegram se as variáveis estiverem definidas
       if (process.env.TELEGRAM_BOT_TOKEN && process.env.WEBHOOK_DOMAIN) {
-        console.log('[Detector de Promessa Vazia] Configurando webhook do Telegram...');
+        console.log('[Seth VII] Configurando webhook do Telegram...');
         telegramWebhookService.setWebhook().catch(err => 
           console.error('Erro ao configurar webhook do Telegram:', err)
         );
@@ -94,11 +94,11 @@ app.use(express.static(clientBuildPath));
     });
 
     server.on('error', (err) => {
-      console.error('[Detector de Promessa Vazia] Erro no servidor HTTP:', err);
+      console.error('[Seth VII] Erro no servidor HTTP:', err);
     });
 
   } catch (error) {
-    console.error('[Detector de Promessa Vazia] Erro FATAL ao inicializar:', error);
+    console.error('[Seth VII] Erro FATAL ao inicializar:', error);
     process.exit(1);
   }
 })();
