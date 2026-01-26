@@ -39,7 +39,7 @@ export interface PoliticalHistory {
 export async function getPoliticalHistory(candidateName: string, state: string): Promise<PoliticalHistory | null> {
   try {
     const cacheKey = `history_${candidateName}_${state}`;
-    const cached = await getPublicDataCache(cacheKey, 'TSE');
+    const cached = await getPublicDataCache('TSE', cacheKey);
     if (cached) return cached;
 
     logger.info(`[TSE] Buscando histórico: ${candidateName}`);
@@ -65,7 +65,7 @@ export async function getPoliticalHistory(candidateName: string, state: string):
         controversies: 0,
         scandals: 0
       };
-      await savePublicDataCache(cacheKey, 'TSE', history);
+      await savePublicDataCache('TSE', cacheKey, history);
       return history;
     }
 

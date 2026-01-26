@@ -92,6 +92,11 @@ export class BrainAgent {
       if (party === 'N/A' && canonical.party) party = canonical.party;
       if (state === 'N/A' && canonical.state) state = canonical.state;
       if (office === 'Político' && canonical.office) office = canonical.office;
+    } else {
+      // Se não é canônico, tenta extrair das fontes ou mantém padrão
+      office = 'Político';
+      party = 'N/A';
+      state = 'N/A';
     }
 
     const mainCategory = this.detectMainCategory(sources);
@@ -240,6 +245,7 @@ export class BrainAgent {
     const analysisData = {
       user_id: userId,
       author: data.politicianName,
+      politician_name: data.politicianName,
       text: data.aiAnalysis,
       category: data.mainCategory,
       data_sources: legacyDataSources,

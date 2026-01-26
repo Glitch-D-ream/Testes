@@ -44,7 +44,7 @@ export async function getBudgetData(
 ): Promise<BudgetData | null> {
   try {
     const cacheKey = `${category}_${year}_${sphere}`;
-    const cached = await getPublicDataCache(cacheKey, 'SICONFI');
+    const cached = await getPublicDataCache('SICONFI', cacheKey);
     if (cached) {
       return { ...cached, lastUpdated: new Date(cached.lastUpdated) };
     }
@@ -106,7 +106,7 @@ export async function getBudgetData(
       }
     };
 
-    await savePublicDataCache(cacheKey, 'SICONFI', result);
+    await savePublicDataCache('SICONFI', cacheKey, result);
     return result;
   } catch (error) {
     logger.error(`[SICONFI] Erro ao buscar dados: ${error}`);
