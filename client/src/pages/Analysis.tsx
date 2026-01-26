@@ -93,7 +93,8 @@ export default function Analysis() {
   }
 
   const results = data.results || {};
-  const isOfficialOnly = results.status === 'official_profile_only';
+  // A GRANDE SIMPLIFICAÇÃO: Sempre tratar como perfil oficial por enquanto
+  const isOfficialOnly = true; 
   const promises = data.promises || [];
 
   return (
@@ -129,18 +130,19 @@ export default function Analysis() {
       </div>
 
       <main className="max-w-5xl mx-auto px-4 pt-8">
-        {/* Status Banner */}
-        {isOfficialOnly && (
-          <div className="mb-8 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-2xl p-4 flex items-center gap-4">
-            <div className="p-2 bg-amber-100 dark:bg-amber-900/40 text-amber-600 rounded-xl">
-              <ZapOff size={24} />
-            </div>
-            <div>
-              <h3 className="font-bold text-amber-800 dark:text-amber-200">Análise de IA Indisponível</h3>
-              <p className="text-sm text-amber-700 dark:text-amber-300">Exibindo apenas o <strong>Perfil Oficial</strong> baseado em dados governamentais crus. Nenhuma evidência textual válida foi encontrada para análise profunda.</p>
-            </div>
+        {/* Status Banner - A GRANDE SIMPLIFICAÇÃO */}
+        <div className="mb-8 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-2xl p-4 flex items-center gap-4">
+          <div className="p-2 bg-blue-100 dark:bg-blue-900/40 text-blue-600 rounded-xl">
+            <ShieldCheck size={24} />
           </div>
-        )}
+          <div>
+            <h3 className="font-bold text-blue-800 dark:text-blue-200">Modo de Auditoria Oficial Ativo</h3>
+            <p className="text-sm text-blue-700 dark:text-blue-300">
+              O Seth VII está operando no modo de <strong>Alta Credibilidade</strong>. 
+              Análises de notícias foram suspensas para priorizar dados puros da Câmara, Senado e Tesouro Nacional.
+            </p>
+          </div>
+        </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
           

@@ -17,16 +17,9 @@ export class BrainAgent {
       // FLUXO 1: Perfil Oficial (SEMPRE ATIVO - Sem IA)
       const officialProfile = await this.generateOfficialProfile(politicianName, sources);
       
-      // FLUXO 2: Análise de Intenção (OPCIONAL - Com IA)
-      // Só roda se houver fontes válidas e o político for identificado
-      let aiAnalysis = null;
-      const validSources = sources.filter(s => s.source !== 'Generic Fallback' && s.content && s.content.length > 50);
-      
-      if (validSources.length > 0) {
-        aiAnalysis = await this.generateAIAnalysis(politicianName, validSources, officialProfile);
-      } else {
-        logWarn(`[Brain] Fontes insuficientes para análise de IA em ${politicianName}.`);
-      }
+      // A GRANDE SIMPLIFICAÇÃO: Análise de Intenção suspensa para recalibragem
+      let aiAnalysis = "Análise de promessas em discursos e notícias está temporariamente suspensa para recalibragem técnica. Foco atual em dados legislativos e orçamentários oficiais.";
+      logInfo(`[Brain] Modo Simplificado: Usando apenas dados oficiais para ${politicianName}.`);
 
       // Consolidação dos Resultados
       const finalResult = this.consolidateResults(officialProfile, aiAnalysis);
@@ -51,13 +44,13 @@ export class BrainAgent {
     const siconfiCategory = mapPromiseToSiconfiCategory(mainCategory);
     const currentYear = new Date().getFullYear();
     
-    // Dados Governamentais Crus
+    // Dados Governamentais Crus (SICONFI)
     const budgetViability = await validateBudgetViability(siconfiCategory, 500000000, currentYear - 1);
     const pibViability = await validateValueAgainstPIB(500000000);
     
-    // Histórico Legislativo (Diz vs Faz)
-    const promiseTexts = sources.map(s => s.content).filter(c => c && c.length > 0);
-    const temporalAnalysis = await temporalIncoherenceService.analyzeIncoherence(politicianName, promiseTexts);
+    // Histórico Legislativo (Câmara/Senado)
+    // A GRANDE SIMPLIFICAÇÃO: Analisar projetos de lei reais em vez de promessas de notícias
+    const temporalAnalysis = await temporalIncoherenceService.analyzeIncoherence(politicianName, []);
 
     return {
       politicianName,
@@ -65,7 +58,9 @@ export class BrainAgent {
       budgetViability,
       pibViability,
       temporalAnalysis,
-      timestamp: new Date().toISOString()
+      legislativeSummary: temporalAnalysis.summary,
+      timestamp: new Date().toISOString(),
+      dataSource: "Dados Abertos (Câmara/Senado/Tesouro Nacional)"
     };
   }
 
