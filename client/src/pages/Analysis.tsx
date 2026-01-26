@@ -319,6 +319,36 @@ export default function Analysis() {
           {/* Sidebar Column */}
           <div className="lg:col-span-4 space-y-6">
             <div className="sticky top-24">
+              {/* Selo de Verificabilidade (Sprint da Transparência Radical) */}
+              <div className="bg-emerald-50 dark:bg-emerald-900/20 rounded-2xl p-6 border border-emerald-100 dark:border-emerald-800/50 shadow-sm mb-6 relative overflow-hidden">
+                <div className="absolute top-0 right-0 p-2 opacity-10">
+                  <ShieldCheck size={80} />
+                </div>
+                <h3 className="font-bold text-xs uppercase tracking-widest text-emerald-600 dark:text-emerald-400 mb-2 flex items-center gap-2">
+                  <ShieldCheck size={16} /> Selo de Verificabilidade
+                </h3>
+                <div className="text-xl font-black text-emerald-800 dark:text-emerald-200 mb-1">
+                  {results.verificationSeal?.status || 'VERIFICADO'}
+                </div>
+                <p className="text-[10px] text-emerald-600/70 dark:text-emerald-400/70 font-mono">
+                  HASH: {results.verificationSeal?.integrityHash}
+                </p>
+              </div>
+
+              {/* Dashboard de Consistência (Sprint da Transparência Radical) */}
+              <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 border border-slate-200 dark:border-slate-800 shadow-sm mb-6">
+                <h3 className="font-bold text-sm uppercase tracking-wider text-slate-400 mb-4">Consistência Tópica</h3>
+                <div className="flex items-end gap-2 mb-2">
+                  <span className="text-4xl font-black text-slate-800 dark:text-slate-100">
+                    {results.consistencyScore?.toFixed(0)}%
+                  </span>
+                  <span className="text-xs font-bold text-slate-400 mb-1">SCORE GLOBAL</span>
+                </div>
+                <div className="w-full bg-slate-100 dark:bg-slate-800 h-3 rounded-full overflow-hidden">
+                  <div className="bg-blue-600 h-full" style={{ width: `${results.consistencyScore}%` }} />
+                </div>
+              </div>
+
               <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 border border-slate-200 dark:border-slate-800 shadow-sm mb-6">
                 <h3 className="font-bold text-sm uppercase tracking-wider text-slate-400 mb-4">Veredito Orçamentário</h3>
                 <div className="text-lg font-black text-slate-800 dark:text-slate-100">

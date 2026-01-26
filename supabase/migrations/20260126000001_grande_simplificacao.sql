@@ -19,8 +19,10 @@ CREATE TABLE IF NOT EXISTS canonical_politicians (
 -- 2. Inserir os 20 Políticos Canônicos (Exemplos Iniciais)
 INSERT INTO canonical_politicians (name, office, party, state, camara_id, senado_id)
 VALUES 
-('Erika Hilton', 'Deputado Federal', 'PSOL', 'SP', 220593, NULL),
-('Nikolas Ferreira', 'Deputado Federal', 'PL', 'MG', 220538, NULL),
+("Erika Hilton", "Deputado Federal", "PSOL", "SP", 220593, NULL),
+("Nikolas Ferreira", "Deputado Federal", "PL", "MG", 220538, NULL),
+("Arthur Lira", "Deputado Federal", "PP", "AL", 160541, NULL),
+("Rodrigo Pacheco", "Senador", "PSD", "MG", NULL, 5894),
 ('Jones Manoel', 'Político', 'PCB', 'PE', NULL, NULL),
 ('Luiz Inácio Lula da Silva', 'Presidente', 'PT', 'SP', NULL, NULL),
 ('Jair Bolsonaro', 'Ex-Presidente', 'PL', 'RJ', NULL, NULL),
