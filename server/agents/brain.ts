@@ -4,6 +4,7 @@ import { validateBudgetViability, mapPromiseToSiconfiCategory } from '../integra
 import { temporalIncoherenceService } from '../services/temporal-incoherence.service.ts';
 import { negativeEvidenceService } from '../services/negative-evidence.service.ts';
 import { projectPromiseExtractorService } from '../services/project-promise-extractor.service.ts';
+import { governmentPlanExtractorService } from '../services/government-plan-extractor.service.ts';
 import { FilteredSource } from './filter.ts';
 import { logInfo, logError, logWarn } from '../core/logger.ts';
 import axios from 'axios';
@@ -23,14 +24,17 @@ export class BrainAgent {
       Veredito Orçamentário: ${dataSources.budgetVerdict}.
       Resumo: ${dataSources.budgetSummary}.
       
-      ANÁLISE DE CONTRASTE E INAÇÃO (Diz vs Faz):
-      - Score de Ausência de Esforço: ${dataSources.contrastAnalysis.negativeEvidenceScore}/100.
-      - Janela de Observação: 365 dias (Histórico Recente).
+      ANÁLISE DE ATIVIDADE LEGISLATIVA:
       - Projetos Relevantes Encontrados: ${dataSources.contrastAnalysis.details.relevantProjectsFound}.
       - Votações Relevantes Encontradas: ${dataSources.contrastAnalysis.details.relevantVotesFound}.
-      - Veredito de Inação: ${dataSources.contrastAnalysis.negativeEvidenceScore > 80 ? 'INAÇÃO SUSTENTADA DETECTADA' : 'Ação Legislativa Identificada'}.
-      - Explicação: ${dataSources.contrastAnalysis.details.explanation}.
+      - Histórico Recente (365 dias): ${dataSources.contrastAnalysis.negativeEvidenceScore > 80 ? 'Nenhum registro oficial encontrado para este tema.' : 'Atividade oficial identificada.'}
+      - Detalhes Técnicos: ${dataSources.contrastAnalysis.details.explanation}.
       
+      PLANOS DE GOVERNO OFICIAIS (TSE):
+      ${dataSources.govPlanPromises && dataSources.govPlanPromises.length > 0 
+        ? dataSources.govPlanPromises.map((p: any) => `- [OFICIAL] ${p.text} (Fonte: ${p.source})`).join('\n')
+        : 'Nenhum plano de governo oficial processado.'}
+
       EVENTOS DECLARATIVOS (Scout):
       ${sources.length > 0 
         ? sources.map(s => `- [Camada ${s.credibilityLayer}] ${s.title} (Força: ${s.promiseStrength})`).join('\n')
@@ -39,9 +43,9 @@ export class BrainAgent {
       DIRETRIZ DE STATUS: Se uma promessa for detectada no Scout (Camada B ou C) mas não tiver PL correspondente (Camada A), classifique-a como "PROMESSA NÃO FORMALIZADA".
       
       DIRETRIZ DE AUDITORIA: 
-      1. Se o Score de Ausência for alto (>80), o "vazio" é o seu dado principal. Não diga "não encontramos dados", diga "após análise do histórico legislativo, detectamos um SILÊNCIO ESTRUTURAL sobre este tema".
-      2. Transforme a falta de projetos em uma evidência de despriorização política.
-      3. O tempo é sua arma: destaque que em um ano de observação, o político produziu zero sinal sobre a promessa.
+      1. Relate objetivamente o que foi encontrado e o que não foi encontrado.
+      2. Se não houver dados oficiais (PLs, votações) sobre o tema, informe que não há registros legislativos vinculados ao político para este assunto no período analisado.
+      3. Evite adjetivos ou julgamentos de valor sobre a "inaçao". Deixe que os fatos (ou a ausência deles) falem por si.
       
       PROMESSAS TÉCNICAS EXTRAÍDAS DE PROJETOS:
       ${dataSources.technicalPromises && dataSources.technicalPromises.length > 0 
@@ -55,16 +59,22 @@ export class BrainAgent {
       // Adicionar instrução de JSON ao prompt para garantir extração estruturada
       const enhancedPrompt = `${reportPrompt}
       
+      REGRAS DE INTEGRIDADE (ANTI-ALUCINAÇÃO):
+      1. NÃO invente projetos, leis ou números.
+      2. Se o campo "Projetos Relevantes Encontrados" for 0, você NÃO PODE dizer que o político propôs algo sobre o tema.
+      3. Se não houver dados oficiais, relate o que foi encontrado nos "EVENTOS DECLARATIVOS" (notícias) de forma cautelosa, deixando claro que são intenções e não ações formalizadas.
+      4. Baseie-se ESTRITAMENTE nos dados fornecidos acima. Se o resultado for "vazio", explique POR QUE (ex: o político ocupa cargo executivo e não legislativo, ou o tema é novo no debate público).
+      
       IMPORTANTE: Sua resposta deve ser OBRIGATORIAMENTE um objeto JSON válido. 
       Não inclua textos fora do JSON.
       
-      POSTURA ANALÍTICA: Você não é apenas um assistente, você é um AUDITOR. 
-      Se o político não fez nada, seu relatório deve ser incisivo sobre esse "vazio". 
-      O silêncio legislativo é uma escolha política, e você deve reportá-la como tal.
+      POSTURA ANALÍTICA: Você é um analista de dados imparcial e cético. 
+      Seu objetivo é fornecer um relatório baseado em evidências reais. 
+      Se não houver evidências, relate a ausência de dados de forma técnica e neutra.
       
       Estrutura esperada:
       {
-        "report": "Seu parecer técnico completo em Markdown aqui. Use títulos como 'Veredito de Inação' se o score for alto.",
+        "report": "Seu parecer técnico completo em Markdown aqui.",
         "promises": [
           {
             "text": "Descrição da promessa ou compromisso identificado",
@@ -76,7 +86,7 @@ export class BrainAgent {
         ]
       }
       
-      Se não encontrar promessas explícitas, denuncie a falta de compromisso formalizado no tema analisado.`;
+      Se não encontrar promessas explícitas, informe que não foram identificados compromissos formais nos dados processados.`;
 
       const aiResponseRaw = await aiService.generateReport(enhancedPrompt);
       let aiAnalysis = aiResponseRaw;
@@ -227,6 +237,15 @@ export class BrainAgent {
     // Análise de Contraste (Evidência Negativa)
     const contrastAnalysis = await negativeEvidenceService.analyzeContrast(cleanName, sources[0]?.content || 'Geral', mainCategory);
 
+    // 2.5 Extrair Promessas do Plano de Governo (TSE)
+    let govPlanPromises: any[] = [];
+    try {
+      govPlanPromises = await governmentPlanExtractorService.extractFromTSE(cleanName, state !== 'N/A' ? state : 'BR');
+      logInfo(`[Brain] Promessas do Plano de Governo encontradas: ${govPlanPromises.length}`);
+    } catch (e) {
+      logWarn(`[Brain] Falha ao extrair plano de governo: ${e}`);
+    }
+
     // Extrair promessas técnicas dos projetos de lei (Bootstrap Automático)
     let technicalPromises: any[] = [];
     if (projects.length > 0) {
@@ -292,6 +311,7 @@ export class BrainAgent {
       budgetVerdict: budgetViability?.verdict || 'Análise indisponível',
       budgetSummary: budgetViability?.summary || 'Dados orçamentários insuficientes para veredito.',
       contrastAnalysis,
+      govPlanPromises,
       technicalPromises,
       projects: projects.slice(0, 5),
       votingHistory: votingHistory.slice(0, 5),

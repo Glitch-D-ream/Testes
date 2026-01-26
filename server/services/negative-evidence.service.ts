@@ -59,9 +59,9 @@ export class NegativeEvidenceService {
       
       let explanation = '';
       if (!evidenceFound) {
-        explanation = `Não foi encontrada nenhuma evidência de esforço legislativo (votos ou projetos) do político ${politicianName} relacionada ao tema "${category}" nos registros oficiais recentes.`;
+        explanation = `Não foram identificados registros de proposições ou votações oficiais do político ${politicianName} vinculados diretamente ao tema "${category}" no período analisado.`;
       } else {
-        explanation = `Foram encontrados ${relevantProjects.length} projetos e ${relevantVotes.length} votações do político ${politicianName} relacionados ao tema "${category}".`;
+        explanation = `Foram identificados ${relevantProjects.length} projetos e ${relevantVotes.length} votações do político ${politicianName} relacionados ao tema "${category}".`;
       }
 
       return {

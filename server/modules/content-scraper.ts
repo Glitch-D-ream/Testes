@@ -79,7 +79,10 @@ export class ContentScraper {
         '.texto-noticia', // Comum em portais brasileiros
         '.materia-conteudo',
         '.entry-content-body',
-        '.news-content'
+        '.news-content',
+        '.article__content',
+        '.story-content',
+        '.node-article'
       ];
 
       let mainContent = '';
@@ -100,11 +103,14 @@ export class ContentScraper {
         // Tentar pegar div.content-text__container p especificamente para G1 se o seletor falhar
         const g1Paragraphs = $('.content-text__container p').map((_, el) => $(el).text().trim()).get();
         const articleParagraphs = $('article p').map((_, el) => $(el).text().trim()).get();
+        const divParagraphs = $('div p').map((_, el) => $(el).text().trim()).get();
         
         if (g1Paragraphs.length > 1) {
           mainContent = g1Paragraphs.join('\n\n');
         } else if (articleParagraphs.length > 1) {
           mainContent = articleParagraphs.join('\n\n');
+        } else if (divParagraphs.length > 5) {
+          mainContent = divParagraphs.filter(p => p.length > 40).join('\n\n');
         } else {
           const allParagraphs = $('p').map((_, el) => $(el).text().trim()).get();
           mainContent = allParagraphs
