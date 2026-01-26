@@ -14,6 +14,8 @@ export interface Vote {
   proposicao: string;
   voto: string;
   ementa: string;
+  orientacao?: string; // Orientação do partido
+  rebeldia?: boolean; // Se votou contra o partido
   incoerencia?: boolean;
   justificativa?: string;
 }
@@ -62,17 +64,35 @@ export async function getVotacoesDeputado(deputadoId: number): Promise<Vote[]> {
     const votosEncontrados: Vote[] = [];
     for (const votacao of responseVotacoes.data.dados) {
       try {
+        // 1. Buscar votos da sessão
         const resVoto = await axios.get(`${CAMARA_API_BASE}/votacoes/${votacao.id}/votos`, {
           headers: { 'Accept': 'application/json' }
         });
+        
+        // 2. Buscar orientações da sessão para ver a do partido
+        const resOrientacao = await axios.get(`${CAMARA_API_BASE}/votacoes/${votacao.id}/orientacoes`, {
+          headers: { 'Accept': 'application/json' }
+        }).catch(() => ({ data: { dados: [] } }));
+
         const votoDoDeputado = resVoto.data.dados.find((v: any) => v.deputado?.id === deputadoId);
+        
         if (votoDoDeputado) {
+          const siglaPartido = votoDoDeputado.deputado?.siglaPartido;
+          const orientacaoPartido = resOrientacao.data.dados.find((o: any) => o.siglaPartidoBloco === siglaPartido)?.orientacaoVoto;
+          
+          // Lógica de Rebeldia: Votou Sim quando partido orientou Não, ou vice-versa
+          const rebeldia = orientacaoPartido && 
+                          ((votoDoDeputado.tipoVoto === 'Sim' && orientacaoPartido === 'Não') || 
+                           (votoDoDeputado.tipoVoto === 'Não' && orientacaoPartido === 'Sim'));
+
           votosEncontrados.push({
             idVotacao: votacao.id,
             data: votacao.dataHoraRegistro,
             proposicao: votacao.proposicaoExterna?.siglaTipo + ' ' + votacao.proposicaoExterna?.numero + '/' + votacao.proposicaoExterna?.ano,
             voto: votoDoDeputado.tipoVoto,
-            ementa: votacao.proposicaoExterna?.ementa || votacao.descricao || 'Sem ementa disponível'
+            ementa: votacao.proposicaoExterna?.ementa || votacao.descricao || 'Sem ementa disponível',
+            orientacao: orientacaoPartido || 'N/A',
+            rebeldia: !!rebeldia
           });
         }
       } catch (e) { continue; }

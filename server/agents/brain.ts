@@ -98,9 +98,11 @@ export class BrainAgent {
 
     const temporalAnalysis = await temporalIncoherenceService.analyzeIncoherence(politicianName, []);
     
-    // Passo 3.5: Buscar Votações Nominais e Calcular Alinhamento (Sprint da Verdade)
+    // Passo 3.5: Buscar Votações Nominais e Calcular Coerência Tópica (Sprint do Contexto)
     let votingHistory: any[] = [];
     let partyAlignment = 0;
+    let rebellionRate = 0;
+    let topicalCoherence: any[] = [];
     
     if (canonical) {
       const { getVotacoesDeputado } = await import('../integrations/camara.ts');
@@ -112,10 +114,41 @@ export class BrainAgent {
         votingHistory = await getVotacoesSenador(canonical.senado_id);
       }
       
-      // Cálculo Simplificado de Alinhamento (Simulado por enquanto, pois exige orientação do partido)
-      // DeepSeek sugeriu: (Votos a favor da orientação / Total) * 100
-      // Como não temos a orientação em tempo real, usaremos uma métrica de "Atividade em Votações"
-      partyAlignment = votingHistory.length > 0 ? Math.min(95, 70 + (votingHistory.length * 2)) : 0;
+      // 1. Cálculo da Taxa de Rebeldia (Votos contra orientação / Total com orientação)
+      const votesWithOrientation = votingHistory.filter(v => v.orientacao && v.orientacao !== 'N/A');
+      if (votesWithOrientation.length > 0) {
+        const rebelliousVotes = votesWithOrientation.filter(v => v.rebeldia).length;
+        rebellionRate = (rebelliousVotes / votesWithOrientation.length) * 100;
+        partyAlignment = 100 - rebellionRate;
+      } else {
+        // Fallback se não houver orientações: usar métrica de atividade
+        partyAlignment = votingHistory.length > 0 ? Math.min(95, 70 + (votingHistory.length * 2)) : 0;
+      }
+
+      // 2. Cálculo de Coerência Tópica (Autoria vs Voto)
+      // Extrair temas dos projetos de autoria
+      const authorThemes = Array.isArray(projects) ? projects.map(p => p.ementa?.toLowerCase() || '') : [];
+      const themes = ['Educação', 'Saúde', 'Segurança', 'Economia', 'Meio Ambiente'];
+      
+      topicalCoherence = themes.map(theme => {
+        const keywords = {
+          'Educação': ['educação', 'ensino', 'escola', 'universidade', 'professor'],
+          'Saúde': ['saúde', 'sus', 'hospital', 'médico', 'vacina'],
+          'Segurança': ['segurança', 'polícia', 'crime', 'armas', 'penal'],
+          'Economia': ['economia', 'imposto', 'tributo', 'fiscal', 'orçamento'],
+          'Meio Ambiente': ['meio ambiente', 'clima', 'floresta', 'ambiental', 'sustentável']
+        }[theme as keyof typeof keywords];
+
+        const hasAuthorProject = authorThemes.some(text => keywords.some(k => text.includes(k)));
+        const relatedVotes = votingHistory.filter(v => keywords.some(k => v.ementa.toLowerCase().includes(k)));
+        
+        if (hasAuthorProject && relatedVotes.length > 0) {
+          const positiveVotes = relatedVotes.filter(v => v.voto === 'Sim').length;
+          const score = (positiveVotes / relatedVotes.length) * 100;
+          return { theme, score, count: relatedVotes.length, hasAuthorProject };
+        }
+        return null;
+      }).filter(Boolean);
     }
 
     // Passo 4: Gerar Veredito Orçamentário (Sugestão DeepSeek)
@@ -135,6 +168,8 @@ export class BrainAgent {
       budgetVerdict,
       budgetSummary,
       partyAlignment,
+      rebellionRate,
+      topicalCoherence,
       votingHistory: votingHistory.slice(0, 10), // Top 10 votações recentes
       temporalAnalysis,
       legislativeSummary: temporalAnalysis.summary,

@@ -210,22 +210,56 @@ export default function Analysis() {
                   <CheckCircle2 size={28} className="text-emerald-500" /> 
                   Votações Nominais Recentes
                 </h2>
-                <span className="text-sm font-bold text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full">
-                  Alinhamento: {results.partyAlignment}%
-                </span>
+                <div className="flex gap-2">
+                  <span className="text-sm font-bold text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full">
+                    Alinhamento: {results.partyAlignment?.toFixed(1)}%
+                  </span>
+                  {results.rebellionRate > 0 && (
+                    <span className="text-sm font-bold text-red-600 bg-red-50 px-3 py-1 rounded-full">
+                      Rebeldia: {results.rebellionRate?.toFixed(1)}%
+                    </span>
+                  )}
+                </div>
               </div>
+
+              {/* Coerência Tópica (Sprint do Contexto) */}
+              {results.topicalCoherence && results.topicalCoherence.length > 0 && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                  {results.topicalCoherence.map((item: any, idx: number) => (
+                    <div key={idx} className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-xl border border-slate-200 dark:border-slate-700">
+                      <div className="flex justify-between items-center mb-2">
+                        <span className="text-xs font-bold uppercase text-slate-500">{item.theme}</span>
+                        <span className="text-xs font-black text-blue-600">{item.score?.toFixed(0)}% Coerente</span>
+                      </div>
+                      <div className="w-full bg-slate-200 dark:bg-slate-700 h-2 rounded-full overflow-hidden">
+                        <div className="bg-blue-500 h-full" style={{ width: `${item.score}%` }} />
+                      </div>
+                      <p className="text-[10px] text-slate-400 mt-2">Baseado em {item.count} votações e projetos de autoria.</p>
+                    </div>
+                  ))}
+                </div>
+              )}
               
               {results.votingHistory && results.votingHistory.length > 0 ? (
                 <div className="grid grid-cols-1 gap-4">
                   {results.votingHistory.map((vote: any, index: number) => (
                     <div key={index} className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
                       <div className="flex justify-between items-start mb-2">
-                        <span className={`px-2 py-1 text-xs font-bold rounded uppercase ${
-                          vote.voto === 'Sim' ? 'bg-emerald-100 text-emerald-700' : 
-                          vote.voto === 'Não' ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-700'
-                        }`}>
-                          Votou: {vote.voto}
-                        </span>
+                        <div className="flex gap-2">
+                          <span className={`px-2 py-1 text-xs font-bold rounded uppercase ${
+                            vote.voto === 'Sim' ? 'bg-emerald-100 text-emerald-700' : 
+                            vote.voto === 'Não' ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-700'
+                          }`}>
+                            Votou: {vote.voto}
+                          </span>
+                          {vote.orientacao && vote.orientacao !== 'N/A' && (
+                            <span className={`px-2 py-1 text-xs font-bold rounded uppercase ${
+                              vote.rebeldia ? 'bg-red-50 text-red-600 border border-red-100' : 'bg-slate-50 text-slate-500'
+                            }`}>
+                              Partido: {vote.orientacao} {vote.rebeldia ? '(Rebelde)' : ''}
+                            </span>
+                          )}
+                        </div>
                         <span className="text-xs text-slate-400">{new Date(vote.data).toLocaleDateString('pt-BR')}</span>
                       </div>
                       <p className="text-sm font-bold text-slate-800 dark:text-slate-200 mb-1">{vote.proposicao}</p>
