@@ -32,15 +32,15 @@ async function runBuild() {
       format: 'esm',
       outfile: 'dist/index.js',
       plugins: [resolverPlugin],
-      // Adicionamos polyfills para __dirname e __filename no topo do arquivo gerado
+      // Banner corrigido para evitar SyntaxError de declaração duplicada
       banner: {
         js: `
-import { createRequire } from 'module';
-import { fileURLToPath } from 'url';
-import { dirname } from 'path';
-const require = createRequire(import.meta.url);
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+import { createRequire as __createRequire } from 'module';
+import { fileURLToPath as __fileURLToPath } from 'url';
+import { dirname as __dirnameFunc } from 'path';
+const require = __createRequire(import.meta.url);
+const __filename = __fileURLToPath(import.meta.url);
+const __dirname = __dirnameFunc(__filename);
 `,
       },
       external: [
