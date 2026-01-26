@@ -2,6 +2,8 @@ import { getSupabase } from '../core/database.ts';
 import { aiService } from '../services/ai.service.ts';
 import { validateBudgetViability, mapPromiseToSiconfiCategory } from '../integrations/siconfi.ts';
 import { temporalIncoherenceService } from '../services/temporal-incoherence.service.ts';
+import { negativeEvidenceService } from '../services/negative-evidence.service.ts';
+import { projectPromiseExtractorService } from '../services/project-promise-extractor.service.ts';
 import { FilteredSource } from './filter.ts';
 import { logInfo, logError, logWarn } from '../core/logger.ts';
 import axios from 'axios';
@@ -19,7 +21,22 @@ export class BrainAgent {
       Contexto: ${dataSources.politician.office} do ${dataSources.politician.party}-${dataSources.politician.state}.
       Foco: ${dataSources.mainCategory}.
       Veredito Orçamentário: ${dataSources.budgetVerdict}.
-      Resumo: ${dataSources.budgetSummary}.`;
+      Resumo: ${dataSources.budgetSummary}.
+      
+      ANÁLISE DE CONTRASTE (Diz vs Faz):
+      - Score de Ausência de Esforço: ${dataSources.contrastAnalysis.negativeEvidenceScore}/100 (onde 100 é ausência total).
+      - Projetos Relevantes Encontrados: ${dataSources.contrastAnalysis.details.relevantProjectsFound}.
+      - Votações Relevantes Encontradas: ${dataSources.contrastAnalysis.details.relevantVotesFound}.
+      - Explicação: ${dataSources.contrastAnalysis.details.explanation}.
+      
+      DIRETRIZ: Se o Score de Ausência for alto (>70), destaque que não há evidência legislativa que sustente o compromisso com o tema.
+      
+      PROMESSAS TÉCNICAS EXTRAÍDAS DE PROJETOS:
+      ${dataSources.technicalPromises && dataSources.technicalPromises.length > 0 
+        ? dataSources.technicalPromises.map((p: any) => `- [${p.projectTitle}] ${p.text} (Intenção: ${p.intent})`).join('\n')
+        : 'Nenhuma promessa técnica extraída dos projetos recentes.'}
+      
+      DIRETRIZ: Use estas promessas técnicas para mostrar que o político está agindo (ou não) de forma concreta através de leis.`;
       
       logInfo(`[Brain] Gerando parecer técnico via IA para ${cleanName}...`);
       const aiAnalysis = await aiService.generateReport(reportPrompt);
@@ -129,6 +146,26 @@ export class BrainAgent {
 
     const temporalAnalysis = await temporalIncoherenceService.analyzeIncoherence(cleanName, []);
     
+    // Análise de Contraste (Evidência Negativa)
+    const contrastAnalysis = await negativeEvidenceService.analyzeContrast(cleanName, sources[0]?.content || 'Geral', mainCategory);
+
+    // Extrair promessas técnicas dos projetos de lei (Bootstrap Automático)
+    let technicalPromises: any[] = [];
+    if (projects.length > 0) {
+      logInfo(`[Brain] Extraindo promessas técnicas de ${projects.length} projetos para ${cleanName}`);
+      // Processar sequencialmente para evitar rate limit em provedores gratuitos
+      for (const p of projects.slice(0, 2)) {
+        try {
+          const extracted = await projectPromiseExtractorService.extractFromProject(p);
+          if (extracted && extracted.length > 0) {
+            technicalPromises.push(...extracted);
+          }
+        } catch (e) {
+          logWarn(`[Brain] Falha ao extrair promessas do projeto ${p.id}. Pulando...`);
+        }
+      }
+    }
+
     let votingHistory: any[] = [];
     let partyAlignment = 0;
     let rebellionRate = 0;
@@ -169,6 +206,8 @@ export class BrainAgent {
       budgetViability,
       budgetVerdict: budgetViability?.verdict || 'Análise indisponível',
       budgetSummary: budgetViability?.summary || 'Dados orçamentários insuficientes para veredito.',
+      contrastAnalysis,
+      technicalPromises,
       projects: projects.slice(0, 5),
       votingHistory: votingHistory.slice(0, 5),
       partyAlignment,
