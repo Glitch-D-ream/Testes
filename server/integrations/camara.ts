@@ -53,8 +53,9 @@ export async function getVotacoesDeputado(deputadoId: number): Promise<Vote[]> {
     if (cached) return cached;
 
     // Fallback: Buscar votações gerais e filtrar os votos
+    // Nota: Buscamos votações de 2024 para garantir que existam dados nominais
     const responseVotacoes = await axios.get(`${CAMARA_API_BASE}/votacoes`, {
-      params: { ordem: 'DESC', ordenarPor: 'dataHoraRegistro', itens: 20 },
+      params: { dataInicio: '01/01/2024', dataFim: '31/12/2024', ordem: 'DESC', ordenarPor: 'dataHoraRegistro', itens: 30 },
       headers: { 'Accept': 'application/json' }
     });
 

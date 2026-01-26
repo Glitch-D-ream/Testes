@@ -8,7 +8,7 @@ import logger from '../core/logger.ts';
 import { savePublicDataCache, getPublicDataCache } from '../core/database.ts';
 
 // Endpoint real do Tesouro Nacional (Data Lake)
-const SICONFI_API_BASE = 'https://apidatalake.tesouro.gov.br/api/siconfi/index.php/conteudo';
+const SICONFI_API_BASE = 'https://apidatalake.tesouro.gov.br/api/siconfi/index.php/conteudo/dca';
 
 export interface BudgetData {
   year: number;
@@ -52,18 +52,22 @@ export async function getBudgetData(
     logger.info(`[SICONFI] Buscando dados reais no Tesouro: ${category} (${year})`);
 
     // A GRANDE SIMPLIFICAÇÃO: Usando o código da União (1) para análise federal
+    // Nota: 2024 pode ainda não ter o DCA fechado, forçando 2023 para estabilidade
+    const queryYear = year > 2023 ? 2023 : year;
     const idEnte = sphere === 'FEDERAL' ? '1' : '35';
-    logger.info(`[SICONFI] Consultando SICONFI para ente: ${idEnte} (União), ano: ${year}`);
+    const params = { 
+      an_exercicio: queryYear, 
+      id_ente: idEnte,
+      no_anexo: 'DCA-AnexoI-C'
+    };
+    
+    logger.info(`[SICONFI] [DEBUG] Query: ${JSON.stringify(params)} | Categoria: ${category}`);
 
-    const response = await axios.get(`${SICONFI_API_BASE}/dca`, {
-      params: { 
-        an_exercicio: year, 
-        id_ente: idEnte,
-        no_anexo: 'DCA-AnexoI-C'
-      },
-      timeout: 8000,
+    const response = await axios.get(SICONFI_API_BASE, {
+      params,
+      timeout: 10000,
     }).catch((err) => {
-      logger.warn(`[SICONFI] Erro na chamada API: ${err.message}`);
+      logger.warn(`[SICONFI] [DEBUG] Erro na chamada API: ${err.message} | URL: ${err.config?.url} | Params: ${JSON.stringify(err.config?.params)}`);
       return { data: null };
     });
 
