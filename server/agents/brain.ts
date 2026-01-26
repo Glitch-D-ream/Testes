@@ -125,7 +125,7 @@ ${knowledgeBase}
 **NOTA DE TRANSPARÊNCIA:** Auditoria gerada pelo sistema **Seth VII**. Ancoragem estrita em dados oficiais e evidências auditadas.
 `;
 
-      const { aiService } = await import('../services/ai.service.js');
+      const { aiService } = await import('../services/ai.service.ts');
       let fullContext;
       try {
         fullContext = await aiService.generateReport(reportPrompt);
@@ -149,7 +149,7 @@ ${knowledgeBase}
       if (existingAnalysisId) {
         analysis = await this.updateExistingAnalysis(existingAnalysisId, fullContext, politicianName, mainCategory);
       } else {
-        const { analysisService } = await import('../services/analysis.service.js');
+        const { analysisService } = await import('../services/analysis.service.ts');
         analysis = await analysisService.createAnalysis(userId, fullContext, politicianName, mainCategory, extraData);
       }
 
@@ -195,9 +195,9 @@ ${knowledgeBase}
   }
 
   private async updateExistingAnalysis(id: string, text: string, author: string, category: string) {
-    const { aiService } = await import('../services/ai.service.js');
-    const { deepSeekService } = await import('../services/ai-deepseek.service.js');
-    const { calculateProbability } = await import('../modules/probability.js');
+    const { aiService } = await import('../services/ai.service.ts');
+    const { deepSeekService } = await import('../services/ai-deepseek.service.ts');
+    const { calculateProbability } = await import('../modules/probability.ts');
     const { nanoid } = await import('nanoid');
     const supabase = getSupabase();
 

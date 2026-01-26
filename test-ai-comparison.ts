@@ -1,6 +1,6 @@
 
 import dotenv from 'dotenv';
-import { AIService } from './server/services/ai.service.js';
+import { AIService } from './server/services/ai.service.ts';
 import OpenAI from 'openai';
 
 dotenv.config();
@@ -11,7 +11,7 @@ async function runComparison() {
   const prompt = (aiService as any).promptTemplate(sampleText);
 
   // Usando o cliente OpenAI do Seth VII que suporta múltiplos modelos
-  const manusClient = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  const sethClient = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
   const models = [
     { name: 'Gemini 2.5 Flash', id: 'gemini-2.5-flash' },
@@ -28,7 +28,7 @@ async function runComparison() {
     try {
       console.log(`Testando ${model.name}...`);
       const start = Date.now();
-      const response = await manusClient.chat.completions.create({
+      const response = await sethClient.chat.completions.create({
         model: model.id,
         messages: [{ role: 'user', content: prompt }],
         response_format: { type: 'json_object' },

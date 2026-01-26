@@ -82,7 +82,7 @@ export class SearchService {
    * Orquestração da Tríade de Agentes para Análise Automática (V2 com Jobs)
    */
   async autoAnalyzePolitician(politicianName: string, userId: string | null = null) {
-    const { getSupabase } = await import('../core/database.js');
+    const { getSupabase } = await import('../core/database.ts');
     const supabase = getSupabase();
     const { nanoid } = await import('nanoid');
     

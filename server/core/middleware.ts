@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import rateLimit from 'express-rate-limit';
-import { extractTokenFromHeader, verifyJWT } from './auth.js';
+import { extractTokenFromHeader, verifyJWT } from './auth.ts';
 
 /**
  * Middleware de autenticação obrigatória
