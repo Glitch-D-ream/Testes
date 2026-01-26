@@ -38,17 +38,21 @@ export class ScoutHybrid {
     
     const sources: RawSource[] = [];
 
-    // PARALELIZAR FASE 1 E FASE 2
-    logInfo(`[ScoutHybrid] FASE 1 & 2: Buscando em fontes oficiais e scraping direto em paralelo...`);
-    const [officialResults, directResults] = await Promise.all([
+    // PARALELIZAR FASE 1 E FASE 2 + Buscas Especializadas
+    logInfo(`[ScoutHybrid] FASE 1 & 2: Buscando em fontes oficiais, notícias e processos em paralelo...`);
+    const [officialResults, newsResults, interviewResults, legalResults] = await Promise.all([
       officialSourcesSearch.search(query).catch(e => { logWarn(`Oficiais falharam: ${e.message}`); return []; }),
-      directSearchImproved.search(query).catch(e => { logWarn(`Busca direta falhou: ${e.message}`); return []; })
+      directSearchImproved.search(query).catch(e => { logWarn(`Busca direta falhou: ${e.message}`); return []; }),
+      directSearchImproved.search(`"${query}" entrevista OR declarou OR anunciou`).catch(() => []),
+      directSearchImproved.search(`"${query}" processo judicial OR investigação OR tribunal`).catch(() => [])
     ]);
 
-    // Se poucas fontes, tentar variações (Sugestão DeepSeek)
-    if (directResults.length < 3) {
-      logInfo(`[ScoutHybrid] Poucas fontes. Tentando variação: ${query} promessa`);
-      const extraResults = await directSearchImproved.search(`${query} promessa`).catch(() => []);
+    const directResults = [...newsResults, ...interviewResults, ...legalResults];
+
+    // Se poucas fontes, tentar variações
+    if (directResults.length < 5) {
+      logInfo(`[ScoutHybrid] Poucas fontes. Tentando variação: ${query} promessa política`);
+      const extraResults = await directSearchImproved.search(`${query} promessa política`).catch(() => []);
       directResults.push(...extraResults);
     }
 

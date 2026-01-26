@@ -165,28 +165,33 @@ export class AIService {
     }
 
     // 2. Tentar Groq (Rápido e Eficiente)
-    try {
-      logInfo('[AI] Tentando Groq para análise estruturada...');
-      const systemPrompt = 'Você é um analista político sênior. Responda estritamente em JSON.';
-      const prompt = this.promptTemplate(text);
-      const result = await groqService.generateCompletion(systemPrompt, prompt);
-      
-      if (result) {
-        const jsonMatch = result.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-          const parsed = JSON.parse(jsonMatch[0]);
-          if (!parsed.verdict) parsed.verdict = { facts: [], skepticism: [] };
-          if (parsed.promises) {
-            parsed.promises = parsed.promises.map((p: any) => ({
-              ...p,
-              risks: p.risks || []
-            }));
+    const groqKey = process.env.GROQ_API_KEY;
+    if (groqKey && !groqKey.includes('your-')) {
+      try {
+        logInfo('[AI] Tentando Groq para análise estruturada...');
+        const systemPrompt = 'Você é um analista político sênior. Responda estritamente em JSON.';
+        const prompt = this.promptTemplate(text);
+        const result = await groqService.generateCompletion(systemPrompt, prompt);
+        
+        if (result) {
+          const jsonMatch = result.match(/\{[\s\S]*\}/);
+          if (jsonMatch) {
+            const parsed = JSON.parse(jsonMatch[0]);
+            if (!parsed.verdict) parsed.verdict = { facts: [], skepticism: [] };
+            if (parsed.promises) {
+              parsed.promises = parsed.promises.map((p: any) => ({
+                ...p,
+                risks: p.risks || []
+              }));
+            }
+            return parsed as AIAnalysisResult;
           }
-          return parsed as AIAnalysisResult;
         }
+      } catch (error: any) {
+        logWarn(`[AI] Groq falhou na análise estruturada: ${error.message}. Tentando Pollinations...`);
       }
-    } catch (error: any) {
-      logWarn(`[AI] Groq falhou na análise estruturada: ${error.message}. Tentando Pollinations...`);
+    } else {
+      logWarn('[AI] GROQ_API_KEY não configurada corretamente. Pulando para Pollinations.');
     }
 
     // 3. Fallback para Pollinations (Código Aberto / Gratuito)
@@ -203,20 +208,25 @@ export class AIService {
    */
   async generateReport(prompt: string): Promise<string> {
     // 1. Tentar Groq (Primário - Ultra Rápido)
-    try {
-      logInfo('[AI] Tentando Groq como provedor primário...');
-      const systemPrompt = `Você é o núcleo de inteligência do sistema Seth VII. 
-      Sua função é AUDITORIA TÉCNICA PURA. 
-      REGRAS INVIOLÁVEIS:
-      1. PROIBIDO EMOÇÃO: Não use exclamações, adjetivos elogiosos ou pejorativos.
-      2. PROIBIDO ALUCINAÇÃO: Se um dado não foi fornecido no prompt, você NÃO pode inventá-lo. Responda "Dados não disponíveis".
-      3. IMPARCIALIDADE: Trate todos os políticos com o mesmo rigor frio, seja de direita, esquerda ou centro.
-      4. FOCO ORÇAMENTÁRIO: Priorize sempre a viabilidade fiscal (SICONFI) sobre a retórica política.`;
-      
-      const result = await groqService.generateCompletion(systemPrompt, prompt);
-      if (result) return result;
-    } catch (error: any) {
-      logWarn(`[AI] Groq falhou: ${error.message}. Tentando fallbacks tradicionais...`);
+    const groqKey = process.env.GROQ_API_KEY;
+    if (groqKey && !groqKey.includes('your-')) {
+      try {
+        logInfo('[AI] Tentando Groq como provedor primário...');
+        const systemPrompt = `Você é o núcleo de inteligência do sistema Seth VII. 
+        Sua função é AUDITORIA TÉCNICA PURA. 
+        REGRAS INVIOLÁVEIS:
+        1. PROIBIDO EMOÇÃO: Não use exclamações, adjetivos elogiosos ou pejorativos.
+        2. PROIBIDO ALUCINAÇÃO: Se um dado não foi fornecido no prompt, você NÃO pode inventá-lo. Responda "Dados não disponíveis".
+        3. IMPARCIALIDADE: Trate todos os políticos com o mesmo rigor frio, seja de direita, esquerda ou centro.
+        4. FOCO ORÇAMENTÁRIO: Priorize sempre a viabilidade fiscal (SICONFI) sobre a retórica política.`;
+        
+        const result = await groqService.generateCompletion(systemPrompt, prompt);
+        if (result) return result;
+      } catch (error: any) {
+        logWarn(`[AI] Groq falhou: ${error.message}. Tentando fallbacks tradicionais...`);
+      }
+    } else {
+      logWarn('[AI] GROQ_API_KEY não configurada corretamente. Pulando para fallbacks.');
     }
 
     // 2. Fallbacks tradicionais (Pollinations)

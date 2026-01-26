@@ -87,16 +87,27 @@ export class FilterAgent {
       'youtuber', 'marxista', 'pcb', 'candidatura', 'investimento', 'anúncio',
       'gestão', 'administração', 'políticas', 'programa', 'ação', 'medida',
       'iniciativa', 'proposta', 'agenda', 'trabalho', 'desenvolvimento',
-      'sociedade', 'nação', 'município', 'fiscal', 'tributário', 'vou', 'prometo'
+      'sociedade', 'nação', 'município', 'fiscal', 'tributário', 'vou', 'prometo',
+      'entrevista', 'declarou', 'disse', 'afirmou', 'processo', 'judicial',
+      'justiça', 'investigação', 'tribunal', 'stf', 'tse', 'condenado', 'absolvido'
     ];
     
     const hasPoliticalContext = politicalKeywords.some(kw => combinedText.includes(kw));
     
     // Se for de um portal de elite conhecido, aceitamos com menos rigor
-    const eliteDomains = ['estadao.com.br', 'folha.uol.com.br', 'g1.globo.com', 'cnnbrasil.com.br', 'veja.abril.com.br', 'jovempan.com.br', 'gazetadopovo.com.br'];
+    const eliteDomains = [
+      'estadao.com.br', 'folha.uol.com.br', 'g1.globo.com', 'cnnbrasil.com.br', 
+      'veja.abril.com.br', 'jovempan.com.br', 'gazetadopovo.com.br', 'uol.com.br',
+      'bbc.com', 'metropoles.com', 'poder360.com.br', 'jusbrasil.com.br', 'conjur.com.br',
+      'Estadão', 'G1', 'CNN Brasil', 'Poder360', 'Folha', 'Gazeta do Povo'
+    ];
     const isElite = eliteDomains.some(d => combinedText.includes(d));
 
-    return hasPoliticalContext || (isElite && combinedText.length > 30);
+    // Valorizar entrevistas e processos
+    const isInterview = combinedText.includes('entrevista') || (combinedText.match(/"|“|”/g) || []).length > 4;
+    const isLegal = combinedText.includes('processo') || combinedText.includes('judicial') || combinedText.includes('stf');
+
+    return hasPoliticalContext || (isElite && combinedText.length > 30) || isInterview || isLegal;
   }
 }
 
