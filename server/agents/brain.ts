@@ -15,7 +15,24 @@ export class BrainAgent {
   async analyze(politicianName: string, sources: FilteredSource[] = [], userId: string | null = null, existingAnalysisId: string | null = null, ignoreCache: boolean = false) {
     logInfo(`[Brain] Iniciando análise profunda para: ${politicianName}`);
     const brainStart = Date.now();
+
+    // Timeout de segurança para a análise toda (60 segundos)
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('Tempo limite de análise excedido (60s). O servidor de IA ou as fontes externas estão demorando muito.')), 60000)
+    );
     
+    try {
+      return await Promise.race([
+        this.executeAnalysis(politicianName, sources, userId, existingAnalysisId, ignoreCache),
+        timeoutPromise
+      ]) as any;
+    } catch (error) {
+      logError(`[Brain] Falha na análise profunda de ${politicianName}`, error as Error);
+      throw error;
+    }
+  }
+
+  private async executeAnalysis(politicianName: string, sources: FilteredSource[] = [], userId: string | null = null, existingAnalysisId: string | null = null, ignoreCache: boolean = false) {
     try {
       // 0. Validação de Qualidade de Dados (Modo Permissivo)
       const validSources = Array.isArray(sources) ? sources.filter(s => s.source !== 'Generic Fallback') : [];

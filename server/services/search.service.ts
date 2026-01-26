@@ -132,12 +132,19 @@ export class SearchService {
         
         logInfo(`[Orchestrator] [Job:${analysisId}] Concluído com sucesso.`);
       } catch (error: any) {
-        logError(`[Orchestrator] [Job:${analysisId}] Falha: ${error.message}`);
-        // Atualizar o status para failed no banco para o polling do frontend parar
-        await supabase.from('analyses').update({
-          status: 'failed',
-          error_message: error.message // Corrigido para error_message conforme o banco
-        }).eq('id', analysisId);
+        const errorMessage = error.message || 'Erro desconhecido durante a auditoria técnica';
+        logError(`[Orchestrator] [Job:${analysisId}] Falha Crítica: ${errorMessage}`);
+        
+        // Tentar salvar o erro detalhado para que o usuário veja no site
+        try {
+          await supabase.from('analyses').update({
+            status: 'failed',
+            error_message: `Erro no Seth VII: ${errorMessage}. Por favor, tente novamente em instantes.`,
+            text: `A auditoria falhou: ${errorMessage}`
+          }).eq('id', analysisId);
+        } catch (dbErr) {
+          logError(`[Orchestrator] Erro ao reportar falha no banco: ${dbErr}`);
+        }
       }
     });
 
