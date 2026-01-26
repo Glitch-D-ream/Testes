@@ -163,3 +163,5 @@ export class BrainAgent {
     return 'GERAL';
   }
 }
+
+export const brainAgent = new BrainAgent();
