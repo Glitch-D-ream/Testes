@@ -1,0 +1,8 @@
+[phases.setup]
+nixPkgs = ["...", "nodejs-22_x", "playwright-driver"]
+
+[phases.build]
+cmds = ["pnpm install", "pnpm build", "npx playwright install --with-deps chromium"]
+
+[start]
+cmd = "pnpm start"

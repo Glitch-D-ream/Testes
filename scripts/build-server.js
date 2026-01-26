@@ -1,14 +1,16 @@
 import * as esbuild from 'esbuild';
 import path from 'path';
 import fs from 'fs';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const resolverPlugin = {
   name: 'resolver-plugin',
   setup(build) {
-    // Intercepta importações que terminam em .js
     build.onResolve({ filter: /\.js$/ }, args => {
       if (args.importer) {
-        // Remove a extensão .js e tenta encontrar o arquivo .ts correspondente
         const baseName = args.path.replace(/\.js$/, '');
         const tsPath = path.resolve(path.dirname(args.importer), baseName + '.ts');
         
@@ -30,20 +32,27 @@ async function runBuild() {
       format: 'esm',
       outfile: 'dist/index.js',
       plugins: [resolverPlugin],
+      // Adicionamos polyfills para __dirname e __filename no topo do arquivo gerado
       banner: {
-        js: "import { createRequire } from 'module'; const require = createRequire(import.meta.url);",
+        js: `
+import { createRequire } from 'module';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
+const require = createRequire(import.meta.url);
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+`,
       },
       external: [
         'express', 'jsonwebtoken', 'bcryptjs', 'winston', 'dotenv', 
         '@supabase/supabase-js', 'nanoid', 'express-rate-limit', 
         'cookie-parser', 'telegraf', 'jspdf', 'jspdf-autotable', 
         'node-html-to-image', 'axios', 'zod', 'tsx', 'prom-client', '@sentry/node',
-        'cheerio', 'puppeteer-core'
+        'cheerio', 'puppeteer-core', 'playwright', 'playwright-core'
       ],
     });
     console.log('Server build completed successfully!');
 
-    // Copiar frontend para dist/public
     const distPublicPath = path.resolve('dist/public');
     if (!fs.existsSync(distPublicPath)) {
       fs.mkdirSync(distPublicPath, { recursive: true });
