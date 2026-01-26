@@ -59,7 +59,10 @@ export class BrainAgent {
       let finalPromises = extractedPromisesFromAI;
 
       await this.saveAnalysis(userId, existingId, {
-        politicianName: cleanName,
+        politicianName: dataSources.politicianName || cleanName,
+        office: dataSources.politician.office,
+        party: dataSources.politician.party,
+        state: dataSources.politician.state,
         aiAnalysis,
         mainCategory: dataSources.mainCategory,
         promises: finalPromises,
@@ -90,9 +93,13 @@ export class BrainAgent {
 
       if (cachedAnalysis) {
         const ageInHours = (new Date().getTime() - new Date(cachedAnalysis.created_at).getTime()) / (1000 * 60 * 60);
-        if (ageInHours < 24) { 
+        if (ageInHours < 24 && cachedAnalysis.data_sources) { 
           logInfo(`[Brain] Cache válido encontrado para: ${cleanName}`);
-          return cachedAnalysis.data_sources;
+          // Garantir que os campos básicos existam no objeto retornado
+          const ds = cachedAnalysis.data_sources;
+          if (ds.politician && ds.politician.office) {
+            return ds;
+          }
         }
       }
     }
@@ -219,6 +226,10 @@ export class BrainAgent {
     const analysisData: any = {
       user_id: userId,
       author: data.politicianName,
+      politician_name: data.politicianName,
+      office: data.office,
+      party: data.party,
+      state: data.state,
       text: data.aiAnalysis,
       category: data.mainCategory,
       data_sources: legacyDataSources,
@@ -231,35 +242,18 @@ export class BrainAgent {
     try {
       let saveError;
       
-      // Tentar salvar com politician_name primeiro
-      const fullData = { ...analysisData, politician_name: data.politicianName };
-      
       if (existingId) {
         logInfo(`[Brain] Atualizando análise existente: ${existingId}`);
-        const { error } = await supabase.from('analyses').update(fullData).eq('id', existingId);
+        const { error } = await supabase.from('analyses').update(analysisData).eq('id', existingId);
         saveError = error;
       } else {
         const newId = Math.random().toString(36).substring(7);
-        (fullData as any).id = newId;
+        analysisData.id = newId;
         logInfo(`[Brain] Criando nova análise: ${newId}`);
-        const { error } = await supabase.from('analyses').insert([fullData]);
+        const { error } = await supabase.from('analyses').insert([analysisData]);
         saveError = error;
       }
 
-      // Se falhar por causa da coluna politician_name, tentar apenas com author
-      if (saveError && (saveError.message.includes('politician_name') || saveError.code === '42703')) {
-        logWarn(`[Brain] Coluna 'politician_name' não encontrada. Usando 'author' como identificador.`);
-        if (existingId) {
-          const { error } = await supabase.from('analyses').update(analysisData).eq('id', existingId);
-          saveError = error;
-        } else {
-          const newId = Math.random().toString(36).substring(7);
-          (analysisData as any).id = newId;
-          const { error } = await supabase.from('analyses').insert([analysisData]);
-          saveError = error;
-        }
-      }
-      
       if (saveError) throw saveError;
       logInfo(`[Brain] Status da análise atualizado para 'completed' com sucesso.`);
     } catch (error) {
@@ -268,7 +262,7 @@ export class BrainAgent {
   }
 
   private generateAnalysisPrompt(name: string, data: any, sources: FilteredSource[]): string {
-    return `Analise o político ${name} (${data.politician.office}, ${data.politician.party}-${data.politician.state}).
+    return `Analise o político ${name} (${data.politician?.office || 'Político'}, ${data.politician?.party || 'N/A'}-${data.politician?.state || 'N/A'}).
     
     FONTES DE NOTÍCIAS RECENTES:
     ${sources.map(s => `- [${s.source}] ${s.title}: ${s.content.substring(0, 300)}...`).join('\n')}
