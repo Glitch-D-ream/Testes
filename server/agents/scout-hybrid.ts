@@ -37,9 +37,14 @@ export class ScoutHybrid {
     
     const sources: RawSource[] = [];
 
-    // FASE 1: Buscar em Fontes Oficiais (Câmara, Senado, TSE)
-    logInfo(`[ScoutHybrid] FASE 1: Buscando em fontes oficiais...`);
-    const officialResults = await officialSourcesSearch.search(query);
+    // PARALELIZAR FASE 1 E FASE 2
+    logInfo(`[ScoutHybrid] FASE 1 & 2: Buscando em fontes oficiais e scraping direto em paralelo...`);
+    const [officialResults, directResults] = await Promise.all([
+      officialSourcesSearch.search(query),
+      directSearchImproved.search(query)
+    ]);
+
+    // Processar Oficiais
     sources.push(...officialResults.map(r => ({
       title: r.title,
       url: r.url,
@@ -51,15 +56,12 @@ export class ScoutHybrid {
     })));
     logInfo(`[ScoutHybrid] Fontes oficiais encontradas: ${officialResults.length}`);
 
-    // FASE 2: Busca Direta via Scraping (DuckDuckGo/Google)
-    if (sources.length < 5 || deepSearch) {
-      logInfo(`[ScoutHybrid] FASE 2: Buscando via scraping direto...`);
-      const directResults = await directSearchImproved.search(query);
-      
-      const uniqueDirectResults = directResults.filter(r => !sources.some(s => s.url === r.url));
-      
-      logInfo(`[ScoutHybrid] Iniciando scraping paralelo de ${uniqueDirectResults.length} fontes...`);
-      const directScrapePromises = uniqueDirectResults.map(async (r) => {
+    // Processar Diretos (Scraping)
+    const uniqueDirectResults = directResults.filter(r => !sources.some(s => s.url === r.url)).slice(0, 8); // Limitar a 8 fontes para evitar lentidão
+    
+    logInfo(`[ScoutHybrid] Iniciando scraping paralelo de ${uniqueDirectResults.length} fontes...`);
+    const directScrapePromises = uniqueDirectResults.map(async (r) => {
+      try {
         const fullContent = await contentScraper.scrape(r.url);
         return {
           title: r.title,
@@ -70,12 +72,14 @@ export class ScoutHybrid {
           type: 'news' as const,
           confidence: this.whitelist.some(d => r.url.includes(d)) ? 'high' as const : 'medium' as const
         };
-      });
+      } catch (e) {
+        return null;
+      }
+    });
 
-      const directScrapedSources = await Promise.all(directScrapePromises);
-      sources.push(...directScrapedSources);
-      logInfo(`[ScoutHybrid] Scraping direto encontrou: ${directResults.length}`);
-    }
+    const directScrapedSources = (await Promise.all(directScrapePromises)).filter(s => s !== null) as RawSource[];
+    sources.push(...directScrapedSources);
+    logInfo(`[ScoutHybrid] Scraping direto concluído.`);
 
     // FASE 3: Deep Search com variações de query focadas em portais de elite
     if (sources.length < 5 && deepSearch) {

@@ -97,7 +97,7 @@ export class AIService {
           ],
           model: model,
           jsonMode: true
-        }, { timeout: 60000 }); // Aumentado timeout para permitir respostas mais longas e profundas
+        }, { timeout: 15000 }); // Reduzido para 15s para acelerar fallback
 
         let content = response.data;
         
@@ -159,6 +159,32 @@ export class AIService {
   }
 
   async analyzeText(text: string): Promise<AIAnalysisResult> {
+    // 1. Tentar Groq (Primário - Ultra Rápido)
+    try {
+      logInfo('[AI] Tentando Groq para análise estruturada...');
+      const systemPrompt = 'Você é um analista político sênior. Responda estritamente em JSON.';
+      const prompt = this.promptTemplate(text);
+      const result = await groqService.generateCompletion(systemPrompt, prompt);
+      
+      if (result) {
+        const jsonMatch = result.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          const parsed = JSON.parse(jsonMatch[0]);
+          // Garantir campos obrigatórios
+          if (!parsed.verdict) parsed.verdict = { facts: [], skepticism: [] };
+          if (parsed.promises) {
+            parsed.promises = parsed.promises.map((p: any) => ({
+              ...p,
+              risks: p.risks || []
+            }));
+          }
+          return parsed as AIAnalysisResult;
+        }
+      }
+    } catch (error: any) {
+      logWarn(`[AI] Groq falhou na análise estruturada: ${error.message}. Tentando fallback...`);
+    }
+
     try {
       return await this.analyzeWithOpenSource(text);
     } catch (error) {
@@ -210,7 +236,7 @@ export class AIService {
             { role: 'user', content: prompt }
           ],
           model: model
-        }, { timeout: 90000 });
+        }, { timeout: 20000 }); // Reduzido para 20s para acelerar fallback
 
         if (response.data && typeof response.data === 'string') {
           return response.data;

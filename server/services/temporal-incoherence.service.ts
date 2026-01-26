@@ -32,13 +32,13 @@ export class TemporalIncoherenceService {
     const contradictions: Contradiction[] = [];
 
     try {
-      // Tentar buscar como Deputado Federal
-      let votacoes = await this.getDeputadoVotacoes(politicianName);
+      // Buscar como Deputado e Senador em paralelo
+      const [votacoesDeputado, votacoesSenador] = await Promise.all([
+        this.getDeputadoVotacoes(politicianName),
+        this.getSenadorVotacoes(politicianName)
+      ]);
 
-      // Se não encontrar, tentar como Senador
-      if (!votacoes || votacoes.length === 0) {
-        votacoes = await this.getSenadorVotacoes(politicianName);
-      }
+      let votacoes = [...(votacoesDeputado || []), ...(votacoesSenador || [])];
 
       if (!votacoes || votacoes.length === 0) {
         logWarn(`[TemporalIncoherence] Nenhum histórico legislativo encontrado para: ${politicianName}`);

@@ -12,12 +12,13 @@ export class BrainAgent {
   /**
    * O Cérebro Central 3.0: Com Cache, Resiliência e Análise de Incoerência Temporal
    */
-  async analyze(politicianName: string, sources: FilteredSource[], userId: string | null = null, existingAnalysisId: string | null = null, ignoreCache: boolean = false) {
+  async analyze(politicianName: string, sources: FilteredSource[] = [], userId: string | null = null, existingAnalysisId: string | null = null, ignoreCache: boolean = false) {
     logInfo(`[Brain] Iniciando análise profunda para: ${politicianName}`);
+    const brainStart = Date.now();
     
     try {
       // 0. Validação de Qualidade de Dados (Modo Permissivo)
-      const validSources = sources.filter(s => s.source !== 'Generic Fallback');
+      const validSources = Array.isArray(sources) ? sources.filter(s => s.source !== 'Generic Fallback') : [];
 
       if (validSources.length === 0 && sources.length > 0) {
         logWarn(`[Brain] Nenhuma fonte válida encontrada. Usando fontes originais para tentar análise.`);
@@ -55,15 +56,21 @@ export class BrainAgent {
       const siconfiCategory = mapPromiseToSiconfiCategory(mainCategory);
       const currentYear = new Date().getFullYear();
       
+      const budgetStart = Date.now();
       // 3. Validação Orçamentária (SICONFI) - Usar valor simbólico apenas se não houver promessas
       const budgetViability = await validateBudgetViability(siconfiCategory, 500000000, currentYear - 1);
+      logInfo(`[Brain] Tempo SICONFI: ${Date.now() - budgetStart}ms`);
       
+      const pibStart = Date.now();
       // 3.1. Validação Macro (IBGE)
       const pibViability = await validateValueAgainstPIB(500000000);
+      logInfo(`[Brain] Tempo IBGE: ${Date.now() - pibStart}ms`);
 
       // 4. NOVO: Análise de Incoerência Temporal (Diz vs Faz)
-      const promiseTexts = sources.map(s => s.content).filter(c => c && c.length > 0);
+      const temporalStart = Date.now();
+      const promiseTexts = Array.isArray(sources) ? sources.map(s => s.content).filter(c => c && c.length > 0) : [];
       const temporalAnalysis = await temporalIncoherenceService.analyzeIncoherence(politicianName, promiseTexts);
+      logInfo(`[Brain] Tempo Incoerência Temporal: ${Date.now() - temporalStart}ms`);
 
       const temporalSection = temporalAnalysis.hasIncoherence
         ? `## 🔄 ANÁLISE DE INCOERÊNCIA TEMPORAL (DIZ VS FAZ)
@@ -127,8 +134,10 @@ ${knowledgeBase}
 
       const { aiService } = await import('../services/ai.service.ts');
       let fullContext;
+      const aiStart = Date.now();
       try {
         fullContext = await aiService.generateReport(reportPrompt);
+        logInfo(`[Brain] Tempo Geração Relatório IA: ${Date.now() - aiStart}ms`);
       } catch (reportError) {
         logError('[Brain] Falha ao gerar relatório profissional, tentando fallback estruturado', reportError as Error);
         const aiResponse = await aiService.analyzeText(reportPrompt);
