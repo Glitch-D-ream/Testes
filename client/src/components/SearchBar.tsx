@@ -49,6 +49,11 @@ export default function SearchBar() {
           const statusRes = await fetch(`${apiUrl}/api/search/status/${id}`).catch(() => null);
           if (!statusRes || !statusRes.ok) {
             console.warn('Falha na rede ao verificar status, tentando novamente...');
+            if (pollCount > 40) { // ~2 minutos
+              clearInterval(pollInterval);
+              setIsProcessing(false);
+              setError('Falha de conexão persistente com o servidor.');
+            }
             return;
           }
           
@@ -69,7 +74,8 @@ export default function SearchBar() {
             // Atualizar status baseado no tempo decorrido
             if (pollCount < 5) setStatus('Iniciando varredura na web...');
             else if (pollCount < 15) setStatus('Cruzando dados orçamentários (SICONFI)...');
-            else setStatus('Finalizando auditoria técnica com IA...');
+            else if (pollCount < 30) setStatus('Finalizando auditoria técnica com IA...');
+            else setStatus('Aguardando resposta final dos agentes...');
           }
         } catch (err) {
           console.error('Erro no polling:', err);

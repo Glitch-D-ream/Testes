@@ -223,10 +223,21 @@ export class BrainAgent {
       updated_at: new Date().toISOString()
     };
 
-    if (existingId) {
-      await supabase.from('analyses').update(analysisData).eq('id', existingId);
-    } else {
-      await supabase.from('analyses').insert([{ ...analysisData, id: Math.random().toString(36).substring(7) }]);
+    try {
+      if (existingId) {
+        logInfo(`[Brain] Atualizando análise existente: ${existingId}`);
+        const { error } = await supabase.from('analyses').update(analysisData).eq('id', existingId);
+        if (error) throw error;
+      } else {
+        const newId = Math.random().toString(36).substring(7);
+        logInfo(`[Brain] Criando nova análise: ${newId}`);
+        const { error } = await supabase.from('analyses').insert([{ ...analysisData, id: newId }]);
+        if (error) throw error;
+      }
+      logInfo(`[Brain] Status da análise atualizado para 'completed' com sucesso.`);
+    } catch (err: any) {
+      logError(`[Brain] Erro ao salvar análise no banco de dados: ${err.message}`);
+      throw err;
     }
   }
 }

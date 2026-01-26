@@ -125,13 +125,17 @@ export class SearchService {
         
         // Tentar salvar o erro detalhado para que o usuário veja no site
         try {
-          await supabase.from('analyses').update({
+          const { error: updateError } = await supabase.from('analyses').update({
             status: 'failed',
             error_message: `Erro no Seth VII: ${errorMessage}. Por favor, tente novamente em instantes.`,
-            text: `A auditoria falhou: ${errorMessage}`
+            text: `A auditoria falhou: ${errorMessage}`,
+            updated_at: new Date().toISOString()
           }).eq('id', analysisId);
-        } catch (dbErr) {
-          logError(`[Orchestrator] Erro ao reportar falha no banco: ${dbErr}`);
+          
+          if (updateError) throw updateError;
+          logInfo(`[Orchestrator] [Job:${analysisId}] Status de falha registrado no banco.`);
+        } catch (dbErr: any) {
+          logError(`[Orchestrator] Erro ao reportar falha no banco: ${dbErr.message}`);
         }
       }
     });

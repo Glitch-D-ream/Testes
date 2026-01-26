@@ -94,7 +94,7 @@ export class AIService {
           ],
           model: model,
           jsonMode: true
-        }, { timeout: 12000 }); // Reduzido para 12s para acelerar fallback entre modelos gratuitos
+        }, { timeout: 10000 }); // Reduzido para 10s para acelerar fallback entre modelos gratuitos
 
         let content = response.data;
         
@@ -254,7 +254,7 @@ export class AIService {
             { role: 'user', content: prompt }
           ],
           model: model
-        }, { timeout: 15000 }); // Reduzido para 15s para acelerar fallback entre modelos gratuitos
+        }, { timeout: 10000 }); // Reduzido para 10s para acelerar fallback entre modelos gratuitos
 
         if (response.data && typeof response.data === 'string') {
           return response.data;
