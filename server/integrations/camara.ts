@@ -120,3 +120,34 @@ export function analisarIncoerencia(promessa: string, voto: Vote): { incoerente:
 
   return { incoerente: false, justificativa: '' };
 }
+
+/**
+ * Busca proposições (projetos de lei) de um deputado
+ */
+export async function getProposicoesDeputado(deputadoId: number): Promise<any[]> {
+  try {
+    const cacheKey = `proposicoes_camara_${deputadoId}`;
+    const cached = await getPublicDataCache('CAMARA', cacheKey);
+    if (cached) return cached;
+
+    const response = await axios.get(`${CAMARA_API_BASE}/proposicoes`, {
+      params: { idDeputadoAutor: deputadoId, ordem: 'DESC', ordenarPor: 'id', itens: 10 },
+      headers: { 'Accept': 'application/json' }
+    });
+
+    const proposicoes = response.data.dados.map((p: any) => ({
+      id: p.id,
+      sigla: p.siglaTipo,
+      numero: p.numero,
+      ano: p.ano,
+      ementa: p.ementa,
+      url: `https://www.camara.leg.br/proposicoesWeb/fichadetramitacao?idProposicao=${p.id}`
+    }));
+
+    await savePublicDataCache('CAMARA', cacheKey, proposicoes);
+    return proposicoes;
+  } catch (error) {
+    logger.error(`[Camara] Erro ao buscar proposições do deputado ${deputadoId}: ${error}`);
+    return [];
+  }
+}

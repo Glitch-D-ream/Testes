@@ -90,9 +90,7 @@ export default function Analysis() {
         </div>
       </div>
     );
-  }
-
-  const results = data.results || {};
+  const results = analysis?.data_sources || analysis?.results || {};
   // A GRANDE SIMPLIFICAÇÃO: Sempre tratar como perfil oficial por enquanto
   const isOfficialOnly = true; 
   const promises = data.promises || [];
@@ -207,37 +205,46 @@ export default function Analysis() {
               </p>
             </section>
 
-            {/* Promises List */}
-            {!isOfficialOnly && (
-              <section className="space-y-6">
-                <div className="flex items-center justify-between px-2">
-                  <h2 className="text-xl font-black tracking-tight flex items-center gap-3">
-                    <CheckCircle2 size={28} className="text-emerald-500" /> 
-                    Promessas Auditadas
-                  </h2>
+            {/* Projetos de Lei (A GRANDE SIMPLIFICAÇÃO) */}
+            <section className="space-y-6">
+              <div className="flex items-center justify-between px-2">
+                <h2 className="text-xl font-black tracking-tight flex items-center gap-3">
+                  <CheckCircle2 size={28} className="text-blue-500" /> 
+                  Atividade Legislativa Recente
+                </h2>
+              </div>
+              
+              {results.projects && results.projects.length > 0 ? (
+                <div className="grid grid-cols-1 gap-4">
+                  {results.projects.map((project: any, index: number) => (
+                    <div key={index} className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+                      <div className="flex justify-between items-start mb-2">
+                        <span className="px-2 py-1 bg-blue-50 dark:bg-blue-900/30 text-blue-600 text-xs font-bold rounded uppercase">
+                          {project.sigla} {project.numero}/{project.ano}
+                        </span>
+                        <a href={project.url} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-500 hover:underline">Ver Oficial</a>
+                      </div>
+                      <p className="text-sm text-slate-700 dark:text-slate-300 line-clamp-3">{project.ementa}</p>
+                    </div>
+                  ))}
                 </div>
-                
-                {promises.length > 0 ? (
-                  <div className="grid grid-cols-1 gap-6">
-                    {promises.map((promise: any, index: number) => (
-                      <PromiseCard 
-                        key={index} 
-                        id={promise.id}
-                        text={promise.promise_text || promise.text}
-                        category={promise.category || 'Geral'}
-                        confidence={promise.confidence_score || promise.confidence || 0}
-                        reasoning={promise.reasoning}
-                        evidenceSnippet={promise.evidence_snippet}
-                      />
-                    ))}
-                  </div>
-                ) : (
-                  <div className="bg-white dark:bg-slate-900 p-12 rounded-3xl border-2 border-dashed border-slate-200 dark:border-slate-800 text-center">
-                    <p className="text-slate-500 font-bold uppercase tracking-widest text-sm">Nenhuma promessa explícita detectada</p>
-                  </div>
-                )}
-              </section>
-            )}
+              ) : (
+                <div className="bg-white dark:bg-slate-900 p-12 rounded-3xl border-2 border-dashed border-slate-200 dark:border-slate-800 text-center">
+                  <p className="text-slate-500 font-bold uppercase tracking-widest text-sm">Nenhum projeto recente encontrado</p>
+                </div>
+              )}
+            </section>
+
+            {/* Status do Sistema (Beta) */}
+            <section className="bg-slate-100 dark:bg-slate-800/50 p-6 rounded-2xl border border-slate-200 dark:border-slate-700">
+              <h3 className="font-bold text-sm uppercase tracking-wider text-slate-500 mb-4">🚧 Estado do Sistema (Beta)</h3>
+              <ul className="space-y-2 text-sm text-slate-600 dark:text-slate-400">
+                <li className="flex items-center gap-2">✅ <strong>Perfil Oficial:</strong> Validado por ID Canônico.</li>
+                <li className="flex items-center gap-2">✅ <strong>Dados Orçamentários:</strong> Crus, do Tesouro Nacional.</li>
+                <li className="flex items-center gap-2">✅ <strong>Atividade Legislativa:</strong> Projetos de lei reais.</li>
+                <li className="flex items-center gap-2">⏸️ <strong>Análise de Discurso:</strong> Suspensa para garantir credibilidade.</li>
+              </ul>
+            </section>
           </div>
 
           {/* Sidebar Column */}

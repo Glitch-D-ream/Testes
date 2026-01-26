@@ -77,3 +77,34 @@ export async function getVotacoesSenador(codigoSenador: number): Promise<SenadoV
     return [];
   }
 }
+
+/**
+ * Busca matérias (projetos de lei) de um senador
+ */
+export async function getMateriasSenador(codigoSenador: number): Promise<any[]> {
+  try {
+    const cacheKey = `materias_senado_${codigoSenador}`;
+    const cached = await getPublicDataCache('SENADO', cacheKey);
+    if (cached) return cached;
+
+    const response = await axios.get(`${SENADO_API_BASE}/materia/autor/${codigoSenador}`, {
+      headers: { 'Accept': 'application/json' }
+    });
+
+    const materiasRaw = response.data.ListaMateriasAutoria.Materias.Materia;
+    const materias = (Array.isArray(materiasRaw) ? materiasRaw : [materiasRaw]).slice(0, 10).map((m: any) => ({
+      id: m.CodigoMateria,
+      sigla: m.SiglaMateria,
+      numero: m.NumeroMateria,
+      ano: m.AnoMateria,
+      ementa: m.EmentaMateria || 'Sem ementa disponível',
+      url: `https://www25.senado.leg.br/web/atividade/materias/-/materia/${m.CodigoMateria}`
+    }));
+
+    await savePublicDataCache('SENADO', cacheKey, materias);
+    return materias;
+  } catch (error) {
+    logger.error(`[Senado] Erro ao buscar matérias do senador ${codigoSenador}: ${error}`);
+    return [];
+  }
+}

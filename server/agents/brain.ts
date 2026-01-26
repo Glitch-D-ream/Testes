@@ -40,25 +40,72 @@ export class BrainAgent {
   private async generateOfficialProfile(politicianName: string, sources: FilteredSource[]) {
     logInfo(`[Brain] Gerando Perfil Oficial para ${politicianName}`);
     
+    const supabase = getSupabase();
+    const { data: canonical } = await supabase
+      .from('canonical_politicians')
+      .select('*')
+      .eq('name', politicianName)
+      .single();
+
+    let office = 'Político';
+    let party = 'N/A';
+    let state = 'N/A';
+
+    // Passo 1: Enriquecer Perfil via APIs Oficiais
+    if (canonical) {
+      if (canonical.camara_id) {
+        try {
+          const res = await axios.get(`https://dadosabertos.camara.leg.br/api/v2/deputados/${canonical.camara_id}`);
+          const data = res.data.dados;
+          office = 'Deputado Federal';
+          party = data.ultimoStatus.siglaPartido;
+          state = data.ultimoStatus.siglaUf;
+        } catch (e) { logWarn(`[Brain] Erro ao buscar perfil na Câmara para ${politicianName}`); }
+      } else if (canonical.senado_id) {
+        try {
+          const res = await axios.get(`https://legis.senado.leg.br/dadosabertos/senador/${canonical.senado_id}`, { headers: { 'Accept': 'application/json' } });
+          const data = res.data.DetalheParlamentar.Parlamentar;
+          office = 'Senador';
+          party = data.IdentificacaoParlamentar.SiglaPartidoParlamentar;
+          state = data.IdentificacaoParlamentar.UfParlamentar;
+        } catch (e) { logWarn(`[Brain] Erro ao buscar perfil no Senado para ${politicianName}`); }
+      } else {
+        office = canonical.office;
+        party = canonical.party;
+        state = canonical.state;
+      }
+    }
+
     const mainCategory = this.detectMainCategory(sources);
     const siconfiCategory = mapPromiseToSiconfiCategory(mainCategory);
     const currentYear = new Date().getFullYear();
     
-    // Dados Governamentais Crus (SICONFI)
+    // Passo 2: Dados Governamentais Crus (SICONFI)
+    // Para análise federal, usamos o código da União (1) conforme sugerido pelo DeepSeek
     const budgetViability = await validateBudgetViability(siconfiCategory, 500000000, currentYear - 1);
-    const pibViability = await validateValueAgainstPIB(500000000);
     
-    // Histórico Legislativo (Câmara/Senado)
-    // A GRANDE SIMPLIFICAÇÃO: Analisar projetos de lei reais em vez de promessas de notícias
+    // Passo 3: Histórico Legislativo Real (Projetos de Lei)
+    let projects = [];
+    if (canonical) {
+      if (canonical.camara_id) {
+        const { getProposicoesDeputado } = await import('../integrations/camara.ts');
+        projects = await getProposicoesDeputado(canonical.camara_id);
+      } else if (canonical.senado_id) {
+        const { getMateriasSenador } = await import('../integrations/senado.ts');
+        projects = await getMateriasSenador(canonical.senado_id);
+      }
+    }
+
     const temporalAnalysis = await temporalIncoherenceService.analyzeIncoherence(politicianName, []);
 
     return {
       politicianName,
+      politician: { office, party, state },
       mainCategory,
       budgetViability,
-      pibViability,
       temporalAnalysis,
       legislativeSummary: temporalAnalysis.summary,
+      projects: projects.slice(0, 5), // Top 5 projetos recentes
       timestamp: new Date().toISOString(),
       dataSource: "Dados Abertos (Câmara/Senado/Tesouro Nacional)"
     };
@@ -123,29 +170,31 @@ export class BrainAgent {
 
   private async saveAnalysis(data: any, userId: string | null, existingId: string | null) {
     const supabase = getSupabase();
-    const { analysisService } = await import('../services/analysis.service.ts');
     
+    // A GRANDE SIMPLIFICAÇÃO: Salvar o objeto 'data' completo no campo 'data_sources' (JSONB)
+    // Nota: Usamos 'data_sources' porque a coluna 'results' não existe no schema original do Drizzle.
     const analysisData = {
       user_id: userId,
-      politician_name: data.politicianName,
+      author: data.politicianName, // No schema, 'author' é o nome do político
       text: data.aiAnalysis,
       category: data.mainCategory,
-      results: data,
-      status: 'completed'
+      data_sources: data, // Salvando o JSON completo aqui para o frontend
+      status: 'completed',
+      updated_at: new Date().toISOString()
     };
 
     if (existingId) {
-      await supabase.from('analyses').update(analysisData).eq('id', existingId);
+      logInfo(`[Brain] Atualizando análise existente: ${existingId}`);
+      const { error } = await supabase.from('analyses').update(analysisData).eq('id', existingId);
+      if (error) logError(`[Brain] Erro ao atualizar análise no Supabase`, error as any);
       return { id: existingId, ...data };
     } else {
-      const newAnalysis = await analysisService.createAnalysis(
-        userId, 
-        data.aiAnalysis, 
-        data.politicianName, 
-        data.mainCategory, 
-        data
-      );
-      return newAnalysis;
+      const { nanoid } = await import('nanoid');
+      const id = nanoid();
+      logInfo(`[Brain] Criando nova análise: ${id}`);
+      const { error } = await supabase.from('analyses').insert([{ id, ...analysisData }]);
+      if (error) logError(`[Brain] Erro ao inserir análise no Supabase`, error as any);
+      return { id, ...data };
     }
   }
 

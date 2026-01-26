@@ -112,9 +112,6 @@ export class SearchService {
         logInfo(`[Orchestrator] [Job:${analysisId}] [DEBUG] Chamando Brain para análise de dados oficiais...`);
         await brainAgent.analyze(politicianName, [], userId, analysisId);
         
-        logInfo(`[Orchestrator] [Job:${analysisId}] [DEBUG] Brain concluído. Atualizando status final...`);
-        await supabase.from('analyses').update({ status: 'completed' }).eq('id', analysisId);
-        
         logInfo(`[Orchestrator] [Job:${analysisId}] Concluído com sucesso.`);
       } catch (error: any) {
         const errorMessage = error.message || 'Erro desconhecido durante a auditoria técnica';
