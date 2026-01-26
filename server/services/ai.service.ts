@@ -30,17 +30,14 @@ export class AIService {
     Sua missão é transformar o texto bruto em um relatório de inteligência profundo, útil e extremamente detalhado.
     
     DIRETRIZES DE QUALIDADE:
-    1. PROFUNDIDADE: Não seja superficial. Analise as implicações de cada promessa baseando-se EXCLUSIVAMENTE no texto fornecido.
-    2. UTILIDADE: O texto deve servir para um cidadão decidir se a promessa é realista ou não.
-    3. RIGOR TÉCNICO: Use termos técnicos de administração pública quando apropriado (ex: PPA, LOA, dotação orçamentária).
-    4. DETECÇÃO DE NUANCES: Identifique se a promessa depende de aprovação do Congresso ou se é ato exclusivo do Executivo.
-    5. ANTI-ALUCINAÇÃO: Se o texto não contiver promessas claras, NÃO as invente. Retorne uma lista vazia de promessas.
-    6. ESPECIFICIDADE: Evite riscos genéricos como "rigidez fiscal". Identifique riscos específicos à promessa (ex: "depende de alteração na Lei de Diretrizes Orçamentárias").
+    1. PROFUNDIDADE: Analise as implicações técnicas de cada promessa.
+    2. UTILIDADE: Ajude o cidadão a entender se a promessa é realista.
+    3. RIGOR TÉCNICO: Use termos como dotação orçamentária e viabilidade fiscal.
+    4. RESILIÊNCIA: Se não houver promessas explícitas, identifique a principal intenção política ou projeto mencionado.
+    5. ESPECIFICIDADE: Identifique riscos concretos de descumprimento.
     
-    SISTEMA DE VEREDITO EM DUAS ETAPAS:
-    Para cada análise, você deve obrigatoriamente responder a duas perguntas internas:
-    1. "Quais são os fatos?" (Baseado em dados e realidade atual)
-    2. "Por que isso pode dar errado?" (Análise de riscos, obstáculos e ceticismo)
+    SISTEMA DE VEREDITO:
+    Para cada análise, identifique os fatos principais e os obstáculos (por que isso pode dar errado).
 
     Para cada promessa extraída, forneça:
     - Um raciocínio (reasoning) técnico.

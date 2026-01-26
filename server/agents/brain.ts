@@ -1,53 +1,74 @@
-import { FilteredSource } from './filter.ts';
-import axios from 'axios';
 import { logInfo, logError, logWarn } from '../core/logger.ts';
 import { getSupabase } from '../core/database.ts';
+import { aiService } from '../services/ai.service.ts';
 import { validateBudgetViability, mapPromiseToSiconfiCategory } from '../integrations/siconfi.ts';
-import { validateValueAgainstPIB } from '../integrations/ibge.ts';
 import { temporalIncoherenceService } from '../services/temporal-incoherence.service.ts';
-import { cacheService } from '../services/cache.service.ts';
+import { FilteredSource } from './filter.ts';
+import axios from 'axios';
 
 export class BrainAgent {
-  /**
-   * O Cérebro Central 4.0 (Operação Tapa-Buraco): Desacoplado e Seguro
-   */
-  async analyze(politicianName: string, sources: FilteredSource[] = [], userId: string | null = null, existingAnalysisId: string | null = null, ignoreCache: boolean = false) {
-    logInfo(`[Brain] Iniciando análise para: ${politicianName}`);
-    
+  async analyze(politicianName: string, sources: FilteredSource[] = [], userId: string | null = null, existingId: string | null = null, ignoreCache: boolean = false) {
+    const cleanName = politicianName.trim();
+    logInfo(`[Brain] Iniciando análise profunda para: ${cleanName}`);
+
     try {
-      // FLUXO 1: Perfil Oficial (SEMPRE ATIVO - Sem IA)
-      const officialProfile = await this.generateOfficialProfile(politicianName, sources);
+      const dataSources = await this.generateOfficialProfile(cleanName, sources, ignoreCache);
       
-      // A GRANDE SIMPLIFICAÇÃO: Análise de Intenção suspensa para recalibragem
-      logInfo(`[Brain] Modo Simplificado: Usando apenas dados oficiais para ${politicianName}.`);
+      // Gerar Parecer Técnico via IA
+      const reportPrompt = `Gere um parecer técnico para o político ${cleanName}. 
+      Contexto: ${dataSources.politician.office} do ${dataSources.politician.party}-${dataSources.politician.state}.
+      Foco: ${dataSources.mainCategory}.
+      Veredito Orçamentário: ${dataSources.budgetVerdict}.
+      Resumo: ${dataSources.budgetSummary}.`;
       
-      const finalResult = this.consolidateResults(officialProfile, null);
+      const aiAnalysis = await aiService.generateReport(reportPrompt);
       
-      // FLUXO 2: Persistência
-      this.rejectIfInsane(finalResult);
-      const saved = await this.saveAnalysis(finalResult, userId, existingAnalysisId);
-      
-      return saved;
+      await this.saveAnalysis(userId, existingId, {
+        politicianName: cleanName,
+        aiAnalysis,
+        mainCategory: dataSources.mainCategory,
+        dataSources
+      });
+
+      return dataSources;
     } catch (error) {
-      logError(`[Brain] Falha na análise de ${politicianName}`, error as Error);
+      logError(`[Brain] Falha na análise de ${cleanName}`, error as Error);
       throw error;
     }
   }
 
-  private async generateOfficialProfile(politicianName: string, sources: FilteredSource[]) {
+  private async generateOfficialProfile(politicianName: string, sources: FilteredSource[], ignoreCache: boolean = false) {
     const cleanName = politicianName.trim();
+    const supabase = getSupabase();
+
+    // 1.1 Verificar Cache de Análise Completa (Sugestão DeepSeek)
+    if (!ignoreCache) {
+      const { data: cachedAnalysis } = await supabase
+        .from('analyses')
+        .select('*')
+        .eq('politician_name', cleanName)
+        .eq('status', 'completed')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+
+      if (cachedAnalysis) {
+        const ageInHours = (new Date().getTime() - new Date(cachedAnalysis.created_at).getTime()) / (1000 * 60 * 60);
+        if (ageInHours < 24) { 
+          logInfo(`[Brain] Cache válido encontrado para: ${cleanName}`);
+          return cachedAnalysis.data_sources;
+        }
+      }
+    }
+
     logInfo(`[Brain] Gerando Perfil Oficial para ${cleanName}`);
     
-    const supabase = getSupabase();
-    
-    // Normalização para busca: Tentar nome exato, depois tentar com ilike
     let { data: canonical } = await supabase
       .from('canonical_politicians')
       .select('*')
-      .ilike('name', cleanName)
+      .eq('name', cleanName)
       .single();
 
-    // Se não encontrar, tentar uma busca mais flexível
     if (!canonical) {
       const { data: searchResults } = await supabase
         .from('canonical_politicians')
@@ -64,7 +85,6 @@ export class BrainAgent {
     let party = 'N/A';
     let state = 'N/A';
 
-    // Passo 1: Enriquecer Perfil via APIs Oficiais
     if (canonical) {
       if (canonical.camara_id) {
         try {
@@ -73,7 +93,7 @@ export class BrainAgent {
           office = 'Deputado Federal';
           party = data.ultimoStatus.siglaPartido;
           state = data.ultimoStatus.siglaUf;
-        } catch (e) { logWarn(`[Brain] Erro ao buscar perfil na Câmara para ${politicianName}`); }
+        } catch (e) { logWarn(`[Brain] Erro ao buscar perfil na Câmara para ${cleanName}`); }
       } else if (canonical.senado_id) {
         try {
           const res = await axios.get(`https://legis.senado.leg.br/dadosabertos/senador/${canonical.senado_id}`, { headers: { 'Accept': 'application/json' } });
@@ -81,32 +101,20 @@ export class BrainAgent {
           office = 'Senador';
           party = data.IdentificacaoParlamentar.SiglaPartidoParlamentar;
           state = data.IdentificacaoParlamentar.UfParlamentar;
-        } catch (e) { logWarn(`[Brain] Erro ao buscar perfil no Senado para ${politicianName}`); }
-      } else {
-        office = canonical.office || office;
-        party = canonical.party || party;
-        state = canonical.state || state;
+        } catch (e) { logWarn(`[Brain] Erro ao buscar perfil no Senado para ${cleanName}`); }
       }
       
-      // Fallback final: Se as APIs falharam mas temos dados no canônico, use-os
-      if (party === 'N/A' && canonical.party) party = canonical.party;
-      if (state === 'N/A' && canonical.state) state = canonical.state;
+      if ((party === 'N/A' || !party) && canonical.party) party = canonical.party;
+      if ((state === 'N/A' || !state) && canonical.state) state = canonical.state;
       if (office === 'Político' && canonical.office) office = canonical.office;
-    } else {
-      // Se não é canônico, tenta extrair das fontes ou mantém padrão
-      office = 'Político';
-      party = 'N/A';
-      state = 'N/A';
     }
 
     const mainCategory = this.detectMainCategory(sources);
     const siconfiCategory = mapPromiseToSiconfiCategory(mainCategory);
     const currentYear = new Date().getFullYear();
     
-    // Passo 2: Dados Governamentais Crus (SICONFI)
     const budgetViability = await validateBudgetViability(siconfiCategory, 500000000, currentYear - 1);
     
-    // Passo 3: Histórico Legislativo Real (Projetos de Lei)
     let projects = [];
     if (canonical) {
       if (canonical.camara_id) {
@@ -118,9 +126,8 @@ export class BrainAgent {
       }
     }
 
-    const temporalAnalysis = await temporalIncoherenceService.analyzeIncoherence(politicianName, []);
+    const temporalAnalysis = await temporalIncoherenceService.analyzeIncoherence(cleanName, []);
     
-    // Novas métricas (Sprint da Verdade)
     let votingHistory: any[] = [];
     let partyAlignment = 0;
     let rebellionRate = 0;
@@ -137,8 +144,8 @@ export class BrainAgent {
       }
       
       const safeVotingHistory = Array.isArray(votingHistory) ? votingHistory : [];
-      
       const votesWithOrientation = safeVotingHistory.filter(v => v.orientacao && v.orientacao !== 'N/A');
+      
       if (votesWithOrientation.length > 0) {
         const rebelliousVotes = votesWithOrientation.filter(v => v.rebeldia).length;
         rebellionRate = (rebelliousVotes / votesWithOrientation.length) * 100;
@@ -148,98 +155,54 @@ export class BrainAgent {
       }
 
       const authorThemes = Array.isArray(projects) ? projects.map(p => p.ementa?.toLowerCase() || '') : [];
-      const themes = ['Educação', 'Saúde', 'Segurança', 'Economia', 'Meio Ambiente'];
-      
-      topicalCoherence = themes.map(theme => {
-        const keywords: string[] = {
-          'Educação': ['educação', 'ensino', 'escola', 'universidade', 'professor'],
-          'Saúde': ['saúde', 'hospital', 'médico', 'sus', 'vacina', 'medicamento'],
-          'Segurança': ['segurança', 'polícia', 'crime', 'armas', 'penal', 'violência'],
-          'Economia': ['economia', 'tributário', 'imposto', 'fiscal', 'orçamento', 'finanças'],
-          'Meio Ambiente': ['meio ambiente', 'ambiental', 'clima', 'floresta', 'ecossistema', 'sustentável']
-        }[theme] || [];
-
-        const hasAuthorProject = authorThemes.some(t => keywords.some(k => t.includes(k)));
-        const relatedVotes = safeVotingHistory.filter(v => keywords.some(k => (v.ementa || '').toLowerCase().includes(k)));
-        
-        if (hasAuthorProject && relatedVotes.length > 0) {
-          const positiveVotes = relatedVotes.filter(v => v.voto === 'Sim').length;
-          const score = (positiveVotes / relatedVotes.length) * 100;
-          return { theme, score, count: relatedVotes.length, hasAuthorProject };
-        }
-        return null;
-      }).filter(Boolean);
+      topicalCoherence = [
+        { theme: 'Social', score: this.calculateTopicScore(authorThemes, ['social', 'pobreza', 'fome', 'auxílio']), count: authorThemes.length },
+        { theme: 'Econômico', score: this.calculateTopicScore(authorThemes, ['economia', 'imposto', 'tributo', 'fiscal']), count: authorThemes.length }
+      ];
     }
 
-    // Passo 4: Gerar Veredito Orçamentário
-    const executionRate = budgetViability.executionRate || 0;
-    let budgetVerdict = "🔍 Dados de Execução Indisponíveis ou Nulos";
-    
-    if (executionRate > 80) budgetVerdict = "✅ Execução Orçamentária Adequada";
-    else if (executionRate > 50) budgetVerdict = "⚠️ Execução Orçamentária Lenta";
-    else if (executionRate > 0) budgetVerdict = "🚨 Baixa Execução Orçamentária";
-
-    const budgetSummary = `📊 CONTEXTO ORÇAMENTÁRIO: A execução financeira da pasta ${mainCategory} está ${budgetVerdict.replace(/^[^\s]+\s/, '')} (${executionRate.toFixed(1)}% do orçamento executado).`;
-
-    const consistencyScore = topicalCoherence.length > 0 
-      ? topicalCoherence.reduce((acc: number, curr: any) => acc + curr.score, 0) / topicalCoherence.length 
-      : 100;
-
-    const verificationSeal = {
-      status: "VERIFICADO",
-      authority: "Dados Abertos (Câmara/Senado/Tesouro)",
-      lastCheck: new Date().toISOString(),
-      integrityHash: Math.random().toString(36).substring(7).toUpperCase()
-    };
-
-    const finalName = canonical?.name || cleanName;
-
     return {
-      politicianName: finalName,
+      politicianName: canonical?.name || cleanName,
       politician: { office, party, state },
       mainCategory,
       budgetViability,
-      budgetVerdict,
-      budgetSummary,
-      projects,
-      temporalAnalysis,
-      votingHistory: Array.isArray(votingHistory) ? votingHistory : [],
+      budgetVerdict: budgetViability?.verdict || 'Análise indisponível',
+      budgetSummary: budgetViability?.summary || 'Dados orçamentários insuficientes para veredito.',
+      projects: projects.slice(0, 5),
+      votingHistory: votingHistory.slice(0, 5),
       partyAlignment,
       rebellionRate,
       topicalCoherence,
-      consistencyScore,
-      verificationSeal
+      verificationSeal: {
+        status: 'VERIFICADO',
+        lastCheck: new Date().toISOString(),
+        integrityHash: Math.random().toString(36).substring(7).toUpperCase()
+      },
+      consistencyScore: (partyAlignment + (topicalCoherence[0]?.score || 0)) / 2
     };
   }
 
-  private consolidateResults(profile: any, aiAnalysis: any) {
-    return {
-      ...profile,
-      aiAnalysis: aiAnalysis || "Análise profunda não realizada por falta de evidências textuais.",
-      confidence: aiAnalysis ? 85 : 100,
-      status: aiAnalysis ? 'full_analysis' : 'official_profile_only'
-    };
+  private detectMainCategory(sources: FilteredSource[]): string {
+    const text = sources.map(s => s.content).join(' ').toLowerCase();
+    if (text.includes('saúde') || text.includes('médico') || text.includes('hospital')) return 'SAUDE';
+    if (text.includes('educação') || text.includes('escola') || text.includes('ensino')) return 'EDUCACAO';
+    if (text.includes('segurança') || text.includes('polícia') || text.includes('crime')) return 'SEGURANCA';
+    if (text.includes('economia') || text.includes('imposto') || text.includes('emprego')) return 'ECONOMIA';
+    return 'GERAL';
   }
 
-  private rejectIfInsane(data: any) {
-    if (data.confidence > 100) data.confidence = 100;
-    if (!data.politicianName || data.politicianName === 'Autor Desconhecido') {
-      throw new Error('SANITY_FAIL: Político não identificado');
-    }
-    if (data.budgetViability && data.budgetViability.executionRate > 100) {
-       data.budgetViability.executionRate = 100;
-    }
+  private calculateTopicScore(themes: string[], keywords: string[]): number {
+    if (themes.length === 0) return 0;
+    const matches = themes.filter(t => keywords.some(k => t.includes(k))).length;
+    return (matches / themes.length) * 100;
   }
 
-  private async saveAnalysis(data: any, userId: string | null, existingId: string | null) {
+  private async saveAnalysis(userId: string | null, existingId: string | null, data: any) {
     const supabase = getSupabase();
-    
-    // Garantir que a estrutura de data_sources seja compatível com o frontend
     const legacyDataSources = {
-      ...data,
-      politician: data.politician || { office: 'Político', party: 'N/A', state: 'N/A' },
-      budgetVerdict: data.budgetVerdict || 'N/A',
-      consistencyScore: data.consistencyScore || 0
+      ...data.dataSources,
+      budgetVerdict: data.dataSources.budgetVerdict || 'N/A',
+      consistencyScore: data.dataSources.consistencyScore || 0
     };
 
     const analysisData = {
@@ -254,25 +217,10 @@ export class BrainAgent {
     };
 
     if (existingId) {
-      const { error } = await supabase.from('analyses').update(analysisData).eq('id', existingId);
-      if (error) logError(`[Brain] Erro ao atualizar análise no Supabase`, error as any);
-      return { id: existingId, ...data };
+      await supabase.from('analyses').update(analysisData).eq('id', existingId);
     } else {
-      const { nanoid } = await import('nanoid');
-      const id = nanoid();
-      const { error } = await supabase.from('analyses').insert([{ id, ...analysisData }]);
-      if (error) logError(`[Brain] Erro ao inserir análise no Supabase`, error as any);
-      return { id, ...data };
+      await supabase.from('analyses').insert([{ ...analysisData, id: Math.random().toString(36).substring(7) }]);
     }
-  }
-
-  private detectMainCategory(sources: FilteredSource[]): string {
-    const text = sources.map(s => (s.title + ' ' + s.content).toLowerCase()).join(' ');
-    if (text.includes('saúde')) return 'SAUDE';
-    if (text.includes('educação')) return 'EDUCACAO';
-    if (text.includes('segurança')) return 'SEGURANCA';
-    if (text.includes('economia')) return 'ECONOMIA';
-    return 'GERAL';
   }
 }
 

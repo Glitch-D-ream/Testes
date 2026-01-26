@@ -65,16 +65,19 @@ export class FilterAgent {
     
     if (isStaticProfile && !hasAction) return false;
 
-    // 3. Critério de Tamanho Mínimo
-    if (combinedText.length < 40) return false;
+    // 3. Critério de Tamanho Mínimo (Reduzido conforme DeepSeek)
+    if (combinedText.length < 30) return false;
 
-    // 4. Critério de Relevância Política Básica (Expandido)
+    // 4. Critério de Relevância Política Básica (Expandido conforme DeepSeek)
     const politicalKeywords = [
       'governo', 'política', 'projeto', 'lei', 'verba', 'orçamento', 
       'eleição', 'candidato', 'partido', 'ministro', 'deputado', 'senador',
       'brasileiro', 'brasil', 'estado', 'público', 'social', 'história',
       'comunista', 'militante', 'escritor', 'professor', 'pernambuco',
-      'youtuber', 'marxista', 'pcb', 'candidatura', 'investimento', 'anúncio'
+      'youtuber', 'marxista', 'pcb', 'candidatura', 'investimento', 'anúncio',
+      'gestão', 'administração', 'políticas', 'programa', 'ação', 'medida',
+      'iniciativa', 'proposta', 'agenda', 'trabalho', 'desenvolvimento',
+      'sociedade', 'nação', 'município', 'fiscal', 'tributário', 'vou', 'prometo'
     ];
     
     const hasPoliticalContext = politicalKeywords.some(kw => combinedText.includes(kw));
