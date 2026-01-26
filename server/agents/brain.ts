@@ -348,7 +348,10 @@ export class BrainAgent {
     const legacyDataSources = {
       ...data.dataSources,
       budgetVerdict: data.dataSources.budgetVerdict || 'N/A',
-      consistencyScore: data.dataSources.consistencyScore || 0
+      consistencyScore: data.dataSources.consistencyScore || 0,
+      contrastAnalysis: data.dataSources.contrastAnalysis,
+      technicalPromises: data.dataSources.technicalPromises,
+      govPlanPromises: data.dataSources.govPlanPromises
     };
 
     const { DataCompressor } = await import('../core/compression.ts');
