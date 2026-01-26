@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { logInfo, logError, logWarn } from '../core/logger.ts';
 import { groqService } from './ai-groq.service.ts';
+import { deepSeekService } from './ai-deepseek.service.ts';
 
 export interface AIAnalysisResult {
   promises: Array<{
@@ -164,7 +165,18 @@ export class AIService {
   }
 
   async analyzeText(text: string): Promise<AIAnalysisResult> {
-    // 1. Tentar Groq (Primário - Ultra Rápido)
+    // 1. Tentar DeepSeek R1 via OpenRouter (Elite - Raciocínio Profundo)
+    const openRouterKey = process.env.OPENROUTER_API_KEY;
+    if (openRouterKey) {
+      try {
+        logInfo('[AI] Tentando DeepSeek R1 para análise de raciocínio profundo...');
+        return await deepSeekService.analyzeText(text, openRouterKey);
+      } catch (error: any) {
+        logWarn(`[AI] DeepSeek R1 falhou: ${error.message}. Tentando Groq...`);
+      }
+    }
+
+    // 2. Tentar Groq (Rápido e Eficiente)
     try {
       logInfo('[AI] Tentando Groq para análise estruturada...');
       const systemPrompt = 'Você é um analista político sênior. Responda estritamente em JSON.';
@@ -187,9 +199,10 @@ export class AIService {
         }
       }
     } catch (error: any) {
-      logWarn(`[AI] Groq falhou na análise estruturada: ${error.message}. Tentando fallback...`);
+      logWarn(`[AI] Groq falhou na análise estruturada: ${error.message}. Tentando Pollinations...`);
     }
 
+    // 3. Fallback para Pollinations (Código Aberto / Gratuito)
     try {
       return await this.analyzeWithOpenSource(text);
     } catch (error) {
