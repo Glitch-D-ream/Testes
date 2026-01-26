@@ -7,6 +7,8 @@ export interface FilteredSource {
   source: string;
   publishedAt?: string;
   justification: string;
+  promiseStrength: 'strong' | 'medium' | 'weak';
+  credibilityLayer: 'A' | 'B' | 'C';
 }
 
 export class FilterAgent {
@@ -21,16 +23,24 @@ export class FilterAgent {
     for (const source of sources) {
       const content = source.content || '';
       const title = source.title || '';
+      const layer = source.credibilityLayer || 'B';
       
       // Heurística simples para pré-filtragem (passando título também)
       if (this.simpleHeuristic(content, flexibleMode, title)) {
+        // Determinar força da promessa baseada na camada e conteúdo
+        let strength: 'strong' | 'medium' | 'weak' = 'medium';
+        if (layer === 'A') strength = 'strong';
+        else if (layer === 'C') strength = 'weak';
+
         filtered.push({
           title: source.title,
           url: source.url,
           content: content,
           source: source.source,
           publishedAt: source.publishedAt,
-          justification: 'Detectado potencial compromisso ou posicionamento político relevante.'
+          credibilityLayer: layer,
+          promiseStrength: strength,
+          justification: `[Camada ${layer}] Detectado potencial compromisso ou posicionamento político relevante.`
         });
       }
     }

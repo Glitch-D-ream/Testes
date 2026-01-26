@@ -14,6 +14,7 @@ export interface OfficialSourceResult {
   source: string;
   type: 'official';
   confidence: 'high';
+  credibilityLayer: 'A';
 }
 
 export class OfficialSourcesSearch {
@@ -36,7 +37,8 @@ export class OfficialSourcesSearch {
             content: `Dados oficiais do Deputado Federal ${deputy.nome}. Partido: ${deputy.siglaPartido}, Estado: ${deputy.uf}.`,
             source: 'Câmara dos Deputados',
             type: 'official',
-            confidence: 'high'
+            confidence: 'high',
+            credibilityLayer: 'A'
           });
 
           // Adicionar link de proposições
@@ -46,7 +48,8 @@ export class OfficialSourcesSearch {
             content: `Histórico de atuação legislativa, projetos de lei e votos do deputado ${deputy.nome}.`,
             source: 'Câmara dos Deputados',
             type: 'official',
-            confidence: 'high'
+            confidence: 'high',
+            credibilityLayer: 'A'
           });
         }
       }
@@ -83,7 +86,8 @@ export class OfficialSourcesSearch {
             content: `Dados oficiais do Senador ${info.NomeParlamentar}. Partido: ${info.SiglaPartidoParlamentar}, Estado: ${info.UfParlamentar}.`,
             source: 'Senado Federal',
             type: 'official',
-            confidence: 'high'
+            confidence: 'high',
+            credibilityLayer: 'A'
           });
         }
       }

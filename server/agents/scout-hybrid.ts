@@ -18,6 +18,7 @@ export interface RawSource {
   publishedAt?: string;
   type: 'news' | 'social' | 'official';
   confidence: 'high' | 'medium' | 'low';
+  credibilityLayer: 'A' | 'B' | 'C';
 }
 
 export class ScoutHybrid {
@@ -59,7 +60,8 @@ export class ScoutHybrid {
       source: r.source,
       publishedAt: new Date().toISOString(),
       type: 'official' as const,
-      confidence: 'high' as const
+      confidence: 'high' as const,
+      credibilityLayer: 'A' as const
     })));
     logInfo(`[ScoutHybrid] Fontes oficiais encontradas: ${officialResults.length}`);
 
@@ -70,6 +72,11 @@ export class ScoutHybrid {
     const directScrapePromises = uniqueDirectResults.map(async (r) => {
       try {
         const fullContent = await contentScraper.scrape(r.url);
+        const url = r.url.toLowerCase();
+        let layer: 'A' | 'B' | 'C' = 'B';
+        if (url.includes('.gov.br') || url.includes('.leg.br')) layer = 'A';
+        else if (url.includes('twitter.com') || url.includes('x.com')) layer = 'C';
+
         return {
           title: r.title,
           url: r.url,
@@ -77,7 +84,8 @@ export class ScoutHybrid {
           source: r.source,
           publishedAt: r.publishedAt,
           type: 'news' as const,
-          confidence: this.whitelist.some(d => r.url.includes(d)) ? 'high' as const : 'medium' as const
+          confidence: this.whitelist.some(d => r.url.includes(d)) ? 'high' as const : 'medium' as const,
+          credibilityLayer: layer
         };
       } catch (e) {
         return null;
@@ -107,7 +115,8 @@ export class ScoutHybrid {
             source: r.source,
             publishedAt: r.publishedAt,
             type: 'news' as const,
-            confidence: 'high' as const
+            confidence: 'high' as const,
+            credibilityLayer: 'B' as const // Portais de elite são Camada B
           };
         }));
       });
@@ -133,7 +142,8 @@ export class ScoutHybrid {
               source: r.source,
               publishedAt: r.publishedAt,
               type: 'news',
-              confidence: r.confidence
+              confidence: r.confidence,
+              credibilityLayer: r.credibilityLayer
             });
           }
         });

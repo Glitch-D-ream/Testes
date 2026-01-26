@@ -10,6 +10,7 @@ export interface RawSource {
   source: string;
   publishedAt: string;
   confidence: 'high' | 'medium' | 'low';
+  credibilityLayer: 'A' | 'B' | 'C'; // A: Oficial/Planos, B: Jornalismo, C: Redes Sociais
 }
 
 /**
@@ -102,15 +103,24 @@ export class MultiScoutAgent {
         }
 
         if (data && data.results && Array.isArray(data.results)) {
-          return data.results.map((item: any) => ({
-            id: nanoid(),
-            url: item.url || `https://news.search/${nanoid()}`,
-            title: item.title || 'Sem título',
-            content: item.content || 'Sem conteúdo',
-            source: model,
-            publishedAt: item.publishedAt || new Date().toISOString(),
-            confidence: 'medium'
-          }));
+          return data.results.map((item: any) => {
+            // Determinar camada de credibilidade baseada na URL
+            let layer: 'A' | 'B' | 'C' = 'B';
+            const url = (item.url || '').toLowerCase();
+            if (url.includes('.gov.br') || url.includes('.leg.br') || url.includes('tse.jus.br')) layer = 'A';
+            else if (url.includes('twitter.com') || url.includes('x.com') || url.includes('facebook.com')) layer = 'C';
+
+            return {
+              id: nanoid(),
+              url: item.url || `https://news.search/${nanoid()}`,
+              title: item.title || 'Sem título',
+              content: item.content || 'Sem conteúdo',
+              source: model,
+              publishedAt: item.publishedAt || new Date().toISOString(),
+              confidence: layer === 'A' ? 'high' : 'medium',
+              credibilityLayer: layer
+            };
+          });
         }
       } catch (error) {
         logWarn(`[Multi-Scout] Modelo ${model} falhou:`, error as Error);
@@ -143,6 +153,11 @@ export class MultiScoutAgent {
       let count = 0;
 
       while ((match = resultRegex.exec(html)) !== null && count < 5) {
+        const url = match[1].toLowerCase();
+        let layer: 'A' | 'B' | 'C' = 'B';
+        if (url.includes('.gov.br') || url.includes('.leg.br')) layer = 'A';
+        else if (url.includes('twitter.com') || url.includes('x.com')) layer = 'C';
+
         sources.push({
           id: nanoid(),
           url: match[1],
@@ -150,7 +165,8 @@ export class MultiScoutAgent {
           content: match[3].trim(),
           source: 'DuckDuckGo',
           publishedAt: new Date().toISOString(),
-          confidence: 'medium'
+          confidence: layer === 'A' ? 'high' : 'medium',
+          credibilityLayer: layer
         });
         count++;
       }
@@ -192,7 +208,8 @@ export class MultiScoutAgent {
               content: description.replace(/<[^>]+>/g, '').substring(0, 300),
               source: new URL(feedUrl).hostname || 'RSS Feed',
               publishedAt: new Date().toISOString(),
-              confidence: 'medium'
+              confidence: 'medium',
+              credibilityLayer: 'B' // RSS de portais jornalísticos é Camada B
             });
           }
           if (sources.length >= 5) break;

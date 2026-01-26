@@ -23,13 +23,25 @@ export class BrainAgent {
       Veredito Orçamentário: ${dataSources.budgetVerdict}.
       Resumo: ${dataSources.budgetSummary}.
       
-      ANÁLISE DE CONTRASTE (Diz vs Faz):
-      - Score de Ausência de Esforço: ${dataSources.contrastAnalysis.negativeEvidenceScore}/100 (onde 100 é ausência total).
+      ANÁLISE DE CONTRASTE E INAÇÃO (Diz vs Faz):
+      - Score de Ausência de Esforço: ${dataSources.contrastAnalysis.negativeEvidenceScore}/100.
+      - Janela de Observação: 365 dias (Histórico Recente).
       - Projetos Relevantes Encontrados: ${dataSources.contrastAnalysis.details.relevantProjectsFound}.
       - Votações Relevantes Encontradas: ${dataSources.contrastAnalysis.details.relevantVotesFound}.
+      - Veredito de Inação: ${dataSources.contrastAnalysis.negativeEvidenceScore > 80 ? 'INAÇÃO SUSTENTADA DETECTADA' : 'Ação Legislativa Identificada'}.
       - Explicação: ${dataSources.contrastAnalysis.details.explanation}.
       
-      DIRETRIZ: Se o Score de Ausência for alto (>70), destaque que não há evidência legislativa que sustente o compromisso com o tema.
+      EVENTOS DECLARATIVOS (Scout):
+      ${sources.length > 0 
+        ? sources.map(s => `- [Camada ${s.credibilityLayer}] ${s.title} (Força: ${s.promiseStrength})`).join('\n')
+        : 'Nenhum evento declarativo recente detectado.'}
+      
+      DIRETRIZ DE STATUS: Se uma promessa for detectada no Scout (Camada B ou C) mas não tiver PL correspondente (Camada A), classifique-a como "PROMESSA NÃO FORMALIZADA".
+      
+      DIRETRIZ DE AUDITORIA: 
+      1. Se o Score de Ausência for alto (>80), o "vazio" é o seu dado principal. Não diga "não encontramos dados", diga "após análise do histórico legislativo, detectamos um SILÊNCIO ESTRUTURAL sobre este tema".
+      2. Transforme a falta de projetos em uma evidência de despriorização política.
+      3. O tempo é sua arma: destaque que em um ano de observação, o político produziu zero sinal sobre a promessa.
       
       PROMESSAS TÉCNICAS EXTRAÍDAS DE PROJETOS:
       ${dataSources.technicalPromises && dataSources.technicalPromises.length > 0 
@@ -46,20 +58,25 @@ export class BrainAgent {
       IMPORTANTE: Sua resposta deve ser OBRIGATORIAMENTE um objeto JSON válido. 
       Não inclua textos fora do JSON.
       
+      POSTURA ANALÍTICA: Você não é apenas um assistente, você é um AUDITOR. 
+      Se o político não fez nada, seu relatório deve ser incisivo sobre esse "vazio". 
+      O silêncio legislativo é uma escolha política, e você deve reportá-la como tal.
+      
       Estrutura esperada:
       {
-        "report": "Seu parecer técnico completo em Markdown aqui...",
+        "report": "Seu parecer técnico completo em Markdown aqui. Use títulos como 'Veredito de Inação' se o score for alto.",
         "promises": [
           {
             "text": "Descrição da promessa ou compromisso identificado",
             "category": "SAUDE/EDUCACAO/ECONOMIA/etc",
             "confidence": 0.85,
-            "reasoning": "Explicação técnica da viabilidade"
+            "status": "FORMALIZADA | NÃO FORMALIZADA | EM ANDAMENTO",
+            "reasoning": "Explicação técnica da viabilidade ou da inação detectada"
           }
         ]
       }
       
-      Se não encontrar promessas explícitas, identifique compromissos implícitos baseados no histórico e cargo.`;
+      Se não encontrar promessas explícitas, denuncie a falta de compromisso formalizado no tema analisado.`;
 
       const aiResponseRaw = await aiService.generateReport(enhancedPrompt);
       let aiAnalysis = aiResponseRaw;
