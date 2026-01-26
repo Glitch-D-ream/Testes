@@ -11,7 +11,9 @@ import {
   Calendar,
   User as UserIcon,
   Tag as TagIcon,
-  Image as ImageIcon
+  Image as ImageIcon,
+  ShieldCheck,
+  ZapOff
 } from 'lucide-react';
 import { ViabilityThermometer } from '../components/ViabilityThermometer';
 import { PromiseCard } from '../components/PromiseCard';
@@ -69,7 +71,7 @@ export default function Analysis() {
       <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950">
         <div className="text-center space-y-4">
           <div className="animate-spin w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full mx-auto" />
-          <p className="text-slate-500 font-medium">Processando auditoria profunda...</p>
+          <p className="text-slate-500 font-medium">Validando dados oficiais e auditoria...</p>
         </div>
       </div>
     );
@@ -83,13 +85,15 @@ export default function Analysis() {
             <AlertTriangle size={40} />
           </div>
           <h1 className="text-2xl font-bold">Análise não encontrada</h1>
-          <p className="text-slate-500">O relatório solicitado não existe ou foi removido.</p>
+          <p className="text-slate-500">O relatório solicitado não existe ou o político não foi identificado com clareza.</p>
           <Button onClick={() => navigate('/')} fullWidth>Voltar ao Início</Button>
         </div>
       </div>
     );
   }
 
+  const results = data.results || {};
+  const isOfficialOnly = results.status === 'official_profile_only';
   const promises = data.promises || [];
 
   return (
@@ -113,14 +117,6 @@ export default function Analysis() {
               {copied ? 'Copiado' : 'Compartilhar'}
             </Button>
             <Button 
-              variant="outline" 
-              size="sm" 
-              icon={<ImageIcon size={16} />}
-              onClick={() => window.open(`${import.meta.env.VITE_API_URL || ''}/api/analyze/${id}/image`, '_blank')}
-            >
-              Card
-            </Button>
-            <Button 
               variant="primary" 
               size="sm" 
               icon={<Download size={16} />}
@@ -133,6 +129,19 @@ export default function Analysis() {
       </div>
 
       <main className="max-w-5xl mx-auto px-4 pt-8">
+        {/* Status Banner */}
+        {isOfficialOnly && (
+          <div className="mb-8 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-2xl p-4 flex items-center gap-4">
+            <div className="p-2 bg-amber-100 dark:bg-amber-900/40 text-amber-600 rounded-xl">
+              <ZapOff size={24} />
+            </div>
+            <div>
+              <h3 className="font-bold text-amber-800 dark:text-amber-200">Análise de IA Indisponível</h3>
+              <p className="text-sm text-amber-700 dark:text-amber-300">Exibindo apenas o <strong>Perfil Oficial</strong> baseado em dados governamentais crus. Nenhuma evidência textual válida foi encontrada para análise profunda.</p>
+            </div>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
           
           {/* Main Content Column */}
@@ -140,8 +149,8 @@ export default function Analysis() {
             {/* Header Section */}
             <section className="bg-white dark:bg-slate-900 rounded-2xl p-8 border border-slate-200 dark:border-slate-800 shadow-sm">
               <div className="flex flex-wrap gap-3 mb-6">
-                <span className="px-3 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-600 text-xs font-bold rounded-full uppercase tracking-wider">
-                  Relatório de Auditoria
+                <span className="px-3 py-1 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 text-xs font-bold rounded-full uppercase tracking-wider flex items-center gap-1">
+                  <ShieldCheck size={12} /> Perfil Validado
                 </span>
                 <span className="px-3 py-1 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 text-xs font-bold rounded-full uppercase tracking-wider flex items-center gap-1">
                   <Calendar size={12} /> {new Date(data.createdAt || '').toLocaleDateString('pt-BR')}
@@ -149,31 +158,27 @@ export default function Analysis() {
               </div>
 
               <h1 className="text-3xl font-bold mb-6 leading-tight">
-                Análise de Viabilidade: {data.author || 'Autor Não Identificado'}
+                {data.politician_name || data.author}
               </h1>
 
               <div className="flex flex-wrap gap-6 text-sm text-slate-500 mb-8 border-y border-slate-100 dark:border-slate-800 py-4">
                 <div className="flex items-center gap-2">
                   <UserIcon size={16} className="text-blue-500" />
-                  <span className="font-medium">{data.author || 'N/A'}</span>
+                  <span className="font-medium">{results.politician?.role || 'N/A'}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <TagIcon size={16} className="text-blue-500" />
-                  <span className="font-medium">{data.category || 'Geral'}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <BarChart size={16} className="text-blue-500" />
-                  <span className="font-medium">{data.promisesCount} promessas detectadas</span>
+                  <span className="font-medium">{results.politician?.party || 'N/A'} - {results.politician?.state || 'N/A'}</span>
                 </div>
               </div>
 
               <div className="prose dark:prose-invert max-w-none">
                 <h3 className="text-lg font-bold mb-3 flex items-center gap-2">
-                  <Info size={20} className="text-blue-600" /> Texto Analisado
+                  <Info size={20} className="text-blue-600" /> Parecer Técnico
                 </h3>
-                <p className="text-slate-600 dark:text-slate-400 italic bg-slate-50 dark:bg-slate-800/50 p-4 rounded-xl border-l-4 border-blue-600">
-                  "{data.text}"
-                </p>
+                <div className="text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/50 p-6 rounded-xl border-l-4 border-blue-600 whitespace-pre-wrap">
+                  {data.text || "Nenhuma análise textual disponível."}
+                </div>
               </div>
             </section>
 
@@ -184,100 +189,80 @@ export default function Analysis() {
                   <BarChart size={24} />
                 </div>
                 <div>
-                  <h2 className="text-xl font-black tracking-tight">Análise Orçamentária Real</h2>
-                  <p className="text-xs text-slate-500 font-medium uppercase tracking-widest">Dados Oficiais SICONFI</p>
+                  <h2 className="text-xl font-black tracking-tight">Execução Orçamentária: {results.mainCategory || 'Geral'}</h2>
+                  <p className="text-xs text-slate-500 font-medium uppercase tracking-widest">Fonte: SICONFI / Tesouro Nacional</p>
                 </div>
               </div>
               
               <BudgetChart 
-                totalBudget={data.totalBudget || 1500000000000} 
-                executedBudget={data.executedBudget || 1100000000000} 
-                executionRate={data.executionRate || 73.5} 
+                totalBudget={results.budgetViability?.totalBudget || 0} 
+                executedBudget={results.budgetViability?.executedBudget || 0} 
+                executionRate={results.budgetViability?.executionRate || 0} 
                 theme={document.documentElement.classList.contains('dark') ? 'dark' : 'light'}
               />
+              <p className="mt-4 text-xs text-slate-400 italic">
+                * Dados referentes ao último exercício fiscal disponível. A taxa de execução reflete o quanto do orçamento empenhado foi efetivamente liquidado.
+              </p>
             </section>
 
             {/* Promises List */}
-            <section className="space-y-6">
-              <div className="flex items-center justify-between px-2">
-                <h2 className="text-xl font-black tracking-tight flex items-center gap-3">
-                  <CheckCircle2 size={28} className="text-emerald-500" /> 
-                  Promessas Auditadas
-                </h2>
-                <span className="px-3 py-1 bg-slate-100 dark:bg-slate-800 text-slate-500 text-[10px] font-black rounded-full uppercase tracking-widest">
-                  {promises.length} DETECTADAS
-                </span>
-              </div>
-              
-              {promises.length > 0 ? (
-                <div className="grid grid-cols-1 gap-6">
-                  {promises.map((promise: any, index: number) => (
-                    <PromiseCard 
-                      key={index} 
-                      id={promise.id}
-                      text={promise.promise_text || promise.text}
-                      category={promise.category || 'Geral'}
-                      confidence={promise.confidence_score || promise.confidence || 0}
-                      negated={promise.negated || false}
-                      conditional={promise.conditional || false}
-                      reasoning={promise.reasoning}
-                      evidenceSnippet={promise.evidence_snippet}
-                      sourceName={promise.source_name}
-                      sourceUrl={promise.source_url}
-                      legislativeIncoherence={promise.legislative_incoherence}
-                      legislativeSourceUrl={promise.legislative_source_url}
-                    />
-                  ))}
+            {!isOfficialOnly && (
+              <section className="space-y-6">
+                <div className="flex items-center justify-between px-2">
+                  <h2 className="text-xl font-black tracking-tight flex items-center gap-3">
+                    <CheckCircle2 size={28} className="text-emerald-500" /> 
+                    Promessas Auditadas
+                  </h2>
                 </div>
-              ) : (
-                <div className="bg-white dark:bg-slate-900 p-16 rounded-3xl border-2 border-dashed border-slate-200 dark:border-slate-800 text-center">
-                  <div className="w-16 h-16 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <Info size={32} className="text-slate-400" />
+                
+                {promises.length > 0 ? (
+                  <div className="grid grid-cols-1 gap-6">
+                    {promises.map((promise: any, index: number) => (
+                      <PromiseCard 
+                        key={index} 
+                        id={promise.id}
+                        text={promise.promise_text || promise.text}
+                        category={promise.category || 'Geral'}
+                        confidence={promise.confidence_score || promise.confidence || 0}
+                        reasoning={promise.reasoning}
+                        evidenceSnippet={promise.evidence_snippet}
+                      />
+                    ))}
                   </div>
-                  <p className="text-slate-500 font-bold uppercase tracking-widest text-sm">Nenhuma promessa clara detectada</p>
-                  <p className="text-xs text-slate-400 mt-2">O texto analisado pode não conter compromissos verificáveis.</p>
-                </div>
-              )}
-            </section>
+                ) : (
+                  <div className="bg-white dark:bg-slate-900 p-12 rounded-3xl border-2 border-dashed border-slate-200 dark:border-slate-800 text-center">
+                    <p className="text-slate-500 font-bold uppercase tracking-widest text-sm">Nenhuma promessa explícita detectada</p>
+                  </div>
+                )}
+              </section>
+            )}
           </div>
 
           {/* Sidebar Column */}
           <div className="lg:col-span-4 space-y-6">
-            {/* Score Card */}
             <div className="sticky top-24">
               <ViabilityThermometer score={(data.probabilityScore || 0) / 100} />
               
               <div className="mt-6 bg-white dark:bg-slate-900 rounded-2xl p-6 border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
-                <h3 className="font-bold text-sm uppercase tracking-wider text-slate-400">Metodologia Real</h3>
+                <h3 className="font-bold text-sm uppercase tracking-wider text-slate-400">Confiança dos Dados</h3>
                 <div className="space-y-3">
                   <div className="flex items-start gap-3">
                     <div className="w-6 h-6 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center flex-shrink-0">
-                      <CheckCircle2 size={14} />
+                      <ShieldCheck size={14} />
                     </div>
                     <p className="text-xs text-slate-500">
-                      <strong>SICONFI:</strong> Confronto direto com execução orçamentária federal/estadual.
+                      <strong>Identificação:</strong> Político validado via Tabela Canônica (IDs Oficiais).
                     </p>
                   </div>
                   <div className="flex items-start gap-3">
                     <div className="w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center flex-shrink-0">
-                      <CheckCircle2 size={14} />
+                      <BarChart size={14} />
                     </div>
                     <p className="text-xs text-slate-500">
-                      <strong>TSE:</strong> Validação de histórico eleitoral e propostas registradas.
-                    </p>
-                  </div>
-                  <div className="flex items-start gap-3">
-                    <div className="w-6 h-6 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center flex-shrink-0">
-                      <CheckCircle2 size={14} />
-                    </div>
-                    <p className="text-xs text-slate-500">
-                      <strong>IA:</strong> Extração semântica de compromissos e intenções.
+                      <strong>Orçamento:</strong> Dados crus do SICONFI sem interferência de IA.
                     </p>
                   </div>
                 </div>
-                <Button variant="ghost" size="sm" fullWidth className="text-xs" onClick={() => navigate('/methodology')}>
-                  Ver detalhes técnicos
-                </Button>
               </div>
             </div>
           </div>

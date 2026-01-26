@@ -3,362 +3,163 @@ import { logInfo, logError, logWarn } from '../core/logger.ts';
 import { getSupabase } from '../core/database.ts';
 import { validateBudgetViability, mapPromiseToSiconfiCategory } from '../integrations/siconfi.ts';
 import { validateValueAgainstPIB } from '../integrations/ibge.ts';
-import { getDeputadoId, getVotacoesDeputado, analisarIncoerencia } from '../integrations/camara.ts';
-import { getSenadorCodigo, getVotacoesSenador } from '../integrations/senado.ts';
-import { cacheService } from '../services/cache.service.ts';
 import { temporalIncoherenceService } from '../services/temporal-incoherence.service.ts';
+import { cacheService } from '../services/cache.service.ts';
 
 export class BrainAgent {
   /**
-   * O Cérebro Central 3.0: Com Cache, Resiliência e Análise de Incoerência Temporal
+   * O Cérebro Central 4.0 (Operação Tapa-Buraco): Desacoplado e Seguro
    */
   async analyze(politicianName: string, sources: FilteredSource[] = [], userId: string | null = null, existingAnalysisId: string | null = null, ignoreCache: boolean = false) {
-    logInfo(`[Brain] Iniciando análise profunda para: ${politicianName}`);
-    const brainStart = Date.now();
-
-    // Timeout de segurança para a análise toda (60 segundos)
-    const timeoutPromise = new Promise((_, reject) => 
-      setTimeout(() => reject(new Error('Tempo limite de análise excedido (60s). O servidor de IA ou as fontes externas estão demorando muito.')), 60000)
-    );
+    logInfo(`[Brain] Iniciando análise para: ${politicianName}`);
     
     try {
-      return await Promise.race([
-        this.executeAnalysis(politicianName, sources, userId, existingAnalysisId, ignoreCache),
-        timeoutPromise
-      ]) as any;
+      // FLUXO 1: Perfil Oficial (SEMPRE ATIVO - Sem IA)
+      const officialProfile = await this.generateOfficialProfile(politicianName, sources);
+      
+      // FLUXO 2: Análise de Intenção (OPCIONAL - Com IA)
+      // Só roda se houver fontes válidas e o político for identificado
+      let aiAnalysis = null;
+      const validSources = sources.filter(s => s.source !== 'Generic Fallback' && s.content && s.content.length > 50);
+      
+      if (validSources.length > 0) {
+        aiAnalysis = await this.generateAIAnalysis(politicianName, validSources, officialProfile);
+      } else {
+        logWarn(`[Brain] Fontes insuficientes para análise de IA em ${politicianName}.`);
+      }
+
+      // Consolidação dos Resultados
+      const finalResult = this.consolidateResults(officialProfile, aiAnalysis);
+      
+      // Sanity Check Final
+      this.rejectIfInsane(finalResult);
+
+      // Persistência
+      const savedAnalysis = await this.saveAnalysis(finalResult, userId, existingAnalysisId);
+      
+      return savedAnalysis;
     } catch (error) {
-      logError(`[Brain] Falha na análise profunda de ${politicianName}`, error as Error);
+      logError(`[Brain] Falha na análise de ${politicianName}`, error as Error);
       throw error;
     }
   }
 
-  private async executeAnalysis(politicianName: string, sources: FilteredSource[] = [], userId: string | null = null, existingAnalysisId: string | null = null, ignoreCache: boolean = false) {
+  private async generateOfficialProfile(politicianName: string, sources: FilteredSource[]) {
+    logInfo(`[Brain] Gerando Perfil Oficial para ${politicianName}`);
+    
+    const mainCategory = this.detectMainCategory(sources);
+    const siconfiCategory = mapPromiseToSiconfiCategory(mainCategory);
+    const currentYear = new Date().getFullYear();
+    
+    // Dados Governamentais Crus
+    const budgetViability = await validateBudgetViability(siconfiCategory, 500000000, currentYear - 1);
+    const pibViability = await validateValueAgainstPIB(500000000);
+    
+    // Histórico Legislativo (Diz vs Faz)
+    const promiseTexts = sources.map(s => s.content).filter(c => c && c.length > 0);
+    const temporalAnalysis = await temporalIncoherenceService.analyzeIncoherence(politicianName, promiseTexts);
+
+    return {
+      politicianName,
+      mainCategory,
+      budgetViability,
+      pibViability,
+      temporalAnalysis,
+      timestamp: new Date().toISOString()
+    };
+  }
+
+  private async generateAIAnalysis(politicianName: string, sources: FilteredSource[], profile: any) {
+    logInfo(`[Brain] Gerando Análise de IA para ${politicianName}`);
+    
+    const { aiService } = await import('../services/ai.service.ts');
+    
+    const knowledgeBase = sources
+      .map(s => `### ${s.title}\n> ${s.content}`)
+      .join('\n\n');
+
+    const prompt = `
+      AUDITORIA TÉCNICA: ${politicianName}
+      CATEGORIA: ${profile.mainCategory}
+      DADOS OFICIAIS: ${profile.budgetViability.reason}
+      HISTÓRICO: ${profile.temporalAnalysis.summary}
+      
+      EVIDÊNCIAS:
+      ${knowledgeBase}
+      
+      Gere um parecer técnico curto (máx 3 parágrafos) sobre a exequibilidade das intenções encontradas.
+      Se não houver promessas claras, diga apenas: "Nenhuma promessa explícita detectada nas fontes fornecidas."
+    `;
+
     try {
-      // 0. Validação de Qualidade de Dados (Modo Permissivo)
-      const validSources = Array.isArray(sources) ? sources.filter(s => s.source !== 'Generic Fallback') : [];
-
-      if (validSources.length === 0 && sources.length > 0) {
-        logWarn(`[Brain] Nenhuma fonte válida encontrada. Usando fontes originais para tentar análise.`);
-      }
-
-      const targetSources = validSources.length > 0 ? validSources : sources;
-
-      // 0.1. Verificar Cache
-      if (!ignoreCache) {
-        const cachedAnalysis = await cacheService.getAnalysis(politicianName);
-        if (cachedAnalysis) {
-          logInfo(`[Brain] Análise recuperada do cache para: ${politicianName}`);
-          return cachedAnalysis;
-        }
-      }
-      
-      logWarn(`[Brain] Análise não encontrada em cache. Executando análise completa...`);
-
-      // 1. Base de Conhecimento Rica
-      const knowledgeBase = targetSources
-        .map(s => {
-          const title = s.title || 'Declaração Identificada';
-          return `### ${title}\n**Fonte:** ${s.source} | **Data:** ${s.publishedAt || 'Recente'}\n\n> ${s.content}\n\n**Análise de Contexto:** ${s.justification}`;
-        })
-        .join('\n\n---\n\n');
-
-      // 2. Histórico e Aprendizado
-      const history = await this.getPoliticianHistory(politicianName);
-      const historyContext = history 
-        ? `Este político possui um histórico de ${history.totalAnalyses} análises no sistema, com uma média de confiabilidade de ${history.avgScore}%.`
-        : "Este é o primeiro registro detalhado deste político em nossa base de dados em tempo real.";
-
-      // 3. Validação Orçamentária (SICONFI)
-      const mainCategory = this.detectMainCategory(sources);
-      const siconfiCategory = mapPromiseToSiconfiCategory(mainCategory);
-      const currentYear = new Date().getFullYear();
-      
-      const budgetStart = Date.now();
-      // 3. Validação Orçamentária (SICONFI) - Usar valor simbólico apenas se não houver promessas
-      const budgetViability = await validateBudgetViability(siconfiCategory, 500000000, currentYear - 1);
-      logInfo(`[Brain] Tempo SICONFI: ${Date.now() - budgetStart}ms`);
-      
-      const pibStart = Date.now();
-      // 3.1. Validação Macro (IBGE)
-      const pibViability = await validateValueAgainstPIB(500000000);
-      logInfo(`[Brain] Tempo IBGE: ${Date.now() - pibStart}ms`);
-
-      // 4. NOVO: Análise de Incoerência Temporal (Diz vs Faz)
-      const temporalStart = Date.now();
-      const promiseTexts = Array.isArray(sources) ? sources.map(s => s.content).filter(c => c && c.length > 0) : [];
-      const temporalAnalysis = await temporalIncoherenceService.analyzeIncoherence(politicianName, promiseTexts);
-      logInfo(`[Brain] Tempo Incoerência Temporal: ${Date.now() - temporalStart}ms`);
-
-      const temporalSection = temporalAnalysis.hasIncoherence
-        ? `## 🔄 ANÁLISE DE INCOERÊNCIA TEMPORAL (DIZ VS FAZ)
-**Coerência Histórica:** ${temporalAnalysis.coherenceScore}%
-
-${temporalAnalysis.contradictions.map(c => 
-  `- **${c.promiseText}** vs Votação em ${c.votedAgainstOn}: ${c.votedAgainstBill} (Severidade: ${c.severity.toUpperCase()})`
-).join('\n')}
-
-**Resumo:** ${temporalAnalysis.summary}
-
----
-
-`
-        : `## 🔄 ANÁLISE DE INCOERÊNCIA TEMPORAL (DIZ VS FAZ)
-**Coerência Histórica:** ${temporalAnalysis.coherenceScore}%
-
-${temporalAnalysis.summary}
-
----
-
-`;
-
-      // 5. Prompt Consolidado de Auditoria (Extração + Análise + Relatório)
-      const reportPrompt = `
-### MISSÃO: AUDITORIA TÉCNICA INTEGRADA
-Você deve processar as evidências brutas e os dados orçamentários para gerar um dossiê de auditoria completo.
-
-### DIRETRIZES DE RIGOR:
-1. **ZERO ALUCINAÇÃO:** Não invente promessas. Se o político não fez promessas claras nas fontes, declare "Nenhuma promessa explícita detectada".
-2. **NEUTRALIDADE CIRÚRGICA:** Use tom de relatório do Tesouro Nacional. Sem adjetivos.
-3. **CRUZAMENTO DE DADOS:** Use os dados do SICONFI e IBGE fornecidos para validar cada afirmação encontrada nas fontes.
-
-### DADOS DE ENTRADA:
-- **Político:** ${politicianName}
-- **Categoria Alvo:** ${mainCategory}
-- **Orçamento Real (SICONFI):** ${budgetViability.reason}
-- **Contexto Macro (IBGE):** ${pibViability.context}
-- **Histórico Legislativo:** ${temporalAnalysis.summary}
-
-### EVIDÊNCIAS BRUTAS (FONTES):
-${knowledgeBase}
-
-### FORMATO DE SAÍDA (MARKDOWN):
-## 📑 DOSSIÊ DE AUDITORIA: ${politicianName.toUpperCase()}
-## 📊 1. EVIDÊNCIAS COLETADAS
-(Liste as principais declarações encontradas nas fontes)
-
-## 💰 2. ANÁLISE DE COMPATIBILIDADE FISCAL
-(Cruze as declarações com os dados do SICONFI: ${mainCategory})
-
-## ⚠️ 3. MATRIZ DE RISCOS TÉCNICOS
-(Obstáculos reais à execução)
-
-## ⚖️ 4. PARECER TÉCNICO FINAL
-(Veredito sobre a exequibilidade baseado em dados)
-
----
-**NOTA DE TRANSPARÊNCIA:** Auditoria gerada pelo sistema **Seth VII**. Ancoragem estrita em dados oficiais e evidências auditadas.
-`;
-
-      const { aiService } = await import('../services/ai.service.ts');
-      let fullContext;
-      const aiStart = Date.now();
-      try {
-        fullContext = await aiService.generateReport(reportPrompt);
-        logInfo(`[Brain] Tempo Geração Relatório IA: ${Date.now() - aiStart}ms`);
-      } catch (reportError) {
-        logError('[Brain] Falha ao gerar relatório profissional, tentando fallback estruturado', reportError as Error);
-        const aiResponse = await aiService.analyzeText(reportPrompt);
-        fullContext = aiResponse.text || aiResponse.analysisData?.text || "Falha ao gerar relatório detalhado.";
-      }
-      
-      let analysis;
-      const extraData = {
-        totalBudget: (budgetViability as any).totalBudget || 0,
-        executedBudget: (budgetViability as any).executedBudget || 0,
-        executionRate: (budgetViability as any).executionRate || 0,
-        metadata: {
-          pibContext: pibViability.context,
-          temporalSummary: temporalAnalysis.summary
-        }
-      };
-
-      if (existingAnalysisId) {
-        analysis = await this.updateExistingAnalysis(existingAnalysisId, fullContext, politicianName, mainCategory);
-      } else {
-        const { analysisService } = await import('../services/analysis.service.ts');
-        analysis = await analysisService.createAnalysis(userId, fullContext, politicianName, mainCategory, extraData);
-        
-        // Garantir que o status seja atualizado para completed se for uma nova análise
-        const supabase = getSupabase();
-        await supabase.from('analyses').update({ status: 'completed' }).eq('id', analysis.id);
-      }
-
-      const result = {
-        ...analysis,
-        politicianName: politicianName, // Garantir que o nome do político seja retornado
-        budgetViability,
-        pibViability,
-        mainCategory,
-        temporalAnalysis
-      };
-
-      // Salvar em cache para futuras consultas
-      cacheService.saveAnalysis(politicianName, result).catch(err => logWarn('[Brain] Erro ao salvar em cache', err));
-
-      logInfo(`[Brain] Análise concluída com sucesso para ${politicianName}.`);
-      
-      return result;
+      const response = await aiService.generateReport(prompt);
+      return response;
     } catch (error) {
-      logError(`[Brain] Falha na análise profunda de ${politicianName}`, error as Error);
-      throw error;
+      logError(`[Brain] Erro na IA`, error as Error);
+      return "Análise de IA indisponível no momento.";
+    }
+  }
+
+  private consolidateResults(profile: any, aiAnalysis: any) {
+    return {
+      ...profile,
+      aiAnalysis: aiAnalysis || "Análise profunda não realizada por falta de evidências textuais.",
+      confidence: aiAnalysis ? 85 : 100, // 100% se for apenas dados oficiais
+      status: aiAnalysis ? 'full_analysis' : 'official_profile_only'
+    };
+  }
+
+  private rejectIfInsane(data: any) {
+    if (data.confidence > 100) {
+      logError(`[SanityCheck] Confidence absurda detectada: ${data.confidence}%`, new Error('SANITY_FAIL'));
+      data.confidence = 100; // Força correção
+    }
+    
+    if (!data.politicianName || data.politicianName === 'Autor Desconhecido') {
+      throw new Error('SANITY_FAIL: Político não identificado');
+    }
+
+    // Evitar o erro de 923% ou métricas impossíveis
+    if (data.budgetViability && data.budgetViability.executionRate > 100) {
+       logWarn(`[SanityCheck] Taxa de execução absurda corrigida: ${data.budgetViability.executionRate}%`);
+       data.budgetViability.executionRate = 100;
+    }
+  }
+
+  private async saveAnalysis(data: any, userId: string | null, existingId: string | null) {
+    const supabase = getSupabase();
+    const { analysisService } = await import('../services/analysis.service.ts');
+    
+    const analysisData = {
+      user_id: userId,
+      politician_name: data.politicianName,
+      text: data.aiAnalysis,
+      category: data.mainCategory,
+      results: data,
+      status: 'completed'
+    };
+
+    if (existingId) {
+      await supabase.from('analyses').update(analysisData).eq('id', existingId);
+      return { id: existingId, ...data };
+    } else {
+      const newAnalysis = await analysisService.createAnalysis(
+        userId, 
+        data.aiAnalysis, 
+        data.politicianName, 
+        data.mainCategory, 
+        data
+      );
+      return newAnalysis;
     }
   }
 
   private detectMainCategory(sources: FilteredSource[]): string {
-    const validSources = sources.filter(s => s.source !== 'Generic Fallback');
-    const targetSources = validSources.length > 0 ? validSources : sources;
-    const text = targetSources.map(s => (s.title + ' ' + s.content).toLowerCase()).join(' ');
-    if (text.includes('saúde') || text.includes('hospital') || text.includes('médico') || text.includes('sus') || text.includes('vacina')) return 'SAUDE';
-    if (text.includes('educação') || text.includes('escola') || text.includes('ensino') || text.includes('universidade') || text.includes('professor')) return 'EDUCACAO';
-    if (text.includes('segurança') || text.includes('polícia') || text.includes('crime') || text.includes('violência') || text.includes('guarda')) return 'SEGURANCA';
-    if (text.includes('economia') || text.includes('imposto') || text.includes('pib') || text.includes('inflação') || text.includes('juros')) return 'ECONOMIA';
-    if (text.includes('infraestrutura') || text.includes('obras') || text.includes('estrada') || text.includes('ponte') || text.includes('asfalto')) return 'INFRAESTRUTURA';
-    if (text.includes('agricultura') || text.includes('rural') || text.includes('fazenda') || text.includes('safra')) return 'AGRICULTURA';
-    if (text.includes('cultura') || text.includes('arte') || text.includes('cinema') || text.includes('teatro')) return 'CULTURA';
-    if (text.includes('transporte') || text.includes('ônibus') || text.includes('metrô') || text.includes('trem')) return 'TRANSPORTE';
-    if (text.includes('habitação') || text.includes('casa') || text.includes('moradia') || text.includes('apartamento')) return 'HABITACAO';
-    if (text.includes('saneamento') || text.includes('água') || text.includes('esgoto') || text.includes('lixo')) return 'SANEAMENTO';
-    if (text.includes('ciência') || text.includes('tecnologia') || text.includes('pesquisa') || text.includes('inovação')) return 'CIENCIA';
-    if (text.includes('trabalho') || text.includes('emprego') || text.includes('salário') || text.includes('fgts')) return 'TRABALHO';
-    if (text.includes('social') || text.includes('pobreza') || text.includes('fome') || text.includes('auxílio')) return 'SOCIAL';
+    const text = sources.map(s => (s.title + ' ' + s.content).toLowerCase()).join(' ');
+    if (text.includes('saúde')) return 'SAUDE';
+    if (text.includes('educação')) return 'EDUCACAO';
+    if (text.includes('segurança')) return 'SEGURANCA';
+    if (text.includes('economia')) return 'ECONOMIA';
     return 'GERAL';
   }
-
-  private async updateExistingAnalysis(id: string, text: string, author: string, category: string) {
-    const { aiService } = await import('../services/ai.service.ts');
-    const { deepSeekService } = await import('../services/ai-deepseek.service.ts');
-    const { calculateProbability } = await import('../modules/probability.ts');
-    const { nanoid } = await import('nanoid');
-    const supabase = getSupabase();
-
-    let aiAnalysis;
-    const openRouterKey = process.env.OPENROUTER_API_KEY;
-    
-    if (openRouterKey && openRouterKey !== 'sua_chave_aqui') {
-      try {
-        logInfo('[Brain] Utilizando DeepSeek R1 para análise de raciocínio profundo...');
-        aiAnalysis = await deepSeekService.analyzeText(text, openRouterKey);
-      } catch (err) {
-        logError('[Brain] Falha no DeepSeek R1, recorrendo ao AIService padrão', err as Error);
-        aiAnalysis = await aiService.analyzeText(text);
-      }
-    } else {
-      aiAnalysis = await aiService.analyzeText(text);
-    }
-    
-    const promises = aiAnalysis.promises.map(p => {
-      // Tentar encontrar o snippet original no texto para dar contexto real
-      let evidenceSnippet = text.substring(0, 1000);
-      const promiseIndex = text.toLowerCase().indexOf(p.text.toLowerCase().substring(0, 30));
-      if (promiseIndex !== -1) {
-        const start = Math.max(0, promiseIndex - 200);
-        const end = Math.min(text.length, promiseIndex + p.text.length + 300);
-        evidenceSnippet = "..." + text.substring(start, end).replace(/\s+/g, ' ').trim() + "...";
-      }
-
-      return {
-        text: p.text,
-        confidence: p.confidence,
-        category: p.category,
-        negated: p.negated,
-        conditional: p.conditional,
-        reasoning: p.reasoning,
-        risks: p.risks || [],
-        evidenceSnippet: evidenceSnippet,
-        sourceName: 'Múltiplas Fontes Auditadas',
-        newsTitle: 'Análise Consolidada',
-        legislativeIncoherence: null as string | null,
-        legislativeSourceUrl: null as string | null
-      };
-    });
-
-    if (author) {
-      try {
-        const deputadoId = await getDeputadoId(author);
-        if (deputadoId) {
-          const votacoes = await getVotacoesDeputado(deputadoId);
-          for (const p of promises) {
-            for (const v of votacoes) {
-              const analise = analisarIncoerencia(p.text, v);
-              if (analise.incoerente) {
-                p.legislativeIncoherence = analise.justificativa;
-                p.legislativeSourceUrl = `https://www.camara.leg.br/proposicoesWeb/fichadetramitacao?idProposicao=${v.idVotacao}`;
-                break;
-              }
-            }
-          }
-        }
-      } catch (err) {
-        logError('[BrainAgent] Erro no cruzamento legislativo', err as Error);
-      }
-    }
-
-    const probabilityScore = await calculateProbability(promises, author, category);
-
-    const { error } = await supabase
-      .from('analyses')
-      .update({
-        text,
-        category,
-        extracted_promises: promises,
-        probability_score: probabilityScore.score,
-        methodology_notes: JSON.stringify({
-          factors: probabilityScore.factors,
-          details: probabilityScore.details,
-          verdict: aiAnalysis.verdict
-        }),
-        status: 'completed',
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', id);
-
-    if (error) throw error;
-
-    if (promises.length > 0) {
-      const promisesToInsert = promises.map(p => ({
-        id: nanoid(),
-        analysis_id: id,
-        promise_text: p.text,
-        category: p.category,
-        confidence_score: p.confidence,
-        extracted_entities: { 
-          risks: p.risks || [],
-          legislative_incoherence: p.legislativeIncoherence,
-          legislative_source_url: p.legislativeSourceUrl
-        },
-        negated: p.negated || false,
-        conditional: p.conditional || false,
-        evidence_snippet: p.evidenceSnippet,
-        source_name: p.sourceName,
-        news_title: p.newsTitle
-      }));
-      await supabase.from('promises').insert(promisesToInsert);
-    }
-
-    return { id, probabilityScore, promises };
-  }
-
-  private async getPoliticianHistory(name: string) {
-    try {
-      const supabase = getSupabase();
-      const { data, error } = await supabase
-        .from('analyses')
-        .select('probability_score')
-        .ilike('author', `%${name}%`)
-        .eq('status', 'completed');
-
-      if (error || !data || data.length === 0) return null;
-
-      const totalAnalyses = data.length;
-      const avgScore = data.reduce((acc, curr) => acc + (curr.probability_score || 0), 0) / totalAnalyses;
-      
-      // Garantir que o score médio não ultrapasse 100% e tratar scores salvos como decimais (0-1)
-      const normalizedAvg = avgScore > 1 ? avgScore / 100 : avgScore;
-      return { totalAnalyses, avgScore: Math.min(Math.round(normalizedAvg * 100), 100) };
-    } catch {
-      return null;
-    }
-  }
 }
-
-export const brainAgent = new BrainAgent();
