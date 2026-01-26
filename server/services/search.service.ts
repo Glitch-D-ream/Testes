@@ -120,22 +120,19 @@ export class SearchService {
         
         logInfo(`[Orchestrator] [Job:${analysisId}] Análise concluída com sucesso.`);
       } catch (error: any) {
-        const errorMessage = error.message || 'Erro desconhecido durante a auditoria técnica';
-        logError(`[Orchestrator] [Job:${analysisId}] Falha Crítica: ${errorMessage}`);
+        const errorMessage = error.message || 'Erro técnico durante a auditoria';
+        logError(`[Orchestrator] [Job:${analysisId}] Falha na Auditoria Real: ${errorMessage}`);
         
-        // Tentar salvar o erro detalhado para que o usuário veja no site
         try {
-          const { error: updateError } = await supabase.from('analyses').update({
+          await supabase.from('analyses').update({
             status: 'failed',
-            error_message: `Erro no Seth VII: ${errorMessage}. Por favor, tente novamente em instantes.`,
-            text: `A auditoria falhou: ${errorMessage}`,
+            error_message: `Auditoria Interrompida: ${errorMessage}. O Seth VII não utiliza dados estimados; por favor, tente novamente quando os serviços oficiais estiverem estáveis.`,
+            text: `Falha na integridade dos dados: ${errorMessage}`,
             updated_at: new Date().toISOString()
           }).eq('id', analysisId);
-          
-          if (updateError) throw updateError;
-          logInfo(`[Orchestrator] [Job:${analysisId}] Status de falha registrado no banco.`);
+          logInfo(`[Orchestrator] [Job:${analysisId}] Falha de integridade registrada.`);
         } catch (dbErr: any) {
-          logError(`[Orchestrator] Erro ao reportar falha no banco: ${dbErr.message}`);
+          logError(`[Orchestrator] Erro ao registrar falha: ${dbErr.message}`);
         }
       }
     });

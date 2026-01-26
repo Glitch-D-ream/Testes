@@ -147,21 +147,12 @@ export class AIService {
         throw new Error(`Modelo ${model} não gerou a profundidade esperada`);
       } catch (error) {
         logError(`[AI] Falha na tentativa com ${model}`, error as Error);
-        lastError = error;
         continue;
       }
     }
 
-    logWarn('[AI] Todos os modelos de alta qualidade falharam. Usando fallback básico estruturado.');
-    return {
-      promises: [],
-      overallSentiment: "Análise limitada devido a instabilidade nos provedores de IA gratuitos.",
-      credibilityScore: 50,
-      verdict: {
-        facts: ["Análise de discurso temporariamente limitada."],
-        skepticism: ["Os provedores de IA de código aberto estão instáveis no momento."]
-      }
-    };
+    logError('[AI] Todos os modelos de alta qualidade falharam. Abortando análise para evitar dados imprecisos.');
+    throw new Error('Não foi possível gerar uma análise técnica precisa devido à instabilidade nos provedores de IA. Por favor, tente novamente em instantes.');
   }
 
   async analyzeText(text: string): Promise<AIAnalysisResult> {

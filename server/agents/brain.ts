@@ -21,13 +21,8 @@ export class BrainAgent {
       Veredito Orçamentário: ${dataSources.budgetVerdict}.
       Resumo: ${dataSources.budgetSummary}.`;
       
-      let aiAnalysis = "Análise técnica em processamento...";
-      try {
-        aiAnalysis = await aiService.generateReport(reportPrompt);
-      } catch (e) {
-        logWarn(`[Brain] Falha ao gerar parecer via IA para ${cleanName}. Usando fallback técnico.`);
-        aiAnalysis = `PARECER TÉCNICO SETH VII:\n\nO político ${cleanName} atua como ${dataSources.politician.office} (${dataSources.politician.party}-${dataSources.politician.state}). A auditoria focou na área de ${dataSources.mainCategory}, onde foi identificado um veredito orçamentário: ${dataSources.budgetVerdict}.\n\nNota: A análise profunda de discurso via IA está temporariamente indisponível, mas os dados oficiais acima foram validados com sucesso.`;
-      }
+      logInfo(`[Brain] Gerando parecer técnico via IA para ${cleanName}...`);
+      const aiAnalysis = await aiService.generateReport(reportPrompt);
       
       await this.saveAnalysis(userId, existingId, {
         politicianName: cleanName,
@@ -220,7 +215,10 @@ export class BrainAgent {
       category: data.mainCategory,
       data_sources: legacyDataSources,
       status: 'completed',
-      updated_at: new Date().toISOString()
+      updated_at: new Date().toISOString(),
+      total_budget: data.dataSources.budgetViability?.totalBudget || 0,
+      executed_budget: data.dataSources.budgetViability?.executedBudget || 0,
+      execution_rate: data.dataSources.budgetViability?.executionRate || 0
     };
 
     try {

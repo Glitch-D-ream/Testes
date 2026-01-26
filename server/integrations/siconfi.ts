@@ -72,9 +72,8 @@ export async function getBudgetData(
     });
 
     if (!response.data || !response.data.items) {
-      // Fallback: Se a API falhar, usaremos dados históricos médios para não travar o sistema
-      logger.warn(`[SICONFI] API instável. Usando estimativa histórica para ${category}`);
-      return getHistoricalFallback(category, year, sphere);
+      logger.error(`[SICONFI] Dados não encontrados ou API instável para ${category} em ${year}.`);
+      throw new Error(`Dados orçamentários oficiais para ${category} não estão disponíveis no momento.`);
     }
 
     // Filtrar dados de Empenho e Liquidação
@@ -108,33 +107,10 @@ export async function getBudgetData(
 
     await savePublicDataCache('SICONFI', cacheKey, result);
     return result;
-  } catch (error) {
-    logger.error(`[SICONFI] Erro ao buscar dados: ${error}`);
-    return getHistoricalFallback(category, year, sphere);
+  } catch (error: any) {
+    logger.error(`[SICONFI] Erro ao buscar dados: ${error.message}`);
+    throw error;
   }
-}
-
-function getHistoricalFallback(category: string, year: number, sphere: string): BudgetData {
-  // Dados médios reais do orçamento brasileiro para categorias comuns (em Reais)
-  const fallbacks: Record<string, number> = {
-    'SAUDE': 150000000000,
-    'EDUCACAO': 120000000000,
-    'SEGURANCA': 40000000000,
-    'INFRAESTRUTURA': 30000000000,
-    'GERAL': 50000000000
-  };
-
-  const baseValue = fallbacks[category.toUpperCase()] || fallbacks['GERAL'];
-  
-  return {
-    year,
-    sphere: sphere as any,
-    category,
-    budgeted: baseValue,
-    executed: baseValue * 0.85,
-    percentage: 85,
-    lastUpdated: new Date()
-  };
 }
 
 export async function getBudgetHistory(
@@ -175,7 +151,7 @@ export async function validateBudgetViability(
   const history = await getBudgetHistory(category, currentYear - 2, currentYear - 1, sphere);
 
   if (history.length === 0) {
-    return { viable: true, confidence: 0.3, reason: 'Sem dados históricos disponíveis', historicalData: [] };
+    throw new Error(`Não foi possível validar a viabilidade orçamentária para ${category} devido à ausência de dados históricos oficiais.`);
   }
 
   const avgBudget = history.reduce((sum, h) => sum + h.budgeted, 0) / history.length;
