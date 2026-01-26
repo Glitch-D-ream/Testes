@@ -11,143 +11,98 @@ export interface CachedAnalysis {
 }
 
 /**
- * Cache Service: Armazena análises no Supabase para reutilização
- * Reduz chamadas a APIs e acelera o sistema
+ * Cache Service: Armazena análises e dados governamentais no Supabase
  */
 export class CacheService {
-  private readonly CACHE_TTL_DAYS = 7; // Tempo de vida do cache: 7 dias
+  private readonly CACHE_TTL_DAYS = 7;
 
-  /**
-   * Buscar análise em cache
-   */
   async getAnalysis(politicianName: string): Promise<any | null> {
     try {
       const supabase = getSupabase();
       const now = new Date().toISOString();
-      
       const { data, error } = await supabase
         .from('analysis_cache')
         .select('*')
         .eq('politician_name', politicianName)
         .gt('expires_at', now)
         .single();
-
-      if (error || !data) {
-        logWarn(`[Cache] Análise não encontrada ou expirada para: ${politicianName}`);
-        return null;
-      }
-
-      // Incrementar contador de hits
-      try {
-        await getSupabase()
-          .from('analysis_cache')
-          .update({ hit_count: data.hit_count + 1 })
-          .eq('id', data.id);
-      } catch (e) {
-        // Ignorar erro de atualização de hit count
-      }
-
-      logInfo(`[Cache] Análise encontrada em cache para: ${politicianName} (Hits: ${data.hit_count + 1})`);
+      if (error || !data) return null;
       return data.analysis_data;
     } catch (error) {
-      logWarn(`[Cache] Erro ao buscar análise em cache`, error as Error);
       return null;
     }
   }
 
-  /**
-   * Salvar análise em cache
-   */
   async saveAnalysis(politicianName: string, analysisData: any): Promise<boolean> {
     try {
       const supabase = getSupabase();
-      const now = new Date();
-      const expiresAt = new Date(now.getTime() + this.CACHE_TTL_DAYS * 24 * 60 * 60 * 1000);
-
-      // Primeiro, tentar deletar análise antiga se existir
-      try {
-        await supabase
-          .from('analysis_cache')
-          .delete()
-          .eq('politician_name', politicianName);
-      } catch (e) {
-        logWarn(`[Cache] Erro ao deletar cache antigo para ${politicianName}`);
-      }
-
-      // Depois, inserir nova análise
-      const { error } = await supabase
-        .from('analysis_cache')
-        .insert({
-          politician_name: politicianName,
-          analysis_data: analysisData,
-          created_at: now.toISOString(),
-          expires_at: expiresAt.toISOString(),
-          hit_count: 0
-        });
-
-      if (error) {
-        logWarn(`[Cache] Erro ao salvar análise em cache`, error);
-        return false;
-      }
-
-      logInfo(`[Cache] Análise salva em cache para: ${politicianName} (Expira em: ${expiresAt.toISOString()})`);
+      const expiresAt = new Date(Date.now() + this.CACHE_TTL_DAYS * 24 * 60 * 60 * 1000).toISOString();
+      await supabase.from('analysis_cache').upsert({
+        politician_name: politicianName,
+        analysis_data: analysisData,
+        expires_at: expiresAt,
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'politician_name' });
       return true;
     } catch (error) {
-      logWarn(`[Cache] Erro ao salvar análise em cache`, error as Error);
       return false;
     }
   }
 
   /**
-   * Limpar cache expirado
+   * Buscar dados genéricos em cache (SICONFI, Câmara, Senado)
    */
-  async cleanExpiredCache(): Promise<number> {
+  async getGenericData<T>(key: string): Promise<T | null> {
     try {
       const supabase = getSupabase();
       const now = new Date().toISOString();
-
       const { data, error } = await supabase
-        .from('analysis_cache')
-        .delete()
-        .lt('expires_at', now)
-        .select();
-
-      if (error) {
-        logWarn(`[Cache] Erro ao limpar cache expirado`, error);
-        return 0;
-      }
-
-      const deletedCount = data?.length || 0;
-      logInfo(`[Cache] ${deletedCount} análises expiradas removidas do cache`);
-      return deletedCount;
+        .from('public_data_cache')
+        .select('data_content, expiry_date')
+        .eq('data_source', key)
+        .gt('expiry_date', now)
+        .maybeSingle();
+      if (error || !data) return null;
+      return data.data_content as T;
     } catch (error) {
-      logWarn(`[Cache] Erro ao limpar cache expirado`, error as Error);
-      return 0;
+      logWarn(`[Cache] Erro ao buscar dado genérico: ${key}`, error as Error);
+      return null;
     }
   }
 
   /**
-   * Obter estatísticas de cache
+   * Salvar dados genéricos em cache
    */
-  async getStats(): Promise<{ totalCached: number; totalHits: number; avgHitsPerAnalysis: number }> {
+  async saveGenericData(key: string, source: string, data: any, ttlDays: number = 7): Promise<void> {
     try {
       const supabase = getSupabase();
-      const { data, error } = await supabase
-        .from('analysis_cache')
-        .select('hit_count');
+      const expiresAt = new Date(Date.now() + ttlDays * 24 * 60 * 60 * 1000).toISOString();
+      
+      // Verificar se já existe
+      const { data: existing } = await supabase
+        .from('public_data_cache')
+        .select('id')
+        .eq('data_source', key)
+        .maybeSingle();
 
-      if (error || !data) {
-        return { totalCached: 0, totalHits: 0, avgHitsPerAnalysis: 0 };
+      if (existing) {
+        await supabase.from('public_data_cache').update({
+          data_content: data,
+          expiry_date: expiresAt,
+          last_updated: new Date().toISOString()
+        }).eq('id', existing.id);
+      } else {
+        await supabase.from('public_data_cache').insert({
+          id: Math.random().toString(36).substring(7),
+          data_type: source,
+          data_source: key,
+          data_content: data,
+          expiry_date: expiresAt
+        });
       }
-
-      const totalCached = data.length;
-      const totalHits = data.reduce((sum, item) => sum + (item.hit_count || 0), 0);
-      const avgHitsPerAnalysis = totalCached > 0 ? totalHits / totalCached : 0;
-
-      return { totalCached, totalHits, avgHitsPerAnalysis };
+      logInfo(`[Cache] Dado governamental cacheado: ${key} (${source})`);
     } catch (error) {
-      logWarn(`[Cache] Erro ao obter estatísticas de cache`, error as Error);
-      return { totalCached: 0, totalHits: 0, avgHitsPerAnalysis: 0 };
+      logWarn(`[Cache] Erro ao salvar dado genérico: ${key}`, error as Error);
     }
   }
 }

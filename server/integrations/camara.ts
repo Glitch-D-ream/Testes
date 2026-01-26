@@ -4,7 +4,7 @@
  */
 import axios from 'axios';
 import logger from '../core/logger.ts';
-import { savePublicDataCache, getPublicDataCache } from '../core/database.ts';
+import { cacheService } from '../services/cache.service.ts';
 
 const CAMARA_API_BASE = 'https://dadosabertos.camara.leg.br/api/v2';
 
@@ -25,8 +25,8 @@ export interface Vote {
  */
 export async function getDeputadoId(nome: string): Promise<number | null> {
   try {
-    const cacheKey = `deputado_id_${nome}`;
-    const cached = await getPublicDataCache('CAMARA', cacheKey);
+    const cacheKey = `camara:deputado_id:${nome}`;
+    const cached = await cacheService.getGenericData<{id: number}>(cacheKey);
     if (cached) return cached.id;
 
     const response = await axios.get(`${CAMARA_API_BASE}/deputados`, {
@@ -35,7 +35,7 @@ export async function getDeputadoId(nome: string): Promise<number | null> {
 
     const deputado = response.data.dados[0];
     if (deputado) {
-      await savePublicDataCache('CAMARA', cacheKey, { id: deputado.id });
+      await cacheService.saveGenericData(cacheKey, 'CAMARA', { id: deputado.id }, 30);
       return deputado.id;
     }
     return null;
@@ -50,8 +50,8 @@ export async function getDeputadoId(nome: string): Promise<number | null> {
  */
 export async function getVotacoesDeputado(deputadoId: number): Promise<Vote[]> {
   try {
-    const cacheKey = `votacoes_v6_${deputadoId}`;
-    const cached = await getPublicDataCache('CAMARA', cacheKey);
+    const cacheKey = `camara:votacoes:${deputadoId}`;
+    const cached = await cacheService.getGenericData<Vote[]>(cacheKey);
     if (cached) return cached;
 
     // Buscar votações recentes (sem filtro de data para evitar erro 400)
@@ -95,7 +95,7 @@ export async function getVotacoesDeputado(deputadoId: number): Promise<Vote[]> {
     }
 
     if (votosEncontrados.length > 0) {
-      await savePublicDataCache('CAMARA', cacheKey, votosEncontrados);
+      await cacheService.saveGenericData(cacheKey, 'CAMARA', votosEncontrados, 7);
     }
     return votosEncontrados;
   } catch (error) {
@@ -143,8 +143,8 @@ export function analisarIncoerencia(promessa: string, voto: Vote): { incoerente:
  */
 export async function getProposicoesDeputado(deputadoId: number): Promise<any[]> {
   try {
-    const cacheKey = `proposicoes_camara_${deputadoId}`;
-    const cached = await getPublicDataCache('CAMARA', cacheKey);
+    const cacheKey = `camara:proposicoes:${deputadoId}`;
+    const cached = await cacheService.getGenericData<any[]>(cacheKey);
     if (cached) return cached;
 
     const response = await axios.get(`${CAMARA_API_BASE}/proposicoes`, {
@@ -161,7 +161,7 @@ export async function getProposicoesDeputado(deputadoId: number): Promise<any[]>
       url: `https://www.camara.leg.br/proposicoesWeb/fichadetramitacao?idProposicao=${p.id}`
     }));
 
-    await savePublicDataCache('CAMARA', cacheKey, proposicoes);
+    await cacheService.saveGenericData(cacheKey, 'CAMARA', proposicoes, 7);
     return proposicoes;
   } catch (error) {
     logger.error(`[Camara] Erro ao buscar proposições do deputado ${deputadoId}: ${error}`);

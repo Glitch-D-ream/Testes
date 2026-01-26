@@ -5,7 +5,7 @@
 
 import axios from 'axios';
 import logger from '../core/logger.ts';
-import { savePublicDataCache, getPublicDataCache } from '../core/database.ts';
+import { cacheService } from '../services/cache.service.ts';
 
 // Endpoint real do Tesouro Nacional (Data Lake)
 const SICONFI_API_BASE = 'https://apidatalake.tesouro.gov.br/ords/siconfi/tt/dca';
@@ -43,9 +43,10 @@ export async function getBudgetData(
   sphere: 'FEDERAL' | 'STATE' | 'MUNICIPAL' = 'FEDERAL'
 ): Promise<BudgetData | null> {
   try {
-    const cacheKey = `${category}_${year}_${sphere}`;
-    const cached = await getPublicDataCache('SICONFI', cacheKey);
+    const cacheKey = `siconfi:${category}:${year}:${sphere}`;
+    const cached = await cacheService.getGenericData<BudgetData>(cacheKey);
     if (cached) {
+      logger.info(`[SICONFI] Usando dados em cache para ${category} (${year})`);
       return { ...cached, lastUpdated: new Date(cached.lastUpdated) };
     }
 
@@ -105,7 +106,7 @@ export async function getBudgetData(
       }
     };
 
-    await savePublicDataCache('SICONFI', cacheKey, result);
+    await cacheService.saveGenericData(cacheKey, 'SICONFI', result, 30); // Cache de 30 dias para dados históricos
     return result;
   } catch (error: any) {
     logger.error(`[SICONFI] Erro ao buscar dados: ${error.message}`);

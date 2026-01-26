@@ -1,7 +1,10 @@
 
 import { scoutAgent } from '../agents/scout.ts';
 import { getSupabase, initializeDatabase } from '../core/database.ts';
-import { logInfo, logError } from '../core/logger.ts';
+import { logInfo, logError, logWarn } from '../core/logger.ts';
+import { getBudgetData, syncSiconfiData } from '../integrations/siconfi.ts';
+import { getDeputadoId, getVotacoesDeputado, getProposicoesDeputado } from '../integrations/camara.ts';
+import { getSenadorCodigo, getVotacoesSenador, getMateriasSenador } from '../integrations/senado.ts';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -43,6 +46,11 @@ async function runScoutWorker() {
       }
     }
 
+    // 3. Sincronizar dados orçamentários globais (SICONFI)
+    logInfo('📊 Sincronizando dados orçamentários globais...');
+    const categories = ['SAUDE', 'EDUCACAO', 'SEGURANCA_PUBLICA', 'URBANISMO', 'ASSISTENCIA_SOCIAL'];
+    await syncSiconfiData(categories);
+
     logInfo('✅ Scout Worker concluído com sucesso!');
     process.exit(0);
   } catch (error) {
@@ -54,9 +62,32 @@ async function runScoutWorker() {
 async function processPolitician(name: string) {
   logInfo(`🔍 Buscando dados para: ${name}`);
   try {
-    // O ScoutAgent já salva no banco internamente via saveScoutHistory
+    // 1. Coleta de Notícias (Scout)
     const results = await scoutAgent.search(name, true);
     logInfo(`✨ Encontradas ${results.length} fontes para ${name}`);
+
+    // 2. Coleta de Dados Governamentais (Cache Preventivo)
+    logInfo(`🏛️ Sincronizando dados governamentais para: ${name}`);
+    
+    // Tentar Câmara
+    const deputadoId = await getDeputadoId(name);
+    if (deputadoId) {
+      logInfo(`[Worker] Alimentando cache Câmara para ${name} (ID: ${deputadoId})`);
+      await Promise.all([
+        getVotacoesDeputado(deputadoId),
+        getProposicoesDeputado(deputadoId)
+      ]);
+    }
+
+    // Tentar Senado
+    const senadorId = await getSenadorCodigo(name);
+    if (senadorId) {
+      logInfo(`[Worker] Alimentando cache Senado para ${name} (ID: ${senadorId})`);
+      await Promise.all([
+        getVotacoesSenador(senadorId),
+        getMateriasSenador(senadorId)
+      ]);
+    };
 
     // Cold Storage: Salvar resultados em JSON para o GitHub
     if (results.length > 0) {

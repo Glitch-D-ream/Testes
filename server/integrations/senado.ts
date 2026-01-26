@@ -4,7 +4,7 @@
  */
 import axios from 'axios';
 import logger from '../core/logger.ts';
-import { savePublicDataCache, getPublicDataCache } from '../core/database.ts';
+import { cacheService } from '../services/cache.service.ts';
 
 const SENADO_API_BASE = 'https://legis.senado.leg.br/dadosabertos/senador';
 
@@ -23,8 +23,8 @@ export interface SenadoVote {
  */
 export async function getSenadorCodigo(nome: string): Promise<number | null> {
   try {
-    const cacheKey = `senador_codigo_${nome}`;
-    const cached = await getPublicDataCache('SENADO', cacheKey);
+    const cacheKey = `senado:codigo:${nome}`;
+    const cached = await cacheService.getGenericData<{codigo: number}>(cacheKey);
     if (cached) return cached.codigo;
 
     const response = await axios.get(`${SENADO_API_BASE}/lista/atual`, {
@@ -36,7 +36,7 @@ export async function getSenadorCodigo(nome: string): Promise<number | null> {
     
     if (senador) {
       const codigo = senador.IdentificacaoParlamentar.CodigoParlamentar;
-      await savePublicDataCache('SENADO', cacheKey, { codigo });
+      await cacheService.saveGenericData(cacheKey, 'SENADO', { codigo }, 30);
       return codigo;
     }
     return null;
@@ -51,8 +51,8 @@ export async function getSenadorCodigo(nome: string): Promise<number | null> {
  */
 export async function getVotacoesSenador(codigoSenador: number): Promise<SenadoVote[]> {
   try {
-    const cacheKey = `votacoes_senado_${codigoSenador}`;
-    const cached = await getPublicDataCache('SENADO', cacheKey);
+    const cacheKey = `senado:votacoes:${codigoSenador}`;
+    const cached = await cacheService.getGenericData<SenadoVote[]>(cacheKey);
     if (cached) return cached;
 
     const response = await axios.get(`${SENADO_API_BASE}/${codigoSenador}/votacoes`, {
@@ -70,7 +70,7 @@ export async function getVotacoesSenador(codigoSenador: number): Promise<SenadoV
       ementa: v.Materia.Ementa || 'Sem ementa disponível'
     }));
 
-    await savePublicDataCache('SENADO', cacheKey, votacoes);
+    await cacheService.saveGenericData(cacheKey, 'SENADO', votacoes, 7);
     return votacoes;
   } catch (error) {
     logger.error(`[Senado] Erro ao buscar votações do senador ${codigoSenador}: ${error}`);
@@ -83,8 +83,8 @@ export async function getVotacoesSenador(codigoSenador: number): Promise<SenadoV
  */
 export async function getMateriasSenador(codigoSenador: number): Promise<any[]> {
   try {
-    const cacheKey = `materias_senado_${codigoSenador}`;
-    const cached = await getPublicDataCache('SENADO', cacheKey);
+    const cacheKey = `senado:materias:${codigoSenador}`;
+    const cached = await cacheService.getGenericData<any[]>(cacheKey);
     if (cached) return cached;
 
     const response = await axios.get(`${SENADO_API_BASE}/materia/autor/${codigoSenador}`, {
@@ -101,7 +101,7 @@ export async function getMateriasSenador(codigoSenador: number): Promise<any[]> 
       url: `https://www25.senado.leg.br/web/atividade/materias/-/materia/${m.CodigoMateria}`
     }));
 
-    await savePublicDataCache('SENADO', cacheKey, materias);
+    await cacheService.saveGenericData(cacheKey, 'SENADO', materias, 7);
     return materias;
   } catch (error) {
     logger.error(`[Senado] Erro ao buscar matérias do senador ${codigoSenador}: ${error}`);

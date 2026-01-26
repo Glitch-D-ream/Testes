@@ -207,10 +207,10 @@ export class BrainAgent {
       consistencyScore: data.dataSources.consistencyScore || 0
     };
 
-    const analysisData = {
+    // Criar objeto de dados garantindo compatibilidade com schemas antigos e novos
+    const analysisData: any = {
       user_id: userId,
       author: data.politicianName,
-      politician_name: data.politicianName,
       text: data.aiAnalysis,
       category: data.mainCategory,
       data_sources: legacyDataSources,
@@ -221,20 +221,41 @@ export class BrainAgent {
       execution_rate: data.dataSources.budgetViability?.executionRate || 0
     };
 
+    // Adicionar politician_name apenas se o banco suportar (evita erro de schema cache)
+    // Em alguns casos, o Supabase demora a atualizar o cache de colunas
+    analysisData.politician_name = data.politicianName;
+
     try {
+      let saveError;
       if (existingId) {
         logInfo(`[Brain] Atualizando análise existente: ${existingId}`);
         const { error } = await supabase.from('analyses').update(analysisData).eq('id', existingId);
-        if (error) throw error;
+        saveError = error;
       } else {
         const newId = Math.random().toString(36).substring(7);
         logInfo(`[Brain] Criando nova análise: ${newId}`);
         const { error } = await supabase.from('analyses').insert([{ ...analysisData, id: newId }]);
-        if (error) throw error;
+        saveError = error;
       }
+
+      // Se falhar por causa da coluna politician_name (erro de cache do Supabase), tentar sem ela
+      if (saveError && saveError.message.includes('politician_name')) {
+        logWarn(`[Brain] Falha de schema detectada. Tentando salvamento sem a coluna 'politician_name'...`);
+        delete analysisData.politician_name;
+        if (existingId) {
+          const { error } = await supabase.from('analyses').update(analysisData).eq('id', existingId);
+          saveError = error;
+        } else {
+          const newId = Math.random().toString(36).substring(7);
+          const { error } = await supabase.from('analyses').insert([{ ...analysisData, id: newId }]);
+          saveError = error;
+        }
+      }
+
+      if (saveError) throw saveError;
       logInfo(`[Brain] Status da análise atualizado para 'completed' com sucesso.`);
     } catch (err: any) {
-      logError(`[Brain] Erro ao salvar análise no banco de dados: ${err.message}`);
+      logError(`[Brain] Erro fatal ao salvar análise: ${err.message}`);
       throw err;
     }
   }
