@@ -76,7 +76,7 @@ export class AIService {
   private async analyzeWithOpenSource(text: string): Promise<AIAnalysisResult> {
     // Ordem de Prioridade: Modelos Originais -> Backups de Elite Gratuitos
     const models = [
-      'openai', 'mistral', 'llama', // Originais (Pollinations)
+      'openai', 'gpt-4.1-mini', 'mistral', 'llama', // Originais (Pollinations)
       'deepseek-r1', 'llama-3.3-70b', 'mistral-large' // Backups de Segurança
     ];
     let lastError: any;
@@ -212,7 +212,7 @@ export class AIService {
     }
 
     // 2. Fallbacks tradicionais (Pollinations)
-    const models = ['openai', 'mistral', 'llama'];
+    const models = ['openai', 'gpt-4.1-mini', 'mistral', 'llama'];
     let lastError: any;
 
     for (const model of models) {

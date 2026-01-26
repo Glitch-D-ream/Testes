@@ -46,8 +46,11 @@ export default function SearchBar() {
       const pollInterval = setInterval(async () => {
         pollCount++;
         try {
-          const statusRes = await fetch(`${apiUrl}/api/search/status/${id}`);
-          if (!statusRes.ok) throw new Error('Erro ao verificar status');
+          const statusRes = await fetch(`${apiUrl}/api/search/status/${id}`).catch(() => null);
+          if (!statusRes || !statusRes.ok) {
+            console.warn('Falha na rede ao verificar status, tentando novamente...');
+            return;
+          }
           
           const data = await statusRes.json();
 
