@@ -74,10 +74,9 @@ export class AIService {
    * Usando modelos de alto nível para garantir a qualidade do texto.
    */
   private async analyzeWithOpenSource(text: string): Promise<AIAnalysisResult> {
-    // Ordem de Prioridade: Modelos Originais -> Backups de Elite Gratuitos
+    // Ordem de Prioridade: Apenas modelos de Código Aberto via Pollinations
     const models = [
-      'openai', 'gpt-4.1-mini', 'mistral', 'llama', // Originais (Pollinations)
-      'deepseek-r1', 'llama-3.3-70b', 'mistral-large' // Backups de Segurança
+      'mistral', 'llama', 'deepseek-r1', 'llama-3.3-70b', 'mistral-large', 'qwen-qwq'
     ];
     let lastError: any;
 
@@ -94,7 +93,7 @@ export class AIService {
           ],
           model: model,
           jsonMode: true
-        }, { timeout: 15000 }); // Reduzido para 15s para acelerar fallback
+        }, { timeout: 12000 }); // Reduzido para 12s para acelerar fallback entre modelos gratuitos
 
         let content = response.data;
         
@@ -152,7 +151,16 @@ export class AIService {
       }
     }
 
-    throw lastError || new Error('Falha ao gerar relatório de alta qualidade');
+    logWarn('[AI] Todos os modelos de alta qualidade falharam. Usando fallback básico estruturado.');
+    return {
+      promises: [],
+      overallSentiment: "Análise limitada devido a instabilidade nos provedores de IA gratuitos.",
+      credibilityScore: 50,
+      verdict: {
+        facts: ["Análise de discurso temporariamente limitada."],
+        skepticism: ["Os provedores de IA de código aberto estão instáveis no momento."]
+      }
+    };
   }
 
   async analyzeText(text: string): Promise<AIAnalysisResult> {
@@ -212,7 +220,7 @@ export class AIService {
     }
 
     // 2. Fallbacks tradicionais (Pollinations)
-    const models = ['openai', 'gpt-4.1-mini', 'mistral', 'llama'];
+    const models = ['mistral', 'llama', 'deepseek-r1', 'qwen-qwq'];
     let lastError: any;
 
     for (const model of models) {
@@ -233,7 +241,7 @@ export class AIService {
             { role: 'user', content: prompt }
           ],
           model: model
-        }, { timeout: 20000 }); // Reduzido para 20s para acelerar fallback
+        }, { timeout: 15000 }); // Reduzido para 15s para acelerar fallback entre modelos gratuitos
 
         if (response.data && typeof response.data === 'string') {
           return response.data;
