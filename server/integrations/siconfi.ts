@@ -8,7 +8,7 @@ import logger from '../core/logger.ts';
 import { savePublicDataCache, getPublicDataCache } from '../core/database.ts';
 
 // Endpoint real do Tesouro Nacional (Data Lake)
-const SICONFI_API_BASE = 'https://apidatalake.tesouro.gov.br/api/siconfi/index.php/conteudo/dca';
+const SICONFI_API_BASE = 'https://apidatalake.tesouro.gov.br/ords/siconfi/tt/dca';
 
 export interface BudgetData {
   year: number;

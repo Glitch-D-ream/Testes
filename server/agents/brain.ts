@@ -1,4 +1,5 @@
 import { FilteredSource } from './filter.ts';
+import axios from 'axios';
 import { logInfo, logError, logWarn } from '../core/logger.ts';
 import { getSupabase } from '../core/database.ts';
 import { validateBudgetViability, mapPromiseToSiconfiCategory } from '../integrations/siconfi.ts';
@@ -18,19 +19,15 @@ export class BrainAgent {
       const officialProfile = await this.generateOfficialProfile(politicianName, sources);
       
       // A GRANDE SIMPLIFICAÇÃO: Análise de Intenção suspensa para recalibragem
-      let aiAnalysis = "Análise de promessas em discursos e notícias está temporariamente suspensa para recalibragem técnica. Foco atual em dados legislativos e orçamentários oficiais.";
       logInfo(`[Brain] Modo Simplificado: Usando apenas dados oficiais para ${politicianName}.`);
-
-      // Consolidação dos Resultados
-      const finalResult = this.consolidateResults(officialProfile, aiAnalysis);
       
-      // Sanity Check Final
+      const finalResult = this.consolidateResults(officialProfile, null);
+      
+      // FLUXO 2: Persistência
       this.rejectIfInsane(finalResult);
-
-      // Persistência
-      const savedAnalysis = await this.saveAnalysis(finalResult, userId, existingAnalysisId);
+      const saved = await this.saveAnalysis(finalResult, userId, existingAnalysisId);
       
-      return savedAnalysis;
+      return saved;
     } catch (error) {
       logError(`[Brain] Falha na análise de ${politicianName}`, error as Error);
       throw error;
@@ -41,11 +38,26 @@ export class BrainAgent {
     logInfo(`[Brain] Gerando Perfil Oficial para ${politicianName}`);
     
     const supabase = getSupabase();
-    const { data: canonical } = await supabase
+    
+    // Normalização para busca: Tentar nome exato, depois tentar com ilike
+    let { data: canonical } = await supabase
       .from('canonical_politicians')
       .select('*')
-      .eq('name', politicianName)
+      .ilike('name', politicianName)
       .single();
+
+    // Se não encontrar, tentar uma busca mais flexível
+    if (!canonical) {
+      const { data: searchResults } = await supabase
+        .from('canonical_politicians')
+        .select('*')
+        .ilike('name', `%${politicianName}%`)
+        .limit(1);
+      if (searchResults && searchResults.length > 0) {
+        canonical = searchResults[0];
+        logInfo(`[Brain] Político encontrado via busca flexível: ${canonical.name}`);
+      }
+    }
 
     let office = 'Político';
     let party = 'N/A';
@@ -81,7 +93,6 @@ export class BrainAgent {
     const currentYear = new Date().getFullYear();
     
     // Passo 2: Dados Governamentais Crus (SICONFI)
-    // Para análise federal, usamos o código da União (1) conforme sugerido pelo DeepSeek
     const budgetViability = await validateBudgetViability(siconfiCategory, 500000000, currentYear - 1);
     
     // Passo 3: Histórico Legislativo Real (Projetos de Lei)
@@ -98,7 +109,7 @@ export class BrainAgent {
 
     const temporalAnalysis = await temporalIncoherenceService.analyzeIncoherence(politicianName, []);
     
-    // Passo 3.5: Buscar Votações Nominais e Calcular Coerência Tópica (Sprint do Contexto)
+    // Novas métricas (Sprint da Verdade)
     let votingHistory: any[] = [];
     let partyAlignment = 0;
     let rebellionRate = 0;
@@ -114,33 +125,31 @@ export class BrainAgent {
         votingHistory = await getVotacoesSenador(canonical.senado_id);
       }
       
-      // 1. Cálculo da Taxa de Rebeldia (Votos contra orientação / Total com orientação)
-      const votesWithOrientation = votingHistory.filter(v => v.orientacao && v.orientacao !== 'N/A');
+      const safeVotingHistory = Array.isArray(votingHistory) ? votingHistory : [];
+      
+      const votesWithOrientation = safeVotingHistory.filter(v => v.orientacao && v.orientacao !== 'N/A');
       if (votesWithOrientation.length > 0) {
         const rebelliousVotes = votesWithOrientation.filter(v => v.rebeldia).length;
         rebellionRate = (rebelliousVotes / votesWithOrientation.length) * 100;
         partyAlignment = 100 - rebellionRate;
       } else {
-        // Fallback se não houver orientações: usar métrica de atividade
-        partyAlignment = votingHistory.length > 0 ? Math.min(95, 70 + (votingHistory.length * 2)) : 0;
+        partyAlignment = safeVotingHistory.length > 0 ? Math.min(95, 70 + (safeVotingHistory.length * 2)) : 0;
       }
 
-      // 2. Cálculo de Coerência Tópica (Autoria vs Voto)
-      // Extrair temas dos projetos de autoria
       const authorThemes = Array.isArray(projects) ? projects.map(p => p.ementa?.toLowerCase() || '') : [];
       const themes = ['Educação', 'Saúde', 'Segurança', 'Economia', 'Meio Ambiente'];
       
       topicalCoherence = themes.map(theme => {
-        const keywords = {
+        const keywords: string[] = {
           'Educação': ['educação', 'ensino', 'escola', 'universidade', 'professor'],
-          'Saúde': ['saúde', 'sus', 'hospital', 'médico', 'vacina'],
-          'Segurança': ['segurança', 'polícia', 'crime', 'armas', 'penal'],
-          'Economia': ['economia', 'imposto', 'tributo', 'fiscal', 'orçamento'],
-          'Meio Ambiente': ['meio ambiente', 'clima', 'floresta', 'ambiental', 'sustentável']
-        }[theme as keyof typeof keywords];
+          'Saúde': ['saúde', 'hospital', 'médico', 'sus', 'vacina', 'medicamento'],
+          'Segurança': ['segurança', 'polícia', 'crime', 'armas', 'penal', 'violência'],
+          'Economia': ['economia', 'tributário', 'imposto', 'fiscal', 'orçamento', 'finanças'],
+          'Meio Ambiente': ['meio ambiente', 'ambiental', 'clima', 'floresta', 'ecossistema', 'sustentável']
+        }[theme] || [];
 
-        const hasAuthorProject = authorThemes.some(text => keywords.some(k => text.includes(k)));
-        const relatedVotes = votingHistory.filter(v => keywords.some(k => v.ementa.toLowerCase().includes(k)));
+        const hasAuthorProject = authorThemes.some(t => keywords.some(k => t.includes(k)));
+        const relatedVotes = safeVotingHistory.filter(v => keywords.some(k => (v.ementa || '').toLowerCase().includes(k)));
         
         if (hasAuthorProject && relatedVotes.length > 0) {
           const positiveVotes = relatedVotes.filter(v => v.voto === 'Sim').length;
@@ -151,19 +160,19 @@ export class BrainAgent {
       }).filter(Boolean);
     }
 
-    // Passo 4: Gerar Veredito Orçamentário (Sugestão DeepSeek)
+    // Passo 4: Gerar Veredito Orçamentário
     const executionRate = budgetViability.executionRate || 0;
     let budgetVerdict = "🔍 Dados de Execução Indisponíveis ou Nulos";
-    if (executionRate > 70) budgetVerdict = "✅ Execução Orçamentária Adequada";
-    else if (executionRate > 30) budgetVerdict = "⚠️ Execução Orçamentária Regular";
-    else if (executionRate > 0) budgetVerdict = "🔻 Execução Orçamentária Baixa";
+    
+    if (executionRate > 80) budgetVerdict = "✅ Execução Orçamentária Adequada";
+    else if (executionRate > 50) budgetVerdict = "⚠️ Execução Orçamentária Lenta";
+    else if (executionRate > 0) budgetVerdict = "🚨 Baixa Execução Orçamentária";
 
     const budgetSummary = `📊 CONTEXTO ORÇAMENTÁRIO: A execução financeira da pasta ${mainCategory} está ${budgetVerdict.replace(/^[^\s]+\s/, '')} (${executionRate.toFixed(1)}% do orçamento executado).`;
 
-    // Passo 5: Dashboard de Consistência e Selo de Verificabilidade (Sprint da Transparência Radical)
     const consistencyScore = topicalCoherence.length > 0 
       ? topicalCoherence.reduce((acc: number, curr: any) => acc + curr.score, 0) / topicalCoherence.length 
-      : 100; // 100% se não houver contradições em dados oficiais
+      : 100;
 
     const verificationSeal = {
       status: "VERIFICADO",
@@ -172,108 +181,64 @@ export class BrainAgent {
       integrityHash: Math.random().toString(36).substring(7).toUpperCase()
     };
 
+    const finalName = canonical?.name || politicianName;
+
     return {
-      politicianName,
+      politicianName: finalName,
       politician: { office, party, state },
       mainCategory,
       budgetViability,
       budgetVerdict,
       budgetSummary,
+      projects,
+      temporalAnalysis,
+      votingHistory: Array.isArray(votingHistory) ? votingHistory : [],
       partyAlignment,
       rebellionRate,
       topicalCoherence,
       consistencyScore,
-      verificationSeal,
-      votingHistory: votingHistory.slice(0, 10), // Top 10 votações recentes
-      temporalAnalysis,
-      legislativeSummary: temporalAnalysis.summary,
-      projects: projects.slice(0, 5), // Top 5 projetos recentes
-      timestamp: new Date().toISOString(),
-      dataSource: "Dados Abertos (Câmara/Senado/Tesouro Nacional)"
+      verificationSeal
     };
-  }
-
-  private async generateAIAnalysis(politicianName: string, sources: FilteredSource[], profile: any) {
-    logInfo(`[Brain] Gerando Análise de IA para ${politicianName}`);
-    
-    const { aiService } = await import('../services/ai.service.ts');
-    
-    const knowledgeBase = sources
-      .map(s => `### ${s.title}\n> ${s.content}`)
-      .join('\n\n');
-
-    const prompt = `
-      AUDITORIA TÉCNICA: ${politicianName}
-      CATEGORIA: ${profile.mainCategory}
-      DADOS OFICIAIS: ${profile.budgetViability.reason}
-      HISTÓRICO: ${profile.temporalAnalysis.summary}
-      
-      EVIDÊNCIAS:
-      ${knowledgeBase}
-      
-      Gere um parecer técnico curto (máx 3 parágrafos) sobre a exequibilidade das intenções encontradas.
-      Se não houver promessas claras, diga apenas: "Nenhuma promessa explícita detectada nas fontes fornecidas."
-    `;
-
-    try {
-      const response = await aiService.generateReport(prompt);
-      return response;
-    } catch (error) {
-      logError(`[Brain] Erro na IA`, error as Error);
-      return "Análise de IA indisponível no momento.";
-    }
   }
 
   private consolidateResults(profile: any, aiAnalysis: any) {
     return {
       ...profile,
       aiAnalysis: aiAnalysis || "Análise profunda não realizada por falta de evidências textuais.",
-      confidence: aiAnalysis ? 85 : 100, // 100% se for apenas dados oficiais
+      confidence: aiAnalysis ? 85 : 100,
       status: aiAnalysis ? 'full_analysis' : 'official_profile_only'
     };
   }
 
   private rejectIfInsane(data: any) {
-    if (data.confidence > 100) {
-      logError(`[SanityCheck] Confidence absurda detectada: ${data.confidence}%`, new Error('SANITY_FAIL'));
-      data.confidence = 100; // Força correção
-    }
-    
+    if (data.confidence > 100) data.confidence = 100;
     if (!data.politicianName || data.politicianName === 'Autor Desconhecido') {
       throw new Error('SANITY_FAIL: Político não identificado');
     }
-
-    // Evitar o erro de 923% ou métricas impossíveis
     if (data.budgetViability && data.budgetViability.executionRate > 100) {
-       logWarn(`[SanityCheck] Taxa de execução absurda corrigida: ${data.budgetViability.executionRate}%`);
        data.budgetViability.executionRate = 100;
     }
   }
 
   private async saveAnalysis(data: any, userId: string | null, existingId: string | null) {
     const supabase = getSupabase();
-    
-    // A GRANDE SIMPLIFICAÇÃO: Salvar o objeto 'data' completo no campo 'data_sources' (JSONB)
-    // Nota: Usamos 'data_sources' porque a coluna 'results' não existe no schema original do Drizzle.
     const analysisData = {
       user_id: userId,
-      author: data.politicianName, // No schema, 'author' é o nome do político
+      author: data.politicianName,
       text: data.aiAnalysis,
       category: data.mainCategory,
-      data_sources: data, // Salvando o JSON completo aqui para o frontend
+      data_sources: data,
       status: 'completed',
       updated_at: new Date().toISOString()
     };
 
     if (existingId) {
-      logInfo(`[Brain] Atualizando análise existente: ${existingId}`);
       const { error } = await supabase.from('analyses').update(analysisData).eq('id', existingId);
       if (error) logError(`[Brain] Erro ao atualizar análise no Supabase`, error as any);
       return { id: existingId, ...data };
     } else {
       const { nanoid } = await import('nanoid');
       const id = nanoid();
-      logInfo(`[Brain] Criando nova análise: ${id}`);
       const { error } = await supabase.from('analyses').insert([{ id, ...analysisData }]);
       if (error) logError(`[Brain] Erro ao inserir análise no Supabase`, error as any);
       return { id, ...data };

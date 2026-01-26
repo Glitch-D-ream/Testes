@@ -100,19 +100,25 @@ export class SearchService {
     }]);
 
     // 3. Execução Assíncrona (Não bloqueia o retorno da API)
-    // Usamos setImmediate para liberar a thread do Express
     setImmediate(async () => {
       try {
-        logInfo(`[Orchestrator] [Job:${analysisId}] [DEBUG] Iniciando Tríade para: ${politicianName}`);
+        logInfo(`[Orchestrator] [Job:${analysisId}] Iniciando Tríade Completa para: ${politicianName}`);
         
-        // A GRANDE SIMPLIFICAÇÃO: Desativando Scout e Filter de notícias
-        logInfo(`[Orchestrator] [Job:${analysisId}] [DEBUG] Modo Simplificado: Ignorando notícias, focando em dados oficiais.`);
+        // FASE 1: Scout - Busca de notícias e dados (Deep Search habilitado para máxima qualidade)
+        const rawSources = await scoutAgent.search(politicianName, true);
+        logInfo(`[Orchestrator] [Job:${analysisId}] Scout encontrou ${rawSources.length} fontes.`);
         
-        // Brain (O Brain agora será refatorado para lidar com a ausência de notícias)
-        logInfo(`[Orchestrator] [Job:${analysisId}] [DEBUG] Chamando Brain para análise de dados oficiais...`);
-        await brainAgent.analyze(politicianName, [], userId, analysisId);
+        // FASE 2: Filter - Filtragem de promessas e compromissos
+        // Se houver poucas fontes, usamos o modo flexível
+        const useFlexibleMode = rawSources.length < 5;
+        const filteredSources = await filterAgent.filter(rawSources, useFlexibleMode);
+        logInfo(`[Orchestrator] [Job:${analysisId}] Filter selecionou ${filteredSources.length} fontes relevantes.`);
         
-        logInfo(`[Orchestrator] [Job:${analysisId}] Concluído com sucesso.`);
+        // FASE 3: Brain - Consolidação com Dados Oficiais (Câmara, Senado, SICONFI)
+        logInfo(`[Orchestrator] [Job:${analysisId}] Chamando Brain para análise consolidada...`);
+        await brainAgent.analyze(politicianName, filteredSources, userId, analysisId);
+        
+        logInfo(`[Orchestrator] [Job:${analysisId}] Análise concluída com sucesso.`);
       } catch (error: any) {
         const errorMessage = error.message || 'Erro desconhecido durante a auditoria técnica';
         logError(`[Orchestrator] [Job:${analysisId}] Falha Crítica: ${errorMessage}`);

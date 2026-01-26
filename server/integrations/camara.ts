@@ -54,33 +54,29 @@ export async function getVotacoesDeputado(deputadoId: number): Promise<Vote[]> {
     const cached = await getPublicDataCache('CAMARA', cacheKey);
     if (cached) return cached;
 
-    // Fallback: Buscar votações gerais e filtrar os votos
-    // Nota: Buscamos votações de 2024 para garantir que existam dados nominais
+    // Buscar votações recentes (sem filtro de data para evitar erro 400)
     const responseVotacoes = await axios.get(`${CAMARA_API_BASE}/votacoes`, {
-      params: { dataInicio: '01/01/2024', dataFim: '31/12/2024', ordem: 'DESC', ordenarPor: 'dataHoraRegistro', itens: 30 },
+      params: { ordem: 'DESC', ordenarPor: 'dataHoraRegistro', itens: 20 },
       headers: { 'Accept': 'application/json' }
     });
 
     const votosEncontrados: Vote[] = [];
     for (const votacao of responseVotacoes.data.dados) {
       try {
-        // 1. Buscar votos da sessão
-        const resVoto = await axios.get(`${CAMARA_API_BASE}/votacoes/${votacao.id}/votos`, {
+        const resVotos = await axios.get(`${CAMARA_API_BASE}/votacoes/${votacao.id}/votos`, {
           headers: { 'Accept': 'application/json' }
         });
         
-        // 2. Buscar orientações da sessão para ver a do partido
-        const resOrientacao = await axios.get(`${CAMARA_API_BASE}/votacoes/${votacao.id}/orientacoes`, {
-          headers: { 'Accept': 'application/json' }
-        }).catch(() => ({ data: { dados: [] } }));
-
-        const votoDoDeputado = resVoto.data.dados.find((v: any) => v.deputado?.id === deputadoId);
+        const votoDoDeputado = resVotos.data.dados.find((v: any) => v.deputado?.id === deputadoId);
         
         if (votoDoDeputado) {
+          const resOrientacao = await axios.get(`${CAMARA_API_BASE}/votacoes/${votacao.id}/orientacoes`, {
+            headers: { 'Accept': 'application/json' }
+          }).catch(() => ({ data: { dados: [] } }));
+
           const siglaPartido = votoDoDeputado.deputado?.siglaPartido;
           const orientacaoPartido = resOrientacao.data.dados.find((o: any) => o.siglaPartidoBloco === siglaPartido)?.orientacaoVoto;
           
-          // Lógica de Rebeldia: Votou Sim quando partido orientou Não, ou vice-versa
           const rebeldia = orientacaoPartido && 
                           ((votoDoDeputado.tipoVoto === 'Sim' && orientacaoPartido === 'Não') || 
                            (votoDoDeputado.tipoVoto === 'Não' && orientacaoPartido === 'Sim'));

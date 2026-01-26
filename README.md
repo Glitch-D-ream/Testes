@@ -1,4 +1,4 @@
-# Detector de Promessa Vazia 🔍
+# Seth VII 🔍
 
 > **Análise de Viabilidade de Promessas Políticas com Dados Públicos**
 
@@ -13,7 +13,7 @@ Uma plataforma independente e auditável que analisa promessas políticas, posts
 
 ## 🎯 Visão Geral
 
-O **Detector de Promessa Vazia** é um sistema de análise de promessas políticas que:
+O **Seth VII** é um sistema de análise de promessas políticas que:
 
 - **Extrai promessas** de textos usando PLN (Processamento de Linguagem Natural) em português
 - **Cruza dados públicos** de SICONFI (orçamentos), Portal da Transparência (gastos) e TSE (histórico político)
@@ -102,7 +102,7 @@ O servidor estará disponível em `http://localhost:3000`
 ## 📁 Estrutura do Projeto
 
 ```
-detector_promessa_vazia/
+seth_vii/
 ├── client/                          # Frontend React 19
 │   ├── src/
 │   │   ├── pages/                  # Páginas principais

@@ -26,7 +26,7 @@ export default function Home() {
               <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
                 <ShieldCheck className="text-white" size={20} />
               </div>
-              <span className="font-bold text-xl tracking-tight">Detector de Promessas</span>
+              <span className="font-bold text-xl tracking-tight">Seth VII</span>
             </div>
             
             <div className="hidden md:flex items-center gap-8">
@@ -127,7 +127,7 @@ export default function Home() {
               <div className="w-6 h-6 bg-slate-400 rounded flex items-center justify-center">
                 <ShieldCheck className="text-white" size={14} />
               </div>
-              <span className="font-bold text-slate-500">Detector de Promessa Vazia</span>
+              <span className="font-bold text-slate-500">Seth VII</span>
             </div>
             
             <div className="flex gap-8 text-sm text-slate-500">

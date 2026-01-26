@@ -38,7 +38,7 @@ export default function Methodology() {
         <div className="mb-16 text-center">
           <h1 className="text-4xl font-black mb-6 tracking-tight">Como auditamos a política?</h1>
           <p className="text-xl text-slate-500 dark:text-slate-400 leading-relaxed max-w-2xl mx-auto">
-            O Detector de Promessa Vazia utiliza um motor de auditoria digital que combina Inteligência Artificial e cruzamento massivo de dados públicos reais.
+            O **Seth VII** utiliza um motor de auditoria digital que combina Inteligência Artificial e cruzamento massivo de dados públicos reais.
           </p>
         </div>
 
