@@ -36,15 +36,22 @@ export class ScoutHybrid {
       const isRegionalPE = query.toLowerCase().includes('jones manoel') || query.toLowerCase().includes('pernambuco');
       const isRegionalSP = query.toLowerCase().includes('erika hilton') || query.toLowerCase().includes('são paulo');
 
+      // Queries expandidas para capturar atos oficiais e transparência
+      const federalQuery = `${query} "Portal da Transparência" OR "Diário Oficial"`;
+      
       const fastResults = await Promise.all([
         officialSourcesSearch.search(query).catch((e) => { apiFailures.push('Oficial'); return []; }),
         directSearchImproved.search(query).catch((e) => { apiFailures.push('Notícias'); return []; }),
         transparenciaFederalService.searchServidor(query).catch(() => { apiFailures.push('Federal'); return []; }),
+        directSearchImproved.search(federalQuery).catch(() => []), // Busca extra por transparência
         isRegionalSP ? transparenciaSPService.search(query).catch(() => { apiFailures.push('SP'); return []; }) : Promise.resolve([]),
         isRegionalPE ? transparenciaPEService.search(query).catch(() => { apiFailures.push('PE'); return []; }) : Promise.resolve([])
       ]);
 
-      const [officialResults, newsResults, federalResults, spResults, peResults] = fastResults;
+      const [officialResults, newsResults, federalResults, extraFederalResults, spResults, peResults] = fastResults;
+      
+      // Combinar resultados federais extras
+      newsResults.push(...extraFederalResults);
 
       // Se detectarmos falhas em APIs críticas, ativamos o Fallback de Documentos
       if (apiFailures.length > 0 || deepSearch) {

@@ -212,10 +212,44 @@ PARECER:`;
   }
 
   private async generateOfficialProfile(politicianName: string, sources: FilteredSource[], region: any) {
-    // Simulação de busca de perfil oficial para o teste
+    const name = politicianName.toLowerCase();
+    
+    // Power Target Resolver: Mapeamento de Políticos Notórios
+    if (name.includes('lula') || name.includes('luiz inácio')) {
+      return {
+        politicianName: 'Luiz Inácio Lula da Silva',
+        politician: { office: 'Presidente da República', party: 'PT', state: 'Brasil' }
+      };
+    }
+    if (name.includes('bolsonaro') || name.includes('jair')) {
+      return {
+        politicianName: 'Jair Messias Bolsonaro',
+        politician: { office: 'Ex-Presidente / Político', party: 'PL', state: 'Brasil' }
+      };
+    }
+    if (name.includes('tarcisio') || name.includes('tarcísio')) {
+      return {
+        politicianName: 'Tarcísio de Freitas',
+        politician: { office: 'Governador', party: 'Republicanos', state: 'SP' }
+      };
+    }
+    if (name.includes('haddad')) {
+      return {
+        politicianName: 'Fernando Haddad',
+        politician: { office: 'Ministro da Fazenda', party: 'PT', state: 'Brasil' }
+      };
+    }
+
+    // Fallback: Tentar extrair do contexto das fontes se não for um Power Target
+    const hasCongressContext = sources.some(s => s.content.toLowerCase().includes('deputado') || s.content.toLowerCase().includes('câmara'));
+    
     return { 
       politicianName, 
-      politician: { office: 'Deputado Federal', party: 'PP', state: region.state }
+      politician: { 
+        office: hasCongressContext ? 'Deputado Federal' : 'Agente Político', 
+        party: 'Em Análise', 
+        state: region.state 
+      }
     };
   }
 }
