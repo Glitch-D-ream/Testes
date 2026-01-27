@@ -3,6 +3,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Shield, Search, Database, BarChart3, Activity, Globe, Cpu, ChevronRight } from 'lucide-react';
 import SearchBar from '../components/SearchBar';
+import RecentAudits from '../components/RecentAudits';
 import { motion } from 'framer-motion';
 
 export default function Home() {
@@ -103,8 +104,30 @@ export default function Home() {
         </div>
       </motion.main>
 
+      {/* Recent Audits Section */}
+      <section className="relative z-10 py-24 border-y border-slate-900">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between mb-12">
+            <div>
+              <h2 className="text-3xl font-black text-white uppercase tracking-tight">Auditorias Recentes</h2>
+              <p className="text-slate-500 text-xs font-bold uppercase tracking-widest mt-2">Dossiês processados em tempo real pela rede Seth VII</p>
+            </div>
+            <button 
+              onClick={() => navigate('/history')}
+              className="text-[10px] font-black text-blue-500 uppercase tracking-widest hover:text-blue-400 transition-colors flex items-center gap-2"
+            >
+              Ver Histórico Completo <ChevronRight size={14} />
+            </button>
+          </div>
+          
+          <div className="glass rounded-[2.5rem] border border-slate-800/50 overflow-hidden">
+            <RecentAudits />
+          </div>
+        </div>
+      </section>
+
       {/* Agents Grid */}
-      <section className="relative z-10 py-32 bg-slate-950/50 border-y border-slate-900">
+      <section className="relative z-10 py-32 bg-slate-950/50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             <FeatureCard 
@@ -166,9 +189,12 @@ function FeatureCard({ icon, title, desc, color }: { icon: React.ReactNode, titl
       <p className="text-slate-400 leading-relaxed font-medium">
         {desc}
       </p>
-      <div className="mt-8 flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-blue-500 group-hover:gap-4 transition-all">
+      <button 
+        onClick={() => navigate('/methodology')}
+        className="mt-8 flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-blue-500 group-hover:gap-4 transition-all"
+      >
         Ver Detalhes <ChevronRight size={14} />
-      </div>
+      </button>
     </div>
   );
 }
