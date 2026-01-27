@@ -53,6 +53,7 @@
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^4.0.0",
+    "@vitest/ui": "^4.0.18",
     "axios": "^1.7.9",
     "bcryptjs": "^2.4.3",
     "clsx": "^2.1.0",
@@ -72,6 +73,7 @@
     "telegraf": "^4.16.3",
     "typescript": "^5.7.3",
     "vite": "^6.0.0",
+    "vitest": "^4.0.18",
     "winston": "^3.17.0",
     "wrangler": "^4.60.0",
     "zod": "^3.24.1"

@@ -1,7 +1,7 @@
 
 import { getSupabase, initializeDatabase } from '../core/database.ts';
 import { logInfo, logError } from '../core/logger.ts';
-import { scrapingQueue } from '../queues/index.ts';
+import { QueueManager } from '../core/queue-manager.ts';
 import { syncSiconfiData } from '../integrations/siconfi.ts';
 
 /**
@@ -29,18 +29,9 @@ async function runScoutWorker() {
     logInfo(`Distribuindo tarefas para ${targetList.length} políticos nas filas...`);
 
     for (const name of targetList) {
-      // Adicionar tarefa de scraping na fila
-      await scrapingQueue.add({
-        politicianName: name,
-        sourceType: 'SEARCH_HYBRID',
-        timestamp: new Date().toISOString()
-      }, {
-        jobId: `scrape-${name}-${new Date().toISOString().split('T')[0]}`, // Evita duplicados no mesmo dia
-        attempts: 5,
-        backoff: { type: 'exponential', delay: 30000 } // 30s inicial
-      });
-      
-      logInfo(`📌 Job de scraping agendado para: ${name}`);
+      // Usar o QueueManager para despachar com segurança (fallback incluso)
+      await QueueManager.dispatchScrapingJob(name);
+      logInfo(`📌 Job de scraping processado/agendado para: ${name}`);
     }
 
     // 3. Sincronizar dados orçamentários globais (SICONFI)

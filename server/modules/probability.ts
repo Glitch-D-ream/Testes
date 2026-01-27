@@ -7,6 +7,7 @@ import { validateBudgetViability, mapPromiseToSiconfiCategory } from '../integra
 import { trajectoryModule } from './trajectory.ts';
 import { validateCandidateCredibility } from '../integrations/tse.ts';
 import { validateValueAgainstPIB } from '../integrations/ibge.ts';
+import { ConfidenceScorer } from './confidence-scorer.ts';
 
 export interface ProbabilityFactors {
   promiseSpecificity: number;
@@ -205,12 +206,19 @@ export async function calculateProbabilityWithDetails(
   else if (score >= 0.35) riskLevel = 'MÉDIO';
   else riskLevel = 'ALTO';
 
-  return {
-    score: score, // Retornar entre 0 e 1 para consistência
-    factors: avgFactors,
-    riskLevel,
-    confidence: 0.85, // Alta confiança devido ao uso de dados reais
-    details: {
+    // Ajustar confiança baseada na frescura dos dados (exemplo usando data atual)
+      const dataConfidence = ConfidenceScorer.calculateSourceScore({
+        url: 'https://siconfi.tesouro.gov.br',
+        timestamp: new Date(), // Em produção, usar o timestamp real da última sincronização
+        method: 'api'
+      });
+
+    return {
+      score: score,
+      factors: avgFactors,
+      riskLevel,
+      confidence: dataConfidence,
+      details: {
       budgetImpact: avgFactors.budgetaryFeasibility,
       historicalCompliance: avgFactors.historicalCompliance,
       authorTrack: avgFactors.authorTrack
