@@ -1,0 +1,38 @@
+
+name: Seth VII - Watch Sources (DOU)
+
+on:
+  schedule:
+    - cron: '0 9,15 * * 1-5' # Roda às 09:00 e 15:00 (Horário de Brasília aprox) de Seg a Sex
+  workflow_dispatch: # Permite rodar manualmente
+
+jobs:
+  watch-dou:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 10
+
+      - name: Install Dependencies
+        run: pnpm install
+
+      - name: Run DOU Watcher
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          NODE_ENV: production
+        run: npx tsx server/scripts/watch-dou.ts
+
+      - name: Keepalive Workflow
+        uses: gautamkrishnar/keepalive-workflow@v1 # Evita que o GitHub desative o workflow por inatividade
