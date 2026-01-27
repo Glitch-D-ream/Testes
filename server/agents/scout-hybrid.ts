@@ -13,6 +13,7 @@ import { ingestionService } from '../services/ingestion.service.ts';
 import { douService } from '../services/dou.service.ts';
 import { transparenciaSPService } from '../services/transparencia-sp.service.ts';
 import { portalTransparenciaService } from '../integrations/portal-transparencia.ts';
+import { jurisprudenciaService } from '../services/jurisprudencia.service.ts';
 
 export interface RawSource {
   title: string;
@@ -49,14 +50,16 @@ export class ScoutHybrid {
 
     const searchPromises = absenceQueries.map(q => directSearchImproved.search(q).catch(() => []));
     
-    // Busca complementar nos Portais de Transparência (SP e Federal)
+    // Busca complementar nos Portais de Transparência e Jurisprudência
     const spTransparenciaPromise = transparenciaSPService.search(query).catch(() => []);
     const federalTransparenciaPromise = portalTransparenciaService.searchExpenses(query).catch(() => []);
+    const legalPromise = jurisprudenciaService.search(query).catch(() => []);
     
-    const [results, spResults, federalResults] = await Promise.all([
+    const [results, spResults, federalResults, legalResults] = await Promise.all([
       Promise.all(searchPromises),
       spTransparenciaPromise,
-      federalTransparenciaPromise
+      federalTransparenciaPromise,
+      legalPromise
     ]);
     
     const flatResults = results.flat();
@@ -88,6 +91,13 @@ export class ScoutHybrid {
         url: r.url || '',
         snippet: `Valor: ${r.value} | Órgão: ${r.organ}`,
         source: 'Portal da Transparência Federal',
+        publishedAt: r.date
+      })),
+      ...legalResults.map(r => ({
+        title: `[Jurisprudência-${r.court}] ${r.title}`,
+        url: r.url,
+        snippet: r.description,
+        source: `Tribunal ${r.court}`,
         publishedAt: r.date
       }))
     ];

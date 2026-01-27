@@ -1,5 +1,7 @@
 
-import { logInfo, logWarn } from '../core/logger.ts';
+import { logInfo, logWarn, logError } from '../core/logger.ts';
+import { savePublicDataCache, getPublicDataCache } from '../core/database.ts';
+import { createHash } from 'crypto';
 
 export interface NormalizedData {
   date?: string; // ISO format
@@ -87,18 +89,39 @@ export class NormalizationService {
   }
 
   /**
-   * Processa um texto bruto e retorna dados estruturados básicos
+   * Processa um texto bruto e retorna dados estruturados básicos (com cache)
    */
-  process(text: string): NormalizedData {
-    logInfo(`[NormalizationService] Processando texto de ${text.length} caracteres.`);
+  async process(text: string): Promise<NormalizedData> {
+    const textHash = createHash('md5').update(text).digest('hex');
+    const cacheKey = `norm_${textHash}`;
+
+    try {
+      const cached = await getPublicDataCache('NORMALIZATION', cacheKey);
+      if (cached) {
+        logInfo(`[NormalizationService] Cache hit para texto (hash: ${textHash})`);
+        return cached as NormalizedData;
+      }
+    } catch (e) {
+      logWarn('[NormalizationService] Falha ao acessar cache, processando normalmente');
+    }
+
+    logInfo(`[NormalizationService] Processando texto de ${text.length} caracteres (hash: ${textHash}).`);
     
-    return {
+    const result: NormalizedData = {
       date: this.normalizeDate(text) || undefined,
       amount: this.normalizeCurrency(text) || undefined,
       currency: text.includes('R$') ? 'BRL' : undefined,
       entities: this.extractBasicEntities(text),
       originalText: text.substring(0, 500) // Amostra do original
     };
+
+    try {
+      await savePublicDataCache('NORMALIZATION', cacheKey, result, 30); // Cache por 30 dias
+    } catch (e) {
+      logError('[NormalizationService] Erro ao salvar cache', e as Error);
+    }
+
+    return result;
   }
 }
 

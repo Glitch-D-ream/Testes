@@ -65,8 +65,8 @@ export class IngestionService {
 
       if (!result) return null;
 
-      // Normalização de dados extraídos
-      result.metadata.normalized = normalizationService.process(result.content);
+      // Normalização de dados extraídos (Assíncrono com Cache)
+      result.metadata.normalized = await normalizationService.process(result.content);
       
       if (result.metadata.normalized.date) {
         result.metadata.date = result.metadata.normalized.date;
