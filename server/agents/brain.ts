@@ -23,7 +23,7 @@ export class BrainAgent {
       const rawSources = await scoutHybrid.search(cleanName, true);
       
       // 2. Filtragem e Classificação via Filter Agent
-      const filteredSources = await filterAgent.filter(rawSources);
+      const filteredSources = await filterAgent.filter(rawSources, true); // Forçado modo flexível
       
       // 3. Enriquecimento com Dados Oficiais e Orçamentários
       const dataSources = await this.generateOfficialProfile(cleanName, filteredSources);
@@ -128,7 +128,7 @@ export class BrainAgent {
     const supabase = getSupabase();
 
     // 1.1 Verificar Cache de Análise Completa
-    if (!ignoreCache) {
+    if (false) { // Forçado a ignorar cache
       const { data: cachedAnalysis } = await supabase
         .from('analyses')
         .select('*')

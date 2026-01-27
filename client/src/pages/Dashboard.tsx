@@ -12,12 +12,23 @@ import {
   Activity
 } from 'lucide-react';
 
-export default function Dashboard() {
+export default function Statistics() {
   const navigate = useNavigate();
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState<any>(null);
 
   useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const res = await fetch("/api/statistics");
+        const data = await res.json();
+        setStats(data);
+      } catch (err) {
+        console.error("Erro ao buscar estatísticas:", err);
+      }
+    };
+    fetchStats();
     const fetchStats = async () => {
       try {
         const apiUrl = import.meta.env.VITE_API_URL || '';
@@ -32,7 +43,6 @@ export default function Dashboard() {
         setLoading(false);
       }
     };
-
     fetchStats();
   }, []);
 
@@ -53,34 +63,29 @@ export default function Dashboard() {
   };
 
   const itemVariants = {
-    hidden: { y: 20, opacity: 0 },
-    visible: {
-      y: 0,
-      opacity: 1
-    }
+    hidden: { opacity: 0, y: 20 },
+    visible: { opacity: 1, y: 0 }
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-sans selection:bg-blue-100 dark:selection:bg-blue-900/30">
-      {/* Header Minimalista */}
-      <header className="sticky top-0 z-50 bg-white/80 dark:bg-slate-950/80 backdrop-blur-xl border-b border-slate-200 dark:border-slate-800">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 pb-20">
+      <header className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 sticky top-0 z-40 backdrop-blur-md bg-opacity-80">
         <div className="max-w-5xl mx-auto px-4 h-16 flex items-center justify-between">
-          <button 
+          <button
             onClick={() => navigate('/')}
-            className="flex items-center gap-2 text-sm font-bold hover:text-blue-600 transition-colors group"
+            className="flex items-center gap-2 text-sm font-medium text-slate-500 hover:text-blue-600 transition-colors"
           >
-            <ArrowLeft size={18} className="group-hover:-translate-x-1 transition-transform" />
-            Voltar
+            <ArrowLeft size={18} /> Voltar
           </button>
           <div className="flex items-center gap-2">
             <BarChart3 size={20} className="text-blue-600" />
-            <span className="font-bold text-lg">Painel de Transparência Seth VII</span>
+            <span className="font-bold text-lg">Painel de Transparência</span>
           </div>
         </div>
       </header>
 
       <motion.main 
-        className="max-w-5xl mx-auto px-4 pt-12 pb-20"
+        className="max-w-5xl mx-auto px-4 pt-12"
         variants={containerVariants}
         initial="hidden"
         animate="visible"
@@ -142,7 +147,7 @@ export default function Dashboard() {
                     <motion.div 
                       className="h-full bg-blue-600 rounded-full"
                       initial={{ width: 0 }}
-                      animate={{ width: `${(cat.count / (stats.totalPromises || 1)) * 100}%` }}
+                      animate={{ width: `${(cat.count / stats.totalPromises) * 100}%` }}
                       transition={{ duration: 1, ease: "easeOut" }}
                     />
                   </div>
