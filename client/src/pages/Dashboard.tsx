@@ -16,19 +16,8 @@ export default function Statistics() {
   const navigate = useNavigate();
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState<any>(null);
 
   useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        const res = await fetch("/api/statistics");
-        const data = await res.json();
-        setStats(data);
-      } catch (err) {
-        console.error("Erro ao buscar estatísticas:", err);
-      }
-    };
-    fetchStats();
     const fetchStats = async () => {
       try {
         const apiUrl = import.meta.env.VITE_API_URL || '';
