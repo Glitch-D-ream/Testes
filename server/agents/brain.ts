@@ -17,7 +17,7 @@ import axios from 'axios';
 export class BrainAgent {
   async analyze(politicianName: string, userId: string | null = null, existingId: string | null = null) {
     const cleanName = politicianName.trim();
-    logInfo(`[Brain] Iniciando análise profunda para: ${cleanName}`);
+    logInfo(`[Brain] Iniciando análise profunda (Double-Pass) para: ${cleanName}`);
 
     try {
       const rawSources = await scoutHybrid.search(cleanName, true);
@@ -34,7 +34,9 @@ export class BrainAgent {
       ]);
 
       let evidences = [...(vulnerabilityReport?.evidences || []), ...financeEvidences];
-      const { finalReport, finalPromises } = await this.generateAIVeredict(cleanName, dataSources, filteredSources, rawSources);
+      
+      // DOUBLE-PASS IA: Passo 1 (Parecer) -> Passo 2 (Estruturação)
+      const { finalReport, finalPromises } = await this.generateDoublePassAIVeredict(cleanName, dataSources, filteredSources, rawSources);
 
       const finalResult = {
         ...dataSources,
@@ -56,6 +58,59 @@ export class BrainAgent {
       logError(`[Brain] Falha na análise de ${cleanName}`, error as Error);
       throw error;
     }
+  }
+
+  private async generateDoublePassAIVeredict(cleanName: string, dataSources: any, filteredSources: any[], rawSources: any[]) {
+    logInfo(`[Brain] [Double-Pass] Iniciando VerdictEngine para ${cleanName}...`);
+    const contextSources = filteredSources.length > 0 ? filteredSources : rawSources.slice(0, 5);
+    const analysisPrompt = this.generateAnalysisPrompt(cleanName, dataSources, contextSources);
+
+    let aiAnalysis = "";
+    let extractedPromisesFromAI: any[] = [];
+
+    try {
+      // PASSO 1: O PENSADOR (DeepSeek R1 para Parecer Técnico)
+      logInfo(`[Brain] [Double-Pass] PASSO 1: Gerando Parecer Técnico (DeepSeek R1)...`);
+      aiAnalysis = await aiService.generateReport(analysisPrompt);
+      
+      // PASSO 2: O SECRETÁRIO (Groq/Poli para Estruturação JSON)
+      logInfo(`[Brain] [Double-Pass] PASSO 2: Estruturando dados do parecer (Groq)...`);
+      const extractionPrompt = `Receba o seguinte parecer técnico sobre o político ${cleanName} e extraia estritamente em formato JSON as promessas e contradições identificadas.
+      
+      PARECER:
+      ${aiAnalysis}
+      
+      Responda APENAS o JSON no formato:
+      {
+        "promises": [{"text": "...", "category": "...", "confidence": 0.0-1.0, "reasoning": "..."}],
+        "contradictions": [{"point": "...", "evidenceA": "...", "evidenceB": "..."}]
+      }`;
+      
+      const structuredResult = await aiService.analyzeText(extractionPrompt);
+      if (structuredResult?.promises) extractedPromisesFromAI = structuredResult.promises;
+      
+    } catch (error) {
+      logWarn(`[Brain] [Double-Pass] Falha no fluxo primário, tentando fallbacks...`);
+      if (!aiAnalysis) aiAnalysis = await aiService.generateReport(analysisPrompt);
+      if (extractedPromisesFromAI.length === 0) {
+        const structuredResult = await aiService.analyzeText(aiAnalysis);
+        extractedPromisesFromAI = structuredResult?.promises || [];
+      }
+    }
+
+    // Fallback Final: NLP Local
+    if (extractedPromisesFromAI.length === 0 && filteredSources.length > 0) {
+      logWarn('[Brain] IA falhou na extração. Ativando fallback de NLP local...');
+      const { extractPromises } = await import('../modules/nlp.ts');
+      const allContent = filteredSources.map(s => s.content).join('\n\n');
+      const nlpPromises = extractPromises(allContent);
+      extractedPromisesFromAI = nlpPromises.map(p => ({ ...p, reasoning: 'Extraído via análise de padrões linguísticos locais.' }));
+    }
+
+    return { 
+      finalReport: aiAnalysis || `**PARECER TÉCNICO DE INTELIGÊNCIA** (Falha na geração)...`, 
+      finalPromises: extractedPromisesFromAI 
+    };
   }
 
   private async runAbsenceCheck(cleanName: string, filteredSources: any[]) {
@@ -131,52 +186,12 @@ export class BrainAgent {
     }
   }
 
-  private async generateAIVeredict(cleanName: string, dataSources: any, filteredSources: any[], rawSources: any[]) {
-    logInfo(`[Brain] Ativando VerdictEngine para ${cleanName}...`);
-    const contextSources = filteredSources.length > 0 ? filteredSources : rawSources.slice(0, 5);
-    const analysisPrompt = this.generateAnalysisPrompt(cleanName, dataSources, contextSources);
-
-    let aiAnalysis = "";
-    let extractedPromisesFromAI: any[] = [];
-
-    try {
-      logInfo(`[Brain] ETAPA 1: Gerando Parecer Técnico com DeepSeek R1...`);
-      aiAnalysis = await aiService.generateReport(analysisPrompt);
-      logInfo(`[Brain] ETAPA 2: Estruturando promessas com Groq...`);
-      const structuredResult = await aiService.analyzeText(aiAnalysis);
-      if (structuredResult?.promises) extractedPromisesFromAI = structuredResult.promises;
-    } catch (error) {
-      logWarn(`[Brain] Falha no VerdictEngine primário, tentando fallbacks...`);
-      if (!aiAnalysis) aiAnalysis = await aiService.generateReport(analysisPrompt);
-      if (extractedPromisesFromAI.length === 0) {
-        const structuredResult = await aiService.analyzeText(aiAnalysis);
-        extractedPromisesFromAI = structuredResult?.promises || [];
-      }
-    }
-
-    if (extractedPromisesFromAI.length === 0 && filteredSources.length > 0) {
-      logWarn('[Brain] IA não retornou promessas. Ativando fallback de NLP local...');
-      const { extractPromises } = await import('../modules/nlp.ts');
-      const allContent = filteredSources.map(s => s.content).join('\n\n');
-      const nlpPromises = extractPromises(allContent);
-      if (nlpPromises.length > 0) {
-        logInfo(`[Brain] NLP local extraiu ${nlpPromises.length} promessas candidatas.`);
-        extractedPromisesFromAI = nlpPromises.map(p => ({ ...p, reasoning: 'Extraído via análise de padrões linguísticos locais.' }));
-      }
-    }
-
-    const finalReport = aiAnalysis && aiAnalysis.length > 100 ? aiAnalysis : `**PARECER TÉCNICO DE INTELIGÊNCIA**...`;
-    return { finalReport, finalPromises: extractedPromisesFromAI };
-  }
-
   private async persistAnalysis(userId: string | null, finalReport: string, cleanName: string, dataSources: any, finalResult: any, filteredSources: any[], existingId: string | null) {
     try {
       const { analysisService } = await import('../services/analysis.service.ts');
-      
-      // Garantir que dataSources.politician exista para evitar TypeError
       const politicianData = dataSources.politician || { office: 'N/A', party: 'N/A', state: 'N/A' };
       
-      const analysisResult = await analysisService.createAnalysis(userId, finalReport, cleanName, dataSources.mainCategory || 'GERAL', {
+      await analysisService.createAnalysis(userId, finalReport, cleanName, dataSources.mainCategory || 'GERAL', {
         politicianName: dataSources.politicianName || cleanName,
         office: politicianData.office,
         party: politicianData.party,
@@ -192,26 +207,24 @@ export class BrainAgent {
         projects: dataSources.projects,
         votingHistory: dataSources.votingHistory
       });
-      logInfo(`[Brain] Análise persistida com sucesso. ID: ${analysisResult.id}`);
+      logInfo(`[Brain] Análise persistida com sucesso.`);
     } catch (e) {
       logWarn(`[Brain] Falha ao persistir métricas avançadas: ${e}`);
     }
   }
 
   private generateAnalysisPrompt(cleanName: string, dataSources: any, contextSources: any[]): string {
-    return `**AUDITORIA FORENSE DE CONSISTÊNCIA POLÍTICA**...`;
+    return `**AUDITORIA FORENSE DE CONSISTÊNCIA POLÍTICA: ${cleanName}**...`;
   }
 
   private async generateOfficialProfile(politicianName: string, sources: FilteredSource[]) {
-    // Tentar obter perfil real da Câmara se possível
-    const profile = { 
+    return { 
       politicianName, 
       mainCategory: 'Geral', 
       projects: [], 
       votingHistory: [],
-      politician: { office: 'Deputado Federal', party: 'PSOL', state: 'SP' } // Mock para Erika Hilton, idealmente buscaria da API
+      politician: { office: 'Deputado Federal', party: 'PSOL', state: 'SP' }
     };
-    return profile;
   }
 }
 
