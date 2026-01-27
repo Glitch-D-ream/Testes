@@ -80,7 +80,28 @@ export class BrainAgent {
     let extractedPromisesFromAI: any[] = [];
 
     try {
-      aiAnalysis = await aiService.generateReport(analysisPrompt);
+      const strictPrompt = `
+AUDITORIA FORENSE POLÍTICA - SETH VII v2.6
+ALVO: ${cleanName}
+CONTEXTO REGIONAL: ${region.state} / ${region.city}
+
+FONTES BRUTAS COLETADAS:
+${JSON.stringify(contextSources)}
+
+INSTRUÇÕES PARA O PARECER:
+1. FOCO EM FATOS: Analise apenas o que está nas fontes. Não invente trajetórias.
+2. TOM CLÍNICO: Use linguagem técnica e fria. Evite elogios ou críticas subjetivas.
+3. ESTRUTURA:
+   - Resumo Executivo (1 parágrafo)
+   - Análise de Coerência (Discurso vs Fatos)
+   - Indicadores de Vulnerabilidade (Baseado nas fontes)
+   - Conclusão Técnica (Veredito final)
+
+Se as fontes forem insuficientes, declare explicitamente: "DADOS INSUFICIENTES PARA AUDITORIA COMPLETA".
+NÃO use frases como "Jones Manoel tem sido um defensor de...", use "As fontes indicam posicionamento favorável a...".
+
+PARECER:`;
+      aiAnalysis = await aiService.generateReport(strictPrompt);
       const extractionPrompt = `Extraia JSON de promessas do parecer: ${aiAnalysis}`;
       const structuredResult = await aiService.analyzeText(extractionPrompt);
       if (structuredResult?.promises) extractedPromisesFromAI = structuredResult.promises;

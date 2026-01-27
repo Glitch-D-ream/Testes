@@ -90,9 +90,9 @@ export function AnalysisResults() {
         {/* Card Principal de Resultado */}
         <ForensicResultCard 
           politicianName={data.author || 'Alvo'}
-          score={data.probabilityScore || 0}
-          verdict={data.data_sources?.budgetVerdict || 'Consistência em análise.'}
-          analysisDate={new Date().toLocaleDateString('pt-BR')}
+          score={data.probability_score || data.probabilityScore || 0}
+          verdict={data.data_sources?.budgetVerdict || 'Análise baseada em dados oficiais e discursos minerados.'}
+          analysisDate={new Date(data.created_at || Date.now()).toLocaleDateString('pt-BR')}
           confidence={85}
           category="Auditoria Forense"
           data={data}

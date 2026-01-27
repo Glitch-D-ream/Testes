@@ -60,7 +60,7 @@ export const ForensicResultCard: React.FC<ForensicResultCardProps> = ({
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="p-6 rounded-3xl bg-slate-900/30 border border-slate-800/50">
             <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mb-4">Métricas de Confiança</h4>
             <div className="space-y-4">
@@ -70,10 +70,10 @@ export const ForensicResultCard: React.FC<ForensicResultCardProps> = ({
             </div>
           </div>
           
-          <div className="p-6 rounded-3xl bg-slate-900/30 border border-slate-800/50 flex flex-col justify-center">
-            <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mb-4">Veredito do Seth VII</h4>
-            <p className="text-sm text-slate-300 leading-relaxed italic">
-              "{verdict}"
+          <div className="md:col-span-2 p-6 rounded-3xl bg-blue-500/5 border border-blue-500/10 flex flex-col justify-center">
+            <h4 className="text-[10px] font-black text-blue-400 uppercase tracking-[0.2em] mb-4">Veredito do Seth VII</h4>
+            <p className="text-sm text-slate-300 leading-relaxed font-medium">
+              {verdict}
             </p>
           </div>
         </div>
