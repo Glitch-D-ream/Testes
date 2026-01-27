@@ -44,6 +44,25 @@ export class StatisticsController {
         count
       })).sort((a, b) => b.count - a.count);
 
+      // 5. Alertas de Contradição Temporal (Novas Análises com penalidade alta)
+      const { data: contradictionsData } = await supabase
+        .from('analyses')
+        .select('id, author, category, probability_score, data_sources, created_at')
+        .order('created_at', { ascending: false })
+        .limit(10);
+
+      const alerts = contradictionsData?.filter((a: any) => {
+        const penalty = a.data_sources?.trajectoryAnalysis?.penalty || 0;
+        return penalty > 0.15; // Alerta para penalidades significativas
+      }).map((a: any) => ({
+        id: a.id,
+        author: a.author,
+        category: a.category,
+        severity: a.data_sources.trajectoryAnalysis.penalty > 0.3 ? 'high' : 'medium',
+        message: `Contradição detectada: ${a.data_sources.trajectoryAnalysis.reason}`,
+        date: a.created_at
+      })) || [];
+
       if (err1 || err2 || err3 || err4) {
         logError('Erro em uma das queries de estatísticas', (err1 || err2 || err3 || err4) as any);
       }
@@ -54,6 +73,7 @@ export class StatisticsController {
         averageConfidence,
         totalAuthors,
         byCategory,
+        alerts
       });
     } catch (error) {
       logError('Erro ao buscar estatísticas globais', error as Error);

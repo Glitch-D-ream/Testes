@@ -13,10 +13,16 @@ interface Analysis {
 
 interface DashboardStats {
   totalAnalyses: number;
-  averageProbability: number;
-  categoriesBreakdown: Array<{ category: string; count: number }>;
-  probabilityDistribution: Array<{ range: string; count: number }>;
-  recentAnalyses: Analysis[];
+  averageConfidence: number;
+  byCategory: Array<{ category: string; count: number }>;
+  alerts?: Array<{
+    id: string;
+    author: string;
+    category: string;
+    severity: 'high' | 'medium';
+    message: string;
+    date: string;
+  }>;
 }
 
 /**
@@ -36,7 +42,7 @@ export function Dashboard() {
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/dashboard/stats');
+      const response = await fetch('/api/statistics');
 
       if (!response.ok) {
         throw new Error('Falha ao carregar estatísticas');
@@ -119,9 +125,9 @@ export function Dashboard() {
           <div className="bg-white rounded-lg shadow p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-gray-600 text-sm font-medium">Probabilidade Média</p>
+                <p className="text-gray-600 text-sm font-medium">Confiança Média</p>
                 <p className="text-4xl font-bold text-gray-900 mt-2">
-                  {(stats.averageProbability * 100).toFixed(1)}%
+                  {(stats.averageConfidence * 100).toFixed(1)}%
                 </p>
               </div>
               <div className="text-5xl text-green-100">📈</div>
@@ -129,7 +135,7 @@ export function Dashboard() {
             <div className="mt-4 bg-gray-200 rounded-full h-2">
               <div
                 className="bg-green-500 h-2 rounded-full transition-all"
-                style={{ width: `${stats.averageProbability * 100}%` }}
+                style={{ width: `${stats.averageConfidence * 100}%` }}
               ></div>
             </div>
           </div>
@@ -140,13 +146,51 @@ export function Dashboard() {
               <div>
                 <p className="text-gray-600 text-sm font-medium">Categorias Analisadas</p>
                 <p className="text-4xl font-bold text-gray-900 mt-2">
-                  {stats.categoriesBreakdown.length}
+                  {stats.byCategory.length}
                 </p>
               </div>
               <div className="text-5xl text-purple-100">🏷️</div>
             </div>
           </div>
         </div>
+
+        {/* Alertas de Contradição Temporal */}
+        {stats.alerts && stats.alerts.length > 0 && (
+          <div className="mb-8">
+            <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center gap-2">
+              <span className="text-amber-500">⚠️</span> Alertas de Contradição Temporal
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {stats.alerts.map((alert) => (
+                <div 
+                  key={alert.id} 
+                  className={`p-4 rounded-lg border ${
+                    alert.severity === 'high' ? 'bg-red-50 border-red-200' : 'bg-amber-50 border-amber-200'
+                  }`}
+                >
+                  <div className="flex justify-between items-start mb-2">
+                    <span className={`text-xs font-bold uppercase px-2 py-0.5 rounded ${
+                      alert.severity === 'high' ? 'bg-red-200 text-red-800' : 'bg-amber-200 text-amber-800'
+                    }`}>
+                      {alert.severity === 'high' ? 'Crítico' : 'Atenção'}
+                    </span>
+                    <span className="text-[10px] text-gray-500">
+                      {new Date(alert.date).toLocaleDateString('pt-BR')}
+                    </span>
+                  </div>
+                  <p className="text-sm font-bold text-gray-900">{alert.author}</p>
+                  <p className="text-xs text-gray-700 mt-1">{alert.message}</p>
+                  <a 
+                    href={`/analysis/${alert.id}`} 
+                    className="text-xs text-blue-600 font-bold mt-3 inline-block hover:underline"
+                  >
+                    Ver Auditoria Completa →
+                  </a>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Charts */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
@@ -156,7 +200,7 @@ export function Dashboard() {
             <ResponsiveContainer width="100%" height={300}>
               <PieChart>
                 <Pie
-                  data={stats.categoriesBreakdown}
+                  data={stats.byCategory}
                   dataKey="count"
                   nameKey="category"
                   cx="50%"
@@ -164,7 +208,7 @@ export function Dashboard() {
                   outerRadius={100}
                   label
                 >
-                  {stats.categoriesBreakdown.map((_, index) => (
+                  {stats.byCategory.map((_, index) => (
                     <Cell key={`cell-${index}`} fill={categoryColors[index % categoryColors.length]} />
                   ))}
                 </Pie>
@@ -173,76 +217,28 @@ export function Dashboard() {
             </ResponsiveContainer>
           </div>
 
-          {/* Probability Distribution */}
-          <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">Distribuição de Probabilidade</h2>
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={stats.probabilityDistribution}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="range" />
-                <YAxis />
-                <Tooltip />
-                <Bar dataKey="count" fill="#3b82f6" />
-              </BarChart>
-            </ResponsiveContainer>
+          {/* Info Card */}
+          <div className="bg-white rounded-lg shadow p-6 flex flex-col justify-center">
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">Metodologia Seth VII</h2>
+            <p className="text-gray-600 text-sm leading-relaxed">
+              O Seth VII utiliza uma tríade de agentes (Scout, Filter, Brain) para auditar promessas políticas. 
+              Nossas métricas agora incluem:
+            </p>
+            <ul className="mt-4 space-y-2">
+              <li className="flex items-center gap-2 text-sm text-gray-700">
+                <span className="text-blue-500 font-bold">✓</span> <strong>Consenso:</strong> Validação cruzada de múltiplas fontes.
+              </li>
+              <li className="flex items-center gap-2 text-sm text-gray-700">
+                <span className="text-blue-500 font-bold">✓</span> <strong>Trajetória:</strong> Análise estatística de 5 anos de orçamentos.
+              </li>
+              <li className="flex items-center gap-2 text-sm text-gray-700">
+                <span className="text-blue-500 font-bold">✓</span> <strong>Ausência:</strong> Busca por fatores críticos inexistentes.
+              </li>
+            </ul>
           </div>
         </div>
 
-        {/* Recent Analyses */}
-        <div className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">Análises Recentes</h2>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-gray-200">
-                  <th className="text-left py-3 px-4 font-semibold text-gray-700">Autor</th>
-                  <th className="text-left py-3 px-4 font-semibold text-gray-700">Categoria</th>
-                  <th className="text-left py-3 px-4 font-semibold text-gray-700">Promessas</th>
-                  <th className="text-left py-3 px-4 font-semibold text-gray-700">Probabilidade</th>
-                  <th className="text-left py-3 px-4 font-semibold text-gray-700">Data</th>
-                  <th className="text-left py-3 px-4 font-semibold text-gray-700">Ação</th>
-                </tr>
-              </thead>
-              <tbody>
-                {stats.recentAnalyses.map((analysis) => (
-                  <tr key={analysis.id} className="border-b border-gray-100 hover:bg-gray-50">
-                    <td className="py-3 px-4 text-gray-900 font-medium">{analysis.author}</td>
-                    <td className="py-3 px-4">
-                      <span className="inline-block px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium">
-                        {analysis.category}
-                      </span>
-                    </td>
-                    <td className="py-3 px-4 text-gray-600">{analysis.promisesCount}</td>
-                    <td className="py-3 px-4">
-                      <div className="flex items-center gap-2">
-                        <div className="w-24 bg-gray-200 rounded-full h-2">
-                          <div
-                            className="bg-blue-500 h-2 rounded-full"
-                            style={{ width: `${analysis.probabilityScore * 100}%` }}
-                          ></div>
-                        </div>
-                        <span className="text-gray-900 font-medium">
-                          {(analysis.probabilityScore * 100).toFixed(0)}%
-                        </span>
-                      </div>
-                    </td>
-                    <td className="py-3 px-4 text-gray-600 text-sm">
-                      {new Date(analysis.createdAt).toLocaleDateString('pt-BR')}
-                    </td>
-                    <td className="py-3 px-4">
-                      <a
-                        href={`/analysis/${analysis.id}`}
-                        className="text-blue-600 hover:text-blue-800 font-medium"
-                      >
-                        Ver detalhes
-                      </a>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+
 
         {/* Export Section */}
         <div className="mt-8 bg-blue-50 border border-blue-200 rounded-lg p-6">

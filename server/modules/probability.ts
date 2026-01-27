@@ -4,6 +4,7 @@
  */
 
 import { validateBudgetViability, mapPromiseToSiconfiCategory } from '../integrations/siconfi.ts';
+import { trajectoryModule } from './trajectory.ts';
 import { validateCandidateCredibility } from '../integrations/tse.ts';
 import { validateValueAgainstPIB } from '../integrations/ibge.ts';
 
@@ -167,10 +168,23 @@ export async function calculateProbabilityWithDetails(
     const specificity = calculateSpecificity(promise);
     const timeline = calculateTimelineFeasibility(promise);
 
+    // --- Início Checkpoint 3: Contradição Temporal ---
+    let trajectoryPenalty = 0;
+    try {
+      const contradiction = await trajectoryModule.checkPromiseContradiction(promise.text, category || 'GERAL', estimatedValue);
+      if (contradiction.isContradictory) {
+        trajectoryPenalty = contradiction.severity === 'high' ? 0.3 : 0.15;
+        logWarn(`[Probability] Contradição detectada para ${category}: ${contradiction.reason}`);
+      }
+    } catch (e) {
+      logWarn(`[Probability] Falha ao analisar trajetória: ${e}`);
+    }
+    // --- Fim Checkpoint 3 ---
+
     allFactors.push({
       promiseSpecificity: specificity,
-      historicalCompliance: budgetValidation.confidence,
-      budgetaryFeasibility: (budgetValidation.viable ? 0.5 : 0.2) + (pibValidation.isReasonable ? 0.3 : 0.1),
+      historicalCompliance: Math.max(0, budgetValidation.confidence - trajectoryPenalty),
+      budgetaryFeasibility: Math.max(0, (budgetValidation.viable ? 0.5 : 0.2) + (pibValidation.isReasonable ? 0.3 : 0.1) - trajectoryPenalty),
       timelineFeasibility: timeline,
       authorTrack: authorValidation ? authorValidation.score : 0.5
     });

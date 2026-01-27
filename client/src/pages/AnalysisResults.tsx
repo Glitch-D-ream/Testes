@@ -4,6 +4,7 @@ import { Download, Share2, Image as ImageIcon } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import TopicCard from '../components/TopicCard';
 import { ViabilityThermometer } from '../components/ViabilityThermometer';
+import { IntelligencePanel } from '../components/IntelligencePanel';
 import { useAnalysis } from '../hooks/useAnalysis';
 
 export function AnalysisResults() {
@@ -149,6 +150,12 @@ export function AnalysisResults() {
               details={data.probability_score_details}
             />
           </div>
+
+          {/* Checkpoint 7: Painéis de Inteligência Avançada */}
+          <IntelligencePanel 
+            consensusMetrics={data.data_sources?.consensusMetrics}
+            absenceReport={data.data_sources?.absenceReport}
+          />
 
           {/* Texto Original */}
           <div className="mt-8 pt-8 border-t border-gray-200">

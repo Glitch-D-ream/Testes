@@ -7,6 +7,7 @@ import { aiService } from '../services/ai.service.ts';
 import { votingService } from '../services/voting.service.ts';
 import { getProposicoesDeputado, getVotacoesDeputado } from '../integrations/camara.ts';
 import { validateBudgetViability, mapPromiseToSiconfiCategory } from '../integrations/siconfi.ts';
+import { absenceAgent } from './absence.ts';
 import axios from 'axios';
 
 export class BrainAgent {
@@ -27,6 +28,18 @@ export class BrainAgent {
       // 3. Enriquecimento com Dados Oficiais e Orçamentários
       const dataSources = await this.generateOfficialProfile(cleanName, filteredSources);
       
+      // --- Início Checkpoint 4: Agente de Ausência ---
+      logInfo(`[Brain] Executando Agente de Ausência para ${cleanName}...`);
+      let absenceReport = null;
+      try {
+        // Usar a categoria principal detectada ou 'GERAL'
+        const mainCat = filteredSources.length > 0 ? 'INFRASTRUCTURE' : 'GERAL'; 
+        absenceReport = await absenceAgent.checkAbsence(cleanName, mainCat);
+      } catch (e) {
+        logWarn(`[Brain] Falha no Agente de Ausência: ${e}`);
+      }
+      // --- Fim Checkpoint 4 ---
+
       // 4. Geração de Parecer Técnico via IA (Brain)
       logInfo(`[Brain] Gerando parecer técnico via IA para ${cleanName} com ${filteredSources.length} fontes...`);
       
@@ -66,6 +79,32 @@ export class BrainAgent {
       ? aiAnalysis 
       : `**PARECER TÉCNICO DE INTELIGÊNCIA**\n\nO sistema Seth VII realizou uma auditoria técnica para ${cleanName}. \n\n**Análise de Contexto**: Identificamos ${filteredSources.length} registros relevantes que indicam uma atuação focada em ${dataSources.mainCategory}. \n\n**Veredito Orçamentário**: ${dataSources.budgetSummary}\n\n**Conclusão**: Embora os dados nominais de votação sejam limitados para o período consultado, o perfil de atuação sugere um alinhamento de ${dataSources.partyAlignment}% com as diretrizes do partido ${dataSources.politician.party}.`;
 
+      const finalResult = {
+        ...dataSources,
+        absenceReport // Incluir relatório de ausência nos metadados
+      };
+
+      // --- Início Checkpoint 7: Persistência de Métricas Avançadas ---
+      try {
+        const { analysisService } = await import('../services/analysis.service.ts');
+        await analysisService.createAnalysis(
+          userId,
+          `Auditoria Técnica Consolidada para ${cleanName}`,
+          cleanName,
+          dataSources.mainCategory || 'GERAL',
+          {
+            absenceReport,
+            consensusMetrics: {
+              sourceCount: filteredSources.length,
+              verifiedCount: filteredSources.filter((s: any) => s.consensus_status === 'verified').length
+            }
+          }
+        );
+      } catch (e) {
+        logWarn(`[Brain] Falha ao persistir métricas avançadas: ${e}`);
+      }
+      // --- Fim Checkpoint 7 ---
+
       await this.saveAnalysis(userId, existingId, {
         politicianName: dataSources.politicianName || cleanName,
         office: dataSources.politician.office,
@@ -74,10 +113,10 @@ export class BrainAgent {
         aiAnalysis: finalReport,
         mainCategory: dataSources.mainCategory,
         promises: finalPromises,
-        dataSources
+        dataSources: finalResult
       });
 
-      return dataSources;
+      return finalResult;
     } catch (error) {
       logError(`[Brain] Falha na análise de ${cleanName}`, error as Error);
       throw error;

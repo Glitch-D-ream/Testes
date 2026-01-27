@@ -237,6 +237,9 @@ export async function saveScoutHistory(data: {
   source: string;
   politicianName: string;
   publishedAt?: string;
+  reliability_score?: number;
+  consensus_group?: string;
+  consensus_status?: string;
 }) {
   const id = nanoid();
   const { error } = await getSupabase()
@@ -248,7 +251,10 @@ export async function saveScoutHistory(data: {
       content: data.content,
       source: data.source,
       politician_name: data.politicianName,
-      published_at: data.publishedAt || new Date().toISOString()
+      published_at: data.publishedAt || new Date().toISOString(),
+      reliability_score: data.reliability_score || 1.0,
+      consensus_group: data.consensus_group,
+      consensus_status: data.consensus_status || 'pending'
     }], { onConflict: 'url' });
 
   if (error) logError('[Database] Erro ao salvar histórico do Scout', error as any);

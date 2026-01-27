@@ -6,6 +6,7 @@
 import axios from 'axios';
 import logger from '../core/logger.ts';
 import { cacheService } from '../services/cache.service.ts';
+import { snapshotService } from '../services/snapshot.service.ts';
 
 // Endpoint real do Tesouro Nacional (Data Lake)
 const SICONFI_API_BASE = 'https://apidatalake.tesouro.gov.br/ords/siconfi/tt/dca';
@@ -65,17 +66,24 @@ export async function getBudgetData(
     
     logger.info(`[SICONFI] [DEBUG] Query: ${JSON.stringify(params)} | Categoria: ${category}`);
 
-    const response = await axios.get(SICONFI_API_BASE, {
-      params,
-      timeout: 10000,
-    }).catch((err) => {
-      logger.warn(`[SICONFI] [DEBUG] Erro na chamada API: ${err.message} | URL: ${err.config?.url} | Params: ${JSON.stringify(err.config?.params)}`);
-      return { data: null };
-    });
+    let response;
+    try {
+      response = await axios.get(SICONFI_API_BASE, {
+        params,
+        timeout: 10000,
+      });
+    } catch (err: any) {
+      logger.warn(`[SICONFI] Erro na chamada API: ${err.message}. Tentando fallback para snapshot...`);
+      const snapshot = await snapshotService.getLatestSnapshot<BudgetData>(cacheKey);
+      if (snapshot) return snapshot;
+      throw new Error(`Dados orçamentários oficiais para ${category} não estão disponíveis e não há snapshot de backup.`);
+    }
 
     if (!response.data || !response.data.items) {
-      logger.error(`[SICONFI] Dados não encontrados ou API instável para ${category} em ${year}.`);
-      throw new Error(`Dados orçamentários oficiais para ${category} não estão disponíveis no momento.`);
+      logger.warn(`[SICONFI] Dados vazios na API. Tentando fallback para snapshot...`);
+      const snapshot = await snapshotService.getLatestSnapshot<BudgetData>(cacheKey);
+      if (snapshot) return snapshot;
+      throw new Error(`Dados orçamentários oficiais para ${category} retornaram vazios e não há snapshot de backup.`);
     }
 
     // Filtrar dados de Empenho e Liquidação
@@ -110,6 +118,10 @@ export async function getBudgetData(
     };
 
     await cacheService.saveGenericData(cacheKey, 'SICONFI', result, 30); // Cache de 30 dias para dados históricos
+    
+    // Criar snapshot imutável para resiliência futura
+    await snapshotService.createSnapshot(cacheKey, 'SICONFI', result);
+    
     return result;
   } catch (error: any) {
     logger.error(`[SICONFI] Erro ao buscar dados: ${error.message}`);

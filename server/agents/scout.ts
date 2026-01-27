@@ -36,6 +36,18 @@ export class ScoutAgent {
       return [];
     }
   }
+
+  /**
+   * Busca especializada em ausência (licitações, editais)
+   */
+  async searchAbsence(query: string, category: string): Promise<RawSource[]> {
+    try {
+      return await scoutHybrid.searchAbsence(query, category);
+    } catch (error) {
+      logError(`[Scout] Erro na busca de ausência para ${query}`, error as Error);
+      return [];
+    }
+  }
 }
 
 export const scoutAgent = new ScoutAgent();

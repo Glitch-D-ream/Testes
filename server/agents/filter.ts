@@ -1,4 +1,5 @@
 import { logInfo, logWarn } from '../core/logger.ts';
+import { consensusModule } from './consensus.ts';
 
 export interface FilteredSource {
   title: string;
@@ -46,6 +47,35 @@ export class FilterAgent {
     }
 
     logInfo(`[Filter] Filtragem concluída. ${filtered.length} fontes mantidas.`);
+
+    // --- Início Checkpoint 1: Módulo Consensus ---
+    try {
+      logInfo(`[Filter] Iniciando análise de consenso para as fontes filtradas...`);
+      const consensusResults = await consensusModule.analyzeConsensus(filtered);
+      
+      for (const source of filtered) {
+        const result = consensusResults.get(source.url);
+        if (result) {
+          // Ajustar a força da promessa baseado no consenso
+          if (result.status === 'verified') {
+            source.promiseStrength = 'strong';
+            source.justification += ` [VERIFICADO POR CONSENSO]`;
+          } else if (result.status === 'divergent') {
+            source.promiseStrength = 'weak';
+            source.justification += ` [DIVERGÊNCIA DETECTADA]`;
+          }
+          
+          // Adicionar metadados de consenso (serão salvos no banco)
+          (source as any).consensus_group = result.group_id;
+          (source as any).reliability_score = result.reliability_score;
+          (source as any).consensus_status = result.status;
+        }
+      }
+    } catch (error) {
+      logWarn(`[Filter] Falha ao processar consenso: ${error}`);
+    }
+    // --- Fim Checkpoint 1 ---
+
     return filtered;
   }
 

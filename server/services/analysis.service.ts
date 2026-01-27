@@ -44,8 +44,6 @@ export class AnalysisService {
       const supabase = getSupabase();
 
       // Salvar análise no Supabase (com compressão de dados pesados)
-      // Nota: Removidos campos total_budget, executed_budget, execution_rate e metadata 
-      // pois as colunas não existem no banco de dados atual.
       const { error: analysisError } = await supabase
         .from('analyses')
         .insert([{
@@ -55,7 +53,12 @@ export class AnalysisService {
           author,
           category,
           extracted_promises: DataCompressor.compress(promises),
-          probability_score: probabilityScore
+          probability_score: probabilityScore,
+          data_sources: {
+            consensusMetrics: extraData.consensusMetrics || {},
+            absenceReport: extraData.absenceReport || null,
+            trajectoryAnalysis: extraData.trajectoryAnalysis || null
+          }
         }]);
 
       if (analysisError) {

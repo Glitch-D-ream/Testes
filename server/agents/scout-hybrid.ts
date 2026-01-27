@@ -31,6 +31,46 @@ export class ScoutHybrid {
   ];
 
   /**
+   * Busca especializada em ausência (licitações, editais, projetos)
+   */
+  async searchAbsence(query: string, category: string): Promise<RawSource[]> {
+    logInfo(`[ScoutHybrid] Iniciando busca de AUSÊNCIA para: ${query} (${category})`);
+    
+    const absenceQueries = [
+      `site:gov.br "${query}" edital OR licitação OR "projeto executivo"`,
+      `site:comprasgovernamentais.gov.br "${query}"`,
+      `site:transparencia.gov.br "${query}"`,
+      `"${query}" diário oficial licitação`
+    ];
+
+    const searchPromises = absenceQueries.map(q => directSearchImproved.search(q).catch(() => []));
+    const results = await Promise.all(searchPromises);
+    const flatResults = results.flat();
+
+    // Filtrar e formatar
+    const sources: RawSource[] = [];
+    const uniqueUrls = new Set<string>();
+
+    for (const r of flatResults) {
+      if (uniqueUrls.has(r.url)) continue;
+      uniqueUrls.add(r.url);
+
+      sources.push({
+        title: r.title,
+        url: r.url,
+        content: r.snippet,
+        source: r.source,
+        publishedAt: r.publishedAt,
+        type: 'official',
+        confidence: 'high',
+        credibilityLayer: 'A'
+      });
+    }
+
+    return sources;
+  }
+
+  /**
    * Busca híbrida com priorização inteligente
    */
   async search(query: string, deepSearch: boolean = false): Promise<RawSource[]> {
