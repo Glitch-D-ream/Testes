@@ -43,13 +43,15 @@ export class VotingService {
 
       const votes: Vote[] = [];
 
-      for (const v of votacoes.slice(0, 20)) {
+      // Aumentamos para 50 votações para ter mais chance de encontrar votos nominais
+      for (const v of votacoes.slice(0, 50)) {
         try {
-          const votoResp = await axios.get(`https://api.camara.leg.br/api/v2/votacoes/${v.id}/votos`);
-          const votosData = votoResp.data.dados;
+          // Corrigido o domínio da API para o padrão dadosabertos
+          const votoResp = await axios.get(`https://dadosabertos.camara.leg.br/api/v2/votacoes/${v.id}/votos`);
+          const votosData = votoResp.data.dados || [];
           
           const votoDeputado = votosData.find((d: any) => 
-            d.deputado && d.deputado.id.toString() === politicianId
+            d.deputado && d.deputado.id.toString() === politicianId.toString()
           );
 
           if (votoDeputado) {

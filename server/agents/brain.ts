@@ -113,6 +113,7 @@ export class BrainAgent {
 
     logInfo(`[Brain] Gerando Perfil Oficial para ${cleanName}`);
     
+    // 1.2 Buscar dados canônicos no banco
     let { data: canonical } = await supabase
       .from('canonical_politicians')
       .select('*')
@@ -147,6 +148,23 @@ export class BrainAgent {
           logWarn(`[Brain] Falha ao buscar dados da Câmara para ${cleanName}`);
         }
       }
+    } else {
+      // Fallback: Tentar buscar na API da Câmara se não estiver no banco canônico
+      try {
+        const { getDeputadoId } = await import('../integrations/camara.ts');
+        const camaraId = await getDeputadoId(cleanName);
+        if (camaraId) {
+          const res = await axios.get(`https://dadosabertos.camara.leg.br/api/v2/deputados/${camaraId}`);
+          const data = res.data.dados;
+          office = 'Deputado Federal';
+          party = data.ultimoStatus.siglaPartido;
+          state = data.ultimoStatus.siglaUf;
+          // Criar um objeto canônico temporário para o restante da lógica
+          canonical = { camara_id: camaraId, name: cleanName };
+        }
+      } catch (e) {
+        logWarn(`[Brain] Falha no fallback de busca de ID para ${cleanName}`);
+      }
     }
 
     const mainCategory = this.detectMainCategory(sources);
@@ -161,7 +179,8 @@ export class BrainAgent {
     if (canonical) {
       try {
         const siconfiCategory = mapPromiseToSiconfiCategory(mainCategory);
-        budgetViability = await validateBudgetViability(siconfiCategory.name, 1000000, 2023, 'FEDERAL');
+        // A função validateBudgetViability no siconfi.ts espera (category, estimatedValue, year, sphere)
+        budgetViability = await validateBudgetViability(mainCategory, 1000000, 2023, 'FEDERAL');
       } catch (e) {
         logWarn(`[Brain] Falha ao validar viabilidade orçamentária: ${e}`);
       }
@@ -244,9 +263,13 @@ export class BrainAgent {
 
   private async saveAnalysis(userId: string | null, existingId: string | null, data: any) {
     const supabase = getSupabase();
+    
+    // Garantir que os campos de dados oficiais não sejam perdidos na persistência
     const legacyDataSources = {
       ...data.dataSources,
-      budgetVerdict: data.dataSources.budgetVerdict || 'N/A'
+      budgetVerdict: data.dataSources.budgetVerdict || data.dataSources.budgetViability?.viable ? 'Viável' : 'Análise indisponível',
+      budgetSummary: data.dataSources.budgetSummary || data.dataSources.budgetViability?.reason || 'Dados orçamentários insuficientes.',
+      contrastAnalysis: data.dataSources.contrastAnalysis || 'Análise de contraste não realizada.'
     };
 
     const { DataCompressor } = await import('../core/compression.ts');
@@ -260,10 +283,11 @@ export class BrainAgent {
       state: data.state,
       text: data.aiAnalysis,
       category: data.mainCategory,
-      data_sources: legacyDataSources,
+      data_sources: typeof legacyDataSources === 'string' ? JSON.parse(legacyDataSources) : legacyDataSources,
       extracted_promises: DataCompressor.compress(data.promises || []),
       probability_score: data.dataSources.consistencyScore || 0,
       status: 'completed',
+      created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
     };
 

@@ -130,7 +130,7 @@ ${text}`;
       try {
         logInfo(`[AI] Tentando OpenRouter (DeepSeek) para relatório...`);
         const response = await axios.post('https://openrouter.ai/api/v1/chat/completions', {
-          model: 'deepseek/deepseek-r1-distill-llama-70b',
+          model: 'deepseek/deepseek-r1:free',
           messages: [
             { role: 'system', content: 'Você é o núcleo de inteligência do sistema Seth VII. Auditoria técnica pura.' },
             { role: 'user', content: prompt }

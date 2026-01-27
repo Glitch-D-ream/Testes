@@ -63,7 +63,15 @@ export class CacheService {
         .gt('expiry_date', now)
         .maybeSingle();
       if (error || !data) return null;
-      return data.data_content as T;
+      const content = data.data_content;
+      if (typeof content === 'string') {
+        try {
+          return JSON.parse(content) as T;
+        } catch (e) {
+          return content as unknown as T;
+        }
+      }
+      return content as T;
     } catch (error) {
       logWarn(`[Cache] Erro ao buscar dado genérico: ${key}`, error as Error);
       return null;

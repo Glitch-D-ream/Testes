@@ -33,7 +33,11 @@ export async function getDeputadoId(nome: string): Promise<number | null> {
       params: { nome, ordem: 'ASC', ordenarPor: 'nome' }
     });
 
-    const deputado = response.data.dados[0];
+    // Busca exata ou por partes do nome
+    const dados = response.data.dados || [];
+    let deputado = dados.find((d: any) => d.nome.toLowerCase() === nome.toLowerCase());
+    if (!deputado && dados.length > 0) deputado = dados[0];
+    
     if (deputado) {
       await cacheService.saveGenericData(cacheKey, 'CAMARA', { id: deputado.id }, 30);
       return deputado.id;
@@ -54,20 +58,25 @@ export async function getVotacoesDeputado(deputadoId: number): Promise<Vote[]> {
     const cached = await cacheService.getGenericData<Vote[]>(cacheKey);
     if (cached) return cached;
 
-    // Buscar votações recentes (sem filtro de data para evitar erro 400)
+    // Buscar votações recentes do deputado específico
+    // Nota: A API da Câmara não suporta idDeputado diretamente no /votacoes de forma confiável em todos os ambientes
+    // Vamos buscar as votações gerais e filtrar, mas aumentando o range para encontrar votos do deputado
     const responseVotacoes = await axios.get(`${CAMARA_API_BASE}/votacoes`, {
-      params: { ordem: 'DESC', ordenarPor: 'dataHoraRegistro', itens: 20 },
+      params: { ordem: 'DESC', ordenarPor: 'dataHoraRegistro', itens: 50 },
       headers: { 'Accept': 'application/json' }
     });
 
     const votosEncontrados: Vote[] = [];
-    for (const votacao of responseVotacoes.data.dados) {
+    const dadosVotacoes = responseVotacoes.data.dados || [];
+
+    for (const votacao of dadosVotacoes) {
       try {
         const resVotos = await axios.get(`${CAMARA_API_BASE}/votacoes/${votacao.id}/votos`, {
           headers: { 'Accept': 'application/json' }
         });
         
-        const votoDoDeputado = resVotos.data.dados.find((v: any) => v.deputado?.id === deputadoId);
+        const listaVotos = resVotos.data.dados || [];
+        const votoDoDeputado = listaVotos.find((v: any) => v.deputado?.id === deputadoId);
         
         if (votoDoDeputado) {
           const resOrientacao = await axios.get(`${CAMARA_API_BASE}/votacoes/${votacao.id}/orientacoes`, {
