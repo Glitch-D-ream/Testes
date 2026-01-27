@@ -28,6 +28,15 @@ export class MultiScoutAgent {
     'https://www.poder360.com.br/feed/'
   ];
 
+  private readonly nitterInstances = [
+    'https://nitter.net',
+    'https://nitter.cz',
+    'https://nitter.privacydev.net',
+    'https://nitter.it',
+    'https://nitter.poast.org',
+    'https://nitter.moomoo.me'
+  ];
+
   async search(query: string): Promise<RawSource[]> {
     logInfo(`[Multi-Scout] Iniciando busca resiliente para: ${query}`);
     
@@ -51,16 +60,29 @@ export class MultiScoutAgent {
       logWarn(`[Multi-Scout] Falha na busca via IA. Tentando fallback...`, error as Error);
     }
 
-    // Tentativa 3: Busca via RSS Feeds
+    // Tentativa 3: Busca via Social Scout (Nitter/RSS)
     try {
-      sources = await this.searchViaRSSFeeds(query);
-      if (sources.length > 0) {
-        logInfo(`[Multi-Scout] Sucesso na busca via RSS. ${sources.length} fontes encontradas.`);
-        return sources;
+      const socialSources = await this.searchViaSocialRSS(query);
+      if (socialSources.length > 0) {
+        logInfo(`[Multi-Scout] Sucesso na busca via Social Scout. ${socialSources.length} fontes encontradas.`);
+        sources.push(...socialSources);
       }
     } catch (error) {
-      logWarn(`[Multi-Scout] Falha na busca via RSS. Tentando fallback final...`, error as Error);
+      logWarn(`[Multi-Scout] Falha na busca via Social Scout.`, error as Error);
     }
+
+    // Tentativa 4: Busca via RSS Feeds de Notícias
+    try {
+      const newsRSS = await this.searchViaRSSFeeds(query);
+      if (newsRSS.length > 0) {
+        logInfo(`[Multi-Scout] Sucesso na busca via RSS de Notícias. ${newsRSS.length} fontes encontradas.`);
+        sources.push(...newsRSS);
+      }
+    } catch (error) {
+      logWarn(`[Multi-Scout] Falha na busca via RSS de Notícias.`, error as Error);
+    }
+
+    if (sources.length > 0) return sources;
 
     // Tentativa 4: Busca genérica (fallback de último recurso)
     try {
@@ -222,6 +244,66 @@ export class MultiScoutAgent {
     }
 
     return sources;
+  }
+
+  /**
+   * Busca via Social Scout (Nitter RSS)
+   * Tenta encontrar o perfil do político e extrair os tweets mais recentes via RSS
+   */
+  private async searchViaSocialRSS(query: string): Promise<RawSource[]> {
+    const sources: RawSource[] = [];
+    
+    // Gerar variações de username prováveis
+    const nameParts = query.toLowerCase().split(/\s+/);
+    const usernames = [
+      nameParts.join(''), // jonesmanoel
+      nameParts.join('_'), // jones_manoel
+      nameParts[0], // jones
+      nameParts.length > 1 ? `${nameParts[0]}${nameParts[1]}` : null
+    ].filter(Boolean) as string[];
+
+    // Tentar algumas instâncias do Nitter
+    for (const instance of this.nitterInstances) {
+      for (const username of usernames) {
+        try {
+          // Tentar buscar pelo nome de usuário provável
+          const feedUrl = `${instance}/${username}/rss`;
+          logInfo(`[Multi-Scout] Tentando Social Scout (Nitter): ${feedUrl}`);
+          
+          const response = await axios.get(feedUrl, { timeout: 5000 });
+          const feedContent = response.data;
+          const items = feedContent.match(/<item>[\s\S]*?<\/item>/g) || [];
+
+          for (const item of items) {
+            const title = (item.match(/<title><!\[CDATA\[(.*?)\]\]><\/title>/) || item.match(/<title>(.*?)<\/title>/))?.[1] || 'Post Social';
+            const link = (item.match(/<link>(.*?)<\/link>/))?.[1] || '';
+            const description = (item.match(/<description><!\[CDATA\[(.*?)\]\]><\/description>/) || item.match(/<description>(.*?)<\/description>/))?.[1] || '';
+            
+            sources.push({
+              id: nanoid(),
+              url: link.replace(new URL(instance).hostname, 'twitter.com'), // Converter de volta para link original
+              title: title.replace(/<[^>]+>/g, '').substring(0, 100),
+              content: description.replace(/<[^>]+>/g, '').substring(0, 500),
+              source: 'Twitter/X (via Nitter)',
+              publishedAt: new Date().toISOString(),
+              confidence: 'medium',
+              credibilityLayer: 'C'
+            });
+            if (sources.length >= 5) break;
+          }
+
+          if (sources.length > 0) {
+            logInfo(`[Multi-Scout] Social Scout obteve ${sources.length} posts para ${username}`);
+            return sources;
+          }
+        } catch (error) {
+          // Silencioso para não poluir o log com tentativas de username erradas
+        }
+      }
+    }
+    logWarn(`[Multi-Scout] Social Scout não encontrou perfil para: ${query}`);
+
+    return [];
   }
 
   /**

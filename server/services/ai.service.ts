@@ -2,6 +2,7 @@ import axios from 'axios';
 import { logInfo, logError, logWarn } from '../core/logger.ts';
 import { groqService } from './ai-groq.service.ts';
 import { deepSeekService } from './ai-deepseek.service.ts';
+import { CircuitBreaker } from '../core/circuit-breaker.ts';
 
 export interface AIAnalysisResult {
   promises: Array<{
@@ -101,24 +102,33 @@ ${text}`;
   async analyzeText(text: string): Promise<AIAnalysisResult> {
     const openRouterKey = process.env.OPENROUTER_API_KEY;
     if (openRouterKey && !openRouterKey.includes('your-')) {
-      try {
-        return await deepSeekService.analyzeText(text, openRouterKey);
-      } catch (error) {
-        logWarn(`[AI] DeepSeek R1 falhou, tentando Groq...`);
-      }
+      const result = await CircuitBreaker.call(
+        'DeepSeek-R1',
+        () => deepSeekService.analyzeText(text, openRouterKey),
+        async () => {
+          logWarn(`[AI] DeepSeek R1 falhou ou circuito aberto, tentando Groq...`);
+          return null as any;
+        }
+      );
+      if (result) return result;
     }
 
     const groqKey = process.env.GROQ_API_KEY;
     if (groqKey && !groqKey.includes('your-')) {
-      try {
-        const result = await groqService.generateCompletion('Você é um analista político sênior. Responda apenas JSON.', this.promptTemplate(text));
-        const jsonMatch = result.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-          return JSON.parse(jsonMatch[0]) as AIAnalysisResult;
+      const result = await CircuitBreaker.call(
+        'Groq',
+        async () => {
+          const completion = await groqService.generateCompletion('Você é um analista político sênior. Responda apenas JSON.', this.promptTemplate(text));
+          const jsonMatch = completion.match(/\{[\s\S]*\}/);
+          if (jsonMatch) return JSON.parse(jsonMatch[0]) as AIAnalysisResult;
+          throw new Error('JSON inválido do Groq');
+        },
+        async () => {
+          logWarn(`[AI] Groq falhou ou circuito aberto, tentando Pollinations...`);
+          return null as any;
         }
-      } catch (error) {
-        logWarn(`[AI] Groq falhou, tentando Pollinations...`);
-      }
+      );
+      if (result) return result;
     }
 
     return await this.analyzeWithOpenSource(text);
@@ -127,31 +137,41 @@ ${text}`;
   async generateReport(prompt: string): Promise<string> {
     const openRouterKey = process.env.OPENROUTER_API_KEY;
     if (openRouterKey && !openRouterKey.includes('your-')) {
-      try {
-        logInfo(`[AI] Tentando OpenRouter (DeepSeek) para relatório...`);
-        const response = await axios.post('https://openrouter.ai/api/v1/chat/completions', {
-          model: 'deepseek/deepseek-r1:free',
-          messages: [
-            { role: 'system', content: 'Você é o núcleo de inteligência do sistema Seth VII. Auditoria técnica pura.' },
-            { role: 'user', content: prompt }
-          ]
-        }, { 
-          headers: { 'Authorization': `Bearer ${openRouterKey}` },
-          timeout: 40000 
-        });
-        return response.data.choices[0].message.content;
-      } catch (error) {
-        logWarn(`[AI] OpenRouter falhou no relatório, tentando Groq...`);
-      }
+      const result = await CircuitBreaker.call(
+        'DeepSeek-Report',
+        async () => {
+          logInfo(`[AI] Tentando OpenRouter (DeepSeek) para relatório...`);
+          const response = await axios.post('https://openrouter.ai/api/v1/chat/completions', {
+            model: 'deepseek/deepseek-r1',
+            messages: [
+              { role: 'system', content: 'Você é o núcleo de inteligência do sistema Seth VII. Auditoria técnica pura.' },
+              { role: 'user', content: prompt }
+            ]
+          }, { 
+            headers: { 'Authorization': `Bearer ${openRouterKey}` },
+            timeout: 40000 
+          });
+          return response.data.choices[0].message.content;
+        },
+        async () => {
+          logWarn(`[AI] OpenRouter falhou no relatório, tentando Groq...`);
+          return null as any;
+        }
+      );
+      if (result) return result;
     }
 
     const groqKey = process.env.GROQ_API_KEY;
     if (groqKey && !groqKey.includes('your-')) {
-      try {
-        return await groqService.generateCompletion('Você é o núcleo de inteligência do sistema Seth VII. Auditoria técnica pura.', prompt);
-      } catch (error) {
-        logWarn(`[AI] Groq falhou no relatório, tentando Pollinations...`);
-      }
+      const result = await CircuitBreaker.call(
+        'Groq-Report',
+        async () => groqService.generateCompletion('Você é o núcleo de inteligência do sistema Seth VII. Auditoria técnica pura.', prompt),
+        async () => {
+          logWarn(`[AI] Groq falhou no relatório, tentando Pollinations...`);
+          return null as any;
+        }
+      );
+      if (result) return result;
     }
 
     const models = ['mistral', 'llama', 'deepseek-r1'];

@@ -14,6 +14,7 @@ import telegramRoutes from '../routes/telegram.routes.ts';
 import aiTestRoutes from '../routes/ai-test.routes.ts';
 import searchRoutes from '../routes/search.routes.ts';
 import auditRoutes from '../routes/audit.routes.ts';
+import dossierRoutes from '../routes/dossier.routes.ts';
 
 /**
  * Rate limiters
@@ -70,6 +71,9 @@ export function setupRoutes(app: Express): void {
 
   // Rotas de auditoria
   app.use('/api/audit', auditRoutes);
+
+  // Rotas de dossiê
+  app.use('/api/dossier', dossierRoutes);
 
   /**
    * GET /api/health

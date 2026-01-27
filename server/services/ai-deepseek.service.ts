@@ -8,7 +8,7 @@ import { AIAnalysisResult } from './ai.service.ts';
  */
 export class DeepSeekService {
   private readonly API_URL = 'https://openrouter.ai/api/v1/chat/completions';
-  private readonly MODEL = 'deepseek/deepseek-r1:free';
+  private readonly MODEL = 'deepseek/deepseek-r1';
 
   private promptTemplate(text: string): string {
     return `Você é o Auditor-Chefe da Seth VII, especializado em análise de risco político e viabilidade fiscal. Sua missão é dissecar o texto fornecido e extrair inteligência acionável.

@@ -132,10 +132,19 @@ export class ScoutHybrid {
       
       const sources: RawSource[] = [];
 
-      // FASE 1 & 2: Paralelismo Massivo
-      logInfo(`[ScoutHybrid] FASE 1 & 2: Buscando em fontes oficiais, notícias e processos em paralelo...`);
+      // FASE 1 & 2: Paralelismo Massivo (Deep Scout)
+      logInfo(`[ScoutHybrid] FASE 1 & 2: Buscando em fontes oficiais, notícias, redes sociais e processos em paralelo...`);
       
-      const [officialResults, newsResults, interviewResults, legalResults, spResults, jusBrasilResults] = await Promise.all([
+      // Consultas variadas para simular comportamento humano
+      const variations = [
+        query,
+        `"${query}" promessas`,
+        `"${query}" declarações recentes`,
+        `"${query}" plano de governo`,
+        `"${query}" polêmicas OR investigação`
+      ];
+
+      const [officialResults, newsResults, interviewResults, legalResults, spResults, jusBrasilResults, socialResults, ...extraResults] = await Promise.all([
         officialSourcesSearch.search(query).catch(async (e) => { 
           logWarn(`[ScoutHybrid] APIs Oficiais falharam: ${e.message}. Ativando fallback via Browser...`);
           return directSearchImproved.search(`site:gov.br "${query}" OR site:jus.br "${query}"`);
@@ -146,15 +155,20 @@ export class ScoutHybrid {
         transparenciaSPService.search(query).catch(async () => {
           return directSearchImproved.search(`site:transparencia.sp.gov.br "${query}"`);
         }),
-        jusBrasilScraper.searchAndScrape(query).catch(() => [])
+        jusBrasilScraper.searchAndScrape(query).catch(() => []),
+        (multiScoutAgent as any).searchViaSocialRSS(query).catch(() => []),
+        // Buscas extras para profundidade humana
+        ...variations.slice(1).map(v => directSearchImproved.search(v).catch(() => []))
       ]);
 
       const directResults = [
         ...newsResults, 
         ...interviewResults, 
         ...legalResults,
+        ...extraResults.flat(),
         ...spResults.map(r => ({ title: r.title, url: r.url, snippet: r.description, source: 'Portal da Transparência SP', publishedAt: r.date })),
-        ...jusBrasilResults.map(r => ({ title: r.title, url: r.url, snippet: r.content.substring(0, 500), source: 'JusBrasil', publishedAt: new Date().toISOString() }))
+        ...jusBrasilResults.map(r => ({ title: r.title, url: r.url, snippet: r.content.substring(0, 500), source: 'JusBrasil', publishedAt: new Date().toISOString() })),
+        ...socialResults.map((r: any) => ({ title: r.title, url: r.url, snippet: r.content, source: r.source, publishedAt: r.publishedAt }))
       ];
 
       if (directResults.length < 5) {
