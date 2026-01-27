@@ -77,3 +77,25 @@ export async function syncPortalData(categories: string[], states: string[]): Pr
   }
   logger.info('[Portal Transparência] Sincronização concluída');
 }
+
+export const portalTransparenciaService = {
+  getExpenses,
+  syncPortalData,
+  /**
+   * Busca despesas relacionadas a um termo (usado pelo Scout)
+   */
+  async searchExpenses(query: string) {
+    const currentYear = new Date().getFullYear();
+    const startDate = new Date(currentYear - 1, 0, 1); // Último 1 ano
+    const endDate = new Date();
+    
+    const expenses = await getExpenses(query, startDate, endDate, 10);
+    return expenses.map(e => ({
+      description: e.description,
+      value: e.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }),
+      date: e.date.toISOString().split('T')[0],
+      organ: e.source,
+      url: `https://www.portaltransparencia.gov.br/busca?termo=${encodeURIComponent(query)}`
+    }));
+  }
+};
