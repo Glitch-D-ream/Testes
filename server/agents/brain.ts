@@ -297,13 +297,20 @@ export class BrainAgent {
   }
 
   private detectMainCategory(sources: FilteredSource[]): string {
-    const text = sources.map(s => (s.content || '') + ' ' + (s.title || '')).join(' ').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-    if (text.includes('saude') || text.includes('medico') || text.includes('hospital') || text.includes('clinica') || text.includes('sus')) return 'SAUDE';
-    if (text.includes('educacao') || text.includes('escola') || text.includes('ensino') || text.includes('universidade') || text.includes('creche')) return 'EDUCACAO';
-    if (text.includes('seguranca') || text.includes('policia') || text.includes('crime') || text.includes('violencia') || text.includes('guarda')) return 'SEGURANCA';
-    if (text.includes('economia') || text.includes('imposto') || text.includes('emprego') || text.includes('fiscal') || text.includes('tributo') || text.includes('investimento')) return 'ECONOMIA';
-    if (text.includes('infraestrutura') || text.includes('obra') || text.includes('estrada') || text.includes('ponte') || text.includes('asfalto')) return 'INFRAESTRUTURA';
-    return 'GERAL';
+    const text = sources.map(s => (s.content || '') + ' ' + (s.title || '')).join(' ');
+    // Importação dinâmica para usar o novo motor semântico gratuito
+    try {
+      const { detectCategorySemantic } = require('../modules/nlp.ts');
+      return detectCategorySemantic(text);
+    } catch (e) {
+      // Fallback para o motor simples se a importação falhar
+      const textLower = text.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+      if (textLower.includes('saude') || textLower.includes('sus')) return 'SAUDE';
+      if (textLower.includes('educacao') || textLower.includes('escola')) return 'EDUCACAO';
+      if (textLower.includes('seguranca') || textLower.includes('policia')) return 'SEGURANCA';
+      if (textLower.includes('economia') || textLower.includes('imposto')) return 'ECONOMIA';
+      return 'GERAL';
+    }
   }
 
   private calculateTopicScore(themes: string[], keywords: string[]): number {

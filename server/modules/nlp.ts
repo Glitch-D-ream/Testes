@@ -47,8 +47,8 @@ const PROMISE_VERBS = [
 // Categorias de promessas
 const PROMISE_CATEGORIES = {
   INFRASTRUCTURE: ['construir', 'obra', 'estrada', 'ponte', 'rodovia', 'ferrovia', 'aeroporto', 'porto', 'infraestrutura'],
-  EDUCATION: ['escola', 'educação', 'ensino', 'universidade', 'bolsa', 'professor', 'aluno', 'aprendizado'],
-  HEALTH: ['saúde', 'hospital', 'médico', 'medicamento', 'ambulância', 'clínica', 'enfermeiro', 'atendimento'],
+  EDUCATION: ['escola', 'educacao', 'ensino', 'universidade', 'bolsa', 'professor', 'aluno', 'aprendizado', 'creche', 'alfabetizacao'],
+  HEALTH: ['saude', 'hospital', 'medico', 'medicamento', 'ambulancia', 'clinica', 'enfermeiro', 'atendimento', 'sus', 'upa', 'ubs'],
   EMPLOYMENT: ['emprego', 'trabalho', 'desemprego', 'renda', 'salário', 'profissão', 'ocupação', 'contratação'],
   SECURITY: ['segurança', 'polícia', 'crime', 'violência', 'patrulha', 'delegacia', 'presídio', 'criminalidade'],
   ENVIRONMENT: ['ambiente', 'sustentabilidade', 'verde', 'parque', 'floresta', 'poluição', 'reciclagem', 'energia'],
@@ -57,6 +57,45 @@ const PROMISE_CATEGORIES = {
   AGRICULTURE: ['agricultura', 'fazenda', 'agropecuária', 'plantação', 'colheita', 'subsídio', 'produtor'],
   CULTURE: ['cultura', 'arte', 'música', 'cinema', 'museu', 'patrimônio', 'evento', 'festival']
 };
+
+/**
+ * Detecta a categoria principal de um texto de forma semântica (PLN local gratuito)
+ */
+export function detectCategorySemantic(text: string): string {
+  const textLower = text.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  const scores: Record<string, number> = {};
+
+  for (const [cat, keywords] of Object.entries(PROMISE_CATEGORIES)) {
+    scores[cat] = 0;
+    for (const kw of keywords) {
+      // Normalizar a palavra-chave também para garantir o match
+      const kwNorm = kw.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+      const regex = new RegExp(kwNorm, 'gi'); // Removido \b para maior flexibilidade
+      const matches = textLower.match(regex);
+      if (matches) {
+        scores[cat] += matches.length;
+      }
+    }
+  }
+
+  // Adicionar pesos para termos políticos ideológicos se a categoria for GERAL
+  if (textLower.includes('marxismo') || textLower.includes('socialismo') || textLower.includes('capitalismo') || textLower.includes('classe')) {
+    scores['ECONOMY'] += 2;
+    scores['SOCIAL'] += 2;
+  }
+
+  let bestCat = 'GERAL';
+  let maxScore = 0;
+
+  for (const [cat, score] of Object.entries(scores)) {
+    if (score > maxScore) {
+      maxScore = score;
+      bestCat = cat;
+    }
+  }
+
+  return bestCat;
+}
 
 export function extractPromises(text: string): ExtractedPromise[] {
   const promises: ExtractedPromise[] = [];

@@ -80,18 +80,18 @@ export class BrowserScraper {
 
       const page = await context.newPage();
       
-      // Otimização: Reduzir timeout de 25s para 12s e usar 'commit' para ser mais rápido
-      await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 12000 });
+      // Calibração: Aumentar timeout para 20s em sites complexos e usar 'load' para garantir JS
+      await page.goto(url, { waitUntil: 'load', timeout: 20000 });
       
-      // Lidar com redirecionamento do Google News (Otimizado: menos retries e delay menor)
+      // Lidar com redirecionamento do Google News (Persistente)
       let retries = 0;
-      while (page.url().includes('news.google.com') && retries < 3) {
-        await page.waitForTimeout(800);
+      while (page.url().includes('news.google.com') && retries < 5) {
+        await page.waitForTimeout(1000);
         retries++;
       }
       
-      // Esperar a página carregar com timeout flexível (Otimizado: 8s -> 4s)
-      await page.waitForLoadState('networkidle', { timeout: 4000 }).catch(() => {});
+      // Esperar a página carregar com timeout flexível (Persistente: 8s)
+      await page.waitForLoadState('networkidle', { timeout: 8000 }).catch(() => {});
       
       const finalUrl = page.url();
       logInfo(`[BrowserScraper] URL final: ${finalUrl} | UA: ${userAgent.substring(0, 30)}...`);
