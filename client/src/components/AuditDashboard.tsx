@@ -106,103 +106,33 @@ export const AuditDashboard: React.FC<AuditDashboardProps> = ({
         </div>
       </div>
 
-      {/* Abas de Visualização */}
-      <div className="flex gap-2 border-b border-slate-200 dark:border-slate-700">
-        <button
-          onClick={() => setActiveTab('overview')}
-          className={`px-4 py-3 font-medium text-sm border-b-2 transition-all ${
-            activeTab === 'overview'
-              ? 'border-blue-600 text-blue-600'
-              : 'border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
-          }`}
-        >
-          <div className="flex items-center gap-2">
-            <Zap size={16} />
-            Visão Geral
-          </div>
-        </button>
-        <button
-          onClick={() => setActiveTab('graph')}
-          className={`px-4 py-3 font-medium text-sm border-b-2 transition-all ${
-            activeTab === 'graph'
-              ? 'border-blue-600 text-blue-600'
-              : 'border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
-          }`}
-        >
-          <div className="flex items-center gap-2">
-            <Users size={16} />
-            Influências
-          </div>
-        </button>
-        <button
-          onClick={() => setActiveTab('radar')}
-          className={`px-4 py-3 font-medium text-sm border-b-2 transition-all ${
-            activeTab === 'radar'
-              ? 'border-blue-600 text-blue-600'
-              : 'border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
-          }`}
-        >
-          <div className="flex items-center gap-2">
-            <AlertTriangle size={16} />
-            Análise Multidimensional
-          </div>
-        </button>
-      </div>
+      {/* Conteúdo Unificado (Design Limpo e Profissional) */}
+      <div className="space-y-12">
+        {/* Relatório de Texto Forense */}
+        <ForensicTextReport 
+          verdict={{
+            summary: analysisData?.verdict?.summary || "Análise concluída com base nos dados orçamentários e discursivos disponíveis.",
+            score: analysisData?.viabilityScore || 0,
+            level: (analysisData?.viabilityScore || 0) < 40 ? 'CRÍTICO' : (analysisData?.viabilityScore || 0) < 70 ? 'ALERTA' : 'ESTÁVEL'
+          }}
+          keyFindings={analysisData?.promises?.map((p: any) => ({
+            title: p.category,
+            content: p.reasoning,
+            isContradiction: p.confidence < 0.5
+          })) || []}
+          technicalAnalysis={analysisData?.fullReport || "Processando relatório detalhado..."}
+        />
 
-      {/* Conteúdo das Abas */}
-      <div className="min-h-96">
-        {activeTab === 'overview' && (
-          <div className="space-y-6">
-
-
-            {/* Novo Relatório de Texto Forense */}
-            <ForensicTextReport 
-              verdict={{
-                summary: analysisData?.verdict?.summary || "Análise concluída com base nos dados orçamentários e discursivos disponíveis.",
-                score: analysisData?.viabilityScore || 0,
-                level: (analysisData?.viabilityScore || 0) < 40 ? 'CRÍTICO' : (analysisData?.viabilityScore || 0) < 70 ? 'ALERTA' : 'ESTÁVEL'
-              }}
-              keyFindings={analysisData?.promises?.map((p: any) => ({
-                title: p.category,
-                content: p.reasoning,
-                isContradiction: p.confidence < 0.5
-              })) || []}
-              technicalAnalysis={analysisData?.fullReport || "Processando relatório detalhado..."}
-            />
-
-            {analysisData?.contradictions && (
-              <ForensicDossier contradictions={analysisData.contradictions} />
-            )}
-
-            {analysisData?.benchmarkResult && (
-              <BenchmarkingPanel benchmark={analysisData.benchmarkResult} />
-            )}
-
-            {analysisData?.financeEvidences && (
-              <FinancePanel evidences={analysisData.financeEvidences} />
-            )}
-
-
-          </div>
+        {analysisData?.contradictions && analysisData.contradictions.length > 0 && (
+          <ForensicDossier contradictions={analysisData.contradictions} />
         )}
 
-        {activeTab === 'graph' && (
-          <div className="h-96">
-            <InfluenceGraph
-              nodes={analysisData.influenceNodes}
-              edges={analysisData.influenceEdges}
-              politicianName={politicianName}
-            />
-          </div>
+        {analysisData?.benchmarkResult && (
+          <BenchmarkingPanel benchmark={analysisData.benchmarkResult} />
         )}
 
-        {activeTab === 'radar' && (
-          <div className="h-96">
-            <ViabilityRadar
-              dimensions={analysisData.viabilityDimensions}
-              overallScore={analysisData.viabilityScore}
-            />
-          </div>
+        {analysisData?.financeEvidences && (
+          <FinancePanel evidences={analysisData.financeEvidences} />
         )}
       </div>
     </div>
