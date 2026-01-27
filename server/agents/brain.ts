@@ -11,6 +11,8 @@ import { absenceAgent } from './absence.ts';
 import { vulnerabilityAuditor } from './vulnerability.ts';
 import { benchmarkingAgent } from './benchmarking.ts';
 import { evidenceMiner } from '../modules/evidence-miner.ts';
+import { financeService } from '../services/finance.service.ts';
+import { proxyBenchmarkingAgent } from './proxy-benchmarking.ts';
 import axios from 'axios';
 
 export class BrainAgent {
@@ -56,11 +58,57 @@ export class BrainAgent {
       }
       // --- Fim Evolução ---
 
+      // --- Início Evolução: Rastreabilidade Financeira e Emendas ---
+      logInfo(`[Brain] Executando Rastreabilidade Financeira para ${cleanName}...`);
+      let financeEvidences = [];
+      try {
+        if (canonical?.camara_id) {
+          const expenses = await financeService.getParlamentaryExpenses(canonical.camara_id);
+          const proposals = await financeService.getProposals(canonical.camara_id);
+          financeEvidences = [...expenses, ...proposals];
+        }
+        // Sempre buscar Emendas Pix (Simulação/Portal)
+        const pixEmendas = await financeService.getPixEmendas(cleanName);
+        financeEvidences = [...financeEvidences, ...pixEmendas];
+        
+        // Adicionar evidências financeiras ao conjunto de evidências para a auditoria
+        evidences = [...evidences, ...financeEvidences.map(f => ({
+          statement: f.description,
+          sourceTitle: f.source,
+          sourceUrl: f.link || '',
+          category: f.type === 'EXPENSE' ? 'ECONOMY' : 'INSTITUTIONAL',
+          impactScore: f.value ? Math.min(100, Math.floor(f.value / 10000)) : 50,
+          context: `Valor: R$ ${f.value || 'N/A'} | Data: ${f.date}`
+        }))];
+      } catch (e) {
+        logWarn(`[Brain] Falha na Rastreabilidade Financeira: ${e}`);
+      }
+      // --- Fim Evolução ---
+
       // --- Início Evolução: Benchmarking Político ---
       logInfo(`[Brain] Executando Benchmarking Político para ${cleanName}...`);
       let benchmarkResult = null;
       try {
-        benchmarkResult = await benchmarkingAgent.compare(cleanName, dataSources);
+        if (!canonical?.camara_id && !canonical?.senado_id) {
+          logInfo(`[Brain] Político sem mandato. Ativando Proxy Benchmarking para ${cleanName}...`);
+          const proxyResult = await proxyBenchmarkingAgent.getProxyAnalysis(cleanName);
+          benchmarkResult = {
+            politicianName: cleanName,
+            comparisonGroup: 'Proxy Ideológico',
+            metrics: {
+              budgetAlignment: 0,
+              partyLoyalty: 0,
+              productivityScore: proxyResult.projectedProbabilityScore,
+              consistencyScore: proxyResult.projectedProbabilityScore
+            },
+            groupAverages: { budgetAlignment: 50, partyLoyalty: 50, productivityScore: 50, consistencyScore: 50 },
+            uniqueness: proxyResult.reasoning,
+            rankingInGroup: 0,
+            totalInGroup: proxyResult.proxiesUsed?.length || 0
+          };
+        } else {
+          benchmarkResult = await benchmarkingAgent.compare(cleanName, { ...dataSources, financeEvidences });
+        }
       } catch (e) {
         logWarn(`[Brain] Falha no Benchmarking Político: ${e}`);
       }

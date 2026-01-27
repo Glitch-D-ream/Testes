@@ -28,7 +28,8 @@ export default function AnalysisNew() {
             vulnerabilityReport: data.data_sources?.vulnerabilityReport,
             benchmarkResult: data.data_sources?.benchmarkResult,
             consensusMetrics: data.data_sources?.consensusMetrics,
-            absenceReport: data.data_sources?.absenceReport
+            absenceReport: data.data_sources?.absenceReport,
+            financeEvidences: data.data_sources?.financeEvidences
           });
         }
       } catch (err) {

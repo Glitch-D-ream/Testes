@@ -15,6 +15,7 @@ import { ForensicVulnerabilityPanel } from './ForensicVulnerabilityPanel';
 import { BenchmarkingPanel } from './BenchmarkingPanel';
 import { IntelligencePanel } from './IntelligencePanel';
 import { RiskPanel } from './RiskPanel';
+import { FinancePanel } from './FinancePanel';
 
 interface AuditDashboardProps {
   politicianName: string;
@@ -191,6 +192,10 @@ export const AuditDashboard: React.FC<AuditDashboardProps> = ({
 
             {analysisData?.benchmarkResult && (
               <BenchmarkingPanel benchmark={analysisData.benchmarkResult} />
+            )}
+
+            {analysisData?.financeEvidences && (
+              <FinancePanel evidences={analysisData.financeEvidences} />
             )}
 
             <RiskPanel risks={analysisData?.promises?.flatMap((p: any) => p.risks || [])} />
