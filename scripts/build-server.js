@@ -38,12 +38,12 @@ async function runBuild() {
 import { createRequire as __createRequire } from 'module';
 import { fileURLToPath as __fileURLToPath } from 'url';
 import { dirname as __dirnameFunc } from 'path';
-globalThis.require = __createRequire(import.meta.url);
-globalThis.__filename = __fileURLToPath(import.meta.url);
-globalThis.__dirname = __dirnameFunc(globalThis.__filename);
-const require = globalThis.require;
-const __filename = globalThis.__filename;
-const __dirname = globalThis.__dirname;
+var require = __createRequire(import.meta.url);
+var __filename = __fileURLToPath(import.meta.url);
+var __dirname = __dirnameFunc(__filename);
+globalThis.require = require;
+globalThis.__filename = __filename;
+globalThis.__dirname = __dirname;
 
 // Polyfills para ambiente Node.js puro (necessários para bibliotecas como pdf-parse/pdfjs)
 if (typeof globalThis.DOMMatrix === 'undefined') {

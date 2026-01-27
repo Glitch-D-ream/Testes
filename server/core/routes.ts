@@ -5,6 +5,7 @@ import { authMiddleware, optionalAuthMiddleware, requestLoggerMiddleware } from 
 import { csrfProtection, csrfTokenRoute } from './csrf.ts';
 import { allQuery, runQuery, getQuery, createAuditLog } from './database.ts';
 import { logInfo, logError } from './logger.ts';
+import { HealthMonitor } from './health-monitor.ts';
 import authRoutes from '../routes/auth.ts';
 import analysisRoutes from '../routes/analysis.routes.ts';
 import statisticsRoutes from '../routes/statistics.routes.ts';
@@ -72,14 +73,14 @@ export function setupRoutes(app: Express): void {
 
   /**
    * GET /api/health
-   * Verifica a saúde da API
+   * Verifica a saúde detalhada da API e serviços externos
    */
-  app.get('/api/health', (req: Request, res: Response) => {
-    res.json({
-      status: 'ok',
-      timestamp: new Date().toISOString(),
-      env: process.env.NODE_ENV,
-      database: !!process.env.DATABASE_URL ? 'PostgreSQL' : 'SQLite'
-    });
+  app.get('/api/health', async (req: Request, res: Response) => {
+    try {
+      const status = await HealthMonitor.getFullStatus();
+      res.status(status.status === 'healthy' ? 200 : 503).json(status);
+    } catch (err) {
+      res.status(500).json({ status: 'error', message: (err as Error).message });
+    }
   });
 }

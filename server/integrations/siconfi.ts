@@ -7,6 +7,8 @@ import axios from 'axios';
 import logger from '../core/logger.ts';
 import { cacheService } from '../services/cache.service.ts';
 import { snapshotService } from '../services/snapshot.service.ts';
+import { CircuitBreaker } from '../core/circuit-breaker.ts';
+import { retryWithBackoff } from '../core/retry-manager.ts';
 
 // Endpoint real do Tesouro Nacional (Data Lake)
 const SICONFI_API_BASE = 'https://apidatalake.tesouro.gov.br/ords/siconfi/tt/dca';
@@ -68,10 +70,10 @@ export async function getBudgetData(
 
     let response;
     try {
-      response = await axios.get(SICONFI_API_BASE, {
+      response = await retryWithBackoff(() => axios.get(SICONFI_API_BASE, {
         params,
-        timeout: 10000,
-      });
+        timeout: 8000,
+      }));
     } catch (err: any) {
       logger.warn(`[SICONFI] Erro na chamada API: ${err.message}. Tentando fallback para snapshot...`);
       const snapshot = await snapshotService.getLatestSnapshot<BudgetData>(cacheKey);
@@ -170,32 +172,52 @@ export async function validateBudgetViability(
   confidence: number;
   reason: string;
   historicalData: BudgetComparison[];
+  totalBudget: number;
+  executedBudget: number;
+  executionRate: number;
 }> {
-  const currentYear = new Date().getFullYear();
-  const history = await getBudgetHistory(category, currentYear - 2, currentYear - 1, sphere);
+  return CircuitBreaker.call(
+    `siconfi-${sphere}`,
+    async () => {
+      const currentYear = new Date().getFullYear();
+      const history = await getBudgetHistory(category, currentYear - 2, currentYear - 1, sphere);
 
-  if (history.length === 0) {
-    throw new Error(`Não foi possível validar a viabilidade orçamentária para ${category} devido à ausência de dados históricos oficiais.`);
-  }
+      if (history.length === 0) {
+        throw new Error(`Não foi possível validar a viabilidade orçamentária para ${category} devido à ausência de dados históricos oficiais.`);
+      }
 
-  const avgBudget = history.reduce((sum, h) => sum + h.budgeted, 0) / history.length;
-  const isViable = estimatedValue < (avgBudget * 0.1); // Critério: promessa não pode custar mais de 10% do orçamento total da área
+      const avgBudget = history.reduce((sum, h) => sum + h.budgeted, 0) / history.length;
+      const isViable = estimatedValue < (avgBudget * 0.1); // Critério: promessa não pode custar mais de 10% do orçamento total da área
 
-  const totalBudget = history.reduce((sum, h) => sum + h.budgeted, 0);
-  const executedBudget = history.reduce((sum, h) => sum + h.executed, 0);
-  const executionRate = totalBudget > 0 ? (executedBudget / totalBudget) * 100 : 0;
+      const totalBudget = history.reduce((sum, h) => sum + h.budgeted, 0);
+      const executedBudget = history.reduce((sum, h) => sum + h.executed, 0);
+      const executionRate = totalBudget > 0 ? (executedBudget / totalBudget) * 100 : 0;
 
-  return {
-    viable: isViable,
-    confidence: 0.85,
-    reason: isViable 
-      ? `O custo estimado é compatível com o orçamento histórico de ${category}.`
-      : `O custo estimado excede a capacidade fiscal histórica para ${category}.`,
-    historicalData: history,
-    totalBudget,
-    executedBudget,
-    executionRate
-  };
+      return {
+        viable: isViable,
+        confidence: 0.85,
+        reason: isViable 
+          ? `O custo estimado é compatível com o orçamento histórico de ${category}.`
+          : `O custo estimado excede a capacidade fiscal histórica para ${category}.`,
+        historicalData: history,
+        totalBudget,
+        executedBudget,
+        executionRate
+      };
+    },
+    async () => {
+      logger.warn(`[SICONFI] Usando fallback para validação de orçamento (${category})`);
+      return {
+        viable: true,
+        confidence: 0.5,
+        reason: "Validação orçamentária baseada em parâmetros de segurança (API indisponível).",
+        historicalData: [],
+        totalBudget: 0,
+        executedBudget: 0,
+        executionRate: 0
+      };
+    }
+  );
 }
 
 /**

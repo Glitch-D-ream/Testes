@@ -4,9 +4,11 @@ import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import { initializeDatabase } from './core/database.ts';
 
+import { setupRoutes } from './core/routes.ts';
+
+// __filename e __dirname para compatibilidade com ES Modules em dev/prod
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-import { setupRoutes } from './core/routes.ts';
 import cookieParser from 'cookie-parser';
 import { telegramWebhookService } from './services/telegram-webhook.service.ts';
 
