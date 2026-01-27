@@ -5,10 +5,11 @@
 
 import { validateBudgetViability, mapPromiseToSiconfiCategory } from '../integrations/siconfi.ts';
 import { trajectoryModule } from './trajectory.ts';
+import { BudgetContextAnalyzer } from './budget-context-analyzer.ts';
 import { validateCandidateCredibility } from '../integrations/tse.ts';
 import { validateValueAgainstPIB } from '../integrations/ibge.ts';
 import { ConfidenceScorer } from './confidence-scorer.ts';
-import { logWarn, logError } from '../core/logger.ts';
+import { logWarn, logError, logInfo } from '../core/logger.ts';
 
 // Cache de erros para evitar loops em APIs instáveis
 const errorCache = new Map<string, { timestamp: number, message: string }>();
@@ -144,6 +145,10 @@ export async function calculateProbabilityWithDetails(
 
   const allFactors: ProbabilityFactors[] = [];
   const siconfiCategory = mapPromiseToSiconfiCategory(category || 'GERAL');
+  
+  // Determinar o escopo orçamentário baseado no contexto geral da análise
+  const scopeAnalysis = BudgetContextAnalyzer.determineScope(promises[0]?.text || '', author);
+  logInfo(`[Probability] Escopo detectado: ${scopeAnalysis.scope} (${scopeAnalysis.reason})`);
 
   for (const promise of promises) {
     // 1. Determinar o valor para validação (usar o extraído pela IA ou fallback de 500Mi)
@@ -160,7 +165,12 @@ export async function calculateProbabilityWithDetails(
       budgetValidation = { viable: true, confidence: 0.4 }; // Fallback neutro-baixo
     } else {
       try {
-        budgetValidation = await validateBudgetViability(siconfiCategory, estimatedValue, new Date().getFullYear());
+        budgetValidation = await validateBudgetViability(
+          siconfiCategory.name, 
+          estimatedValue, 
+          new Date().getFullYear(),
+          scopeAnalysis.scope
+        );
       } catch (e: any) {
         logError(`[Probability] Erro na análise orçamentária: ${e.message}`);
         errorCache.set(budgetCacheKey, { timestamp: Date.now(), message: e.message });

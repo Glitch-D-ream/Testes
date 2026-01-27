@@ -8,6 +8,7 @@ import { deepSeekService } from './ai-deepseek.service.ts';
 import { logError, logInfo } from '../core/logger.ts';
 import { DataCompressor } from '../core/compression.ts';
 import { MemoryCache } from '../core/cache-l1.ts';
+import { ValueExtractor } from '../modules/value-extractor.ts';
 
 export class AnalysisService {
   async createAnalysis(userId: string | null, text: string, author: string, category: string, extraData: any = {}) {
@@ -38,7 +39,15 @@ export class AnalysisService {
     }
     
     const analysisId = nanoid();
-    const probabilityScore = await calculateProbability(promises, author, category);
+    
+    // Extrair valores financeiros para enriquecer a análise
+    const estimatedValue = ValueExtractor.extractFromIAResponse(aiAnalysis, text);
+    const enrichedPromises = promises.map(p => ({
+      ...p,
+      estimatedValue: p.estimatedValue || estimatedValue // Propaga o valor para as promessas individuais
+    }));
+
+    const probabilityScore = await calculateProbability(enrichedPromises, author, category);
 
     try {
       const supabase = getSupabase();
@@ -98,8 +107,8 @@ export class AnalysisService {
       id: analysisId,
       text,
       probabilityScore,
-      promisesCount: promises.length,
-      promises,
+      promisesCount: enrichedPromises.length,
+      promises: enrichedPromises,
       totalBudget: extraData.totalBudget || 0,
       executedBudget: extraData.executedBudget || 0,
       executionRate: extraData.executionRate || 0,

@@ -135,21 +135,29 @@ export async function getBudgetHistory(
   endYear: number,
   sphere: 'FEDERAL' | 'STATE' | 'MUNICIPAL' = 'FEDERAL'
 ): Promise<BudgetComparison[]> {
-  const comparisons: BudgetComparison[] = [];
-  for (let year = startYear; year <= endYear; year++) {
-    const data = await getBudgetData(category, year, sphere);
-    if (data) {
-      comparisons.push({
-        category,
-        year,
-        budgeted: data.budgeted,
-        executed: data.executed,
-        variance: data.executed - data.budgeted,
-        executionRate: data.percentage,
-      });
-    }
-  }
-  return comparisons;
+  const years = Array.from({ length: endYear - startYear + 1 }, (_, i) => startYear + i);
+  
+  // Executa todas as buscas em paralelo para reduzir latência drástica
+  const results = await Promise.allSettled(
+    years.map(year => getBudgetData(category, year, sphere))
+  );
+
+  return results
+    .map((result, index) => {
+      if (result.status === 'fulfilled' && result.value) {
+        const data = result.value;
+        return {
+          category,
+          year: years[index],
+          budgeted: data.budgeted,
+          executed: data.executed,
+          variance: data.executed - data.budgeted,
+          executionRate: data.percentage,
+        };
+      }
+      return null;
+    })
+    .filter((item): item is BudgetComparison => item !== null);
 }
 
 export async function validateBudgetViability(
