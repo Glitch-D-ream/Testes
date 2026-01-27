@@ -8,6 +8,11 @@ import { trajectoryModule } from './trajectory.ts';
 import { validateCandidateCredibility } from '../integrations/tse.ts';
 import { validateValueAgainstPIB } from '../integrations/ibge.ts';
 import { ConfidenceScorer } from './confidence-scorer.ts';
+import { logWarn, logError } from '../core/logger.ts';
+
+// Cache de erros para evitar loops em APIs instáveis
+const errorCache = new Map<string, { timestamp: number, message: string }>();
+const ERROR_COOLDOWN = 1000 * 60 * 5; // 5 minutos de cooldown
 
 export interface ProbabilityFactors {
   promiseSpecificity: number;
@@ -147,10 +152,20 @@ export async function calculateProbabilityWithDetails(
     // 2. Calcular fatores externos para CADA promessa (agora dinâmico pelo valor)
     let budgetValidation, authorValidation, pibValidation;
     
-    try {
-      budgetValidation = await validateBudgetViability(siconfiCategory, estimatedValue, new Date().getFullYear());
-    } catch (e) {
-      budgetValidation = { viable: true, confidence: 0.5 };
+    const budgetCacheKey = `error:siconfi:${siconfiCategory.code}`;
+    const cachedError = errorCache.get(budgetCacheKey);
+
+    if (cachedError && (Date.now() - cachedError.timestamp < ERROR_COOLDOWN)) {
+      logWarn(`[Probability] Pulando SICONFI para ${siconfiCategory.name} devido a erro recente: ${cachedError.message}`);
+      budgetValidation = { viable: true, confidence: 0.4 }; // Fallback neutro-baixo
+    } else {
+      try {
+        budgetValidation = await validateBudgetViability(siconfiCategory, estimatedValue, new Date().getFullYear());
+      } catch (e: any) {
+        logError(`[Probability] Erro na análise orçamentária: ${e.message}`);
+        errorCache.set(budgetCacheKey, { timestamp: Date.now(), message: e.message });
+        budgetValidation = { viable: true, confidence: 0.5 };
+      }
     }
 
     try {

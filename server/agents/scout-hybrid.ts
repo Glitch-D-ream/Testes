@@ -14,6 +14,7 @@ import { douService } from '../services/dou.service.ts';
 import { transparenciaSPService } from '../services/transparencia-sp.service.ts';
 import { portalTransparenciaService } from '../integrations/portal-transparencia.ts';
 import { jurisprudenciaService } from '../services/jurisprudencia.service.ts';
+import { jusBrasilScraper } from '../modules/jusbrasil-scraper.ts';
 
 export interface RawSource {
   title: string;
@@ -135,12 +136,13 @@ export class ScoutHybrid {
 
     // PARALELIZAR FASE 1 E FASE 2 + Buscas Especializadas
     logInfo(`[ScoutHybrid] FASE 1 & 2: Buscando em fontes oficiais, notícias e processos em paralelo...`);
-    const [officialResults, newsResults, interviewResults, legalResults, spResults] = await Promise.all([
+    const [officialResults, newsResults, interviewResults, legalResults, spResults, jusBrasilResults] = await Promise.all([
       officialSourcesSearch.search(query).catch(e => { logWarn(`Oficiais falharam: ${e.message}`); return []; }),
       directSearchImproved.search(query).catch(e => { logWarn(`Busca direta falhou: ${e.message}`); return []; }),
       directSearchImproved.search(`"${query}" entrevista OR declarou OR anunciou`).catch(() => []),
       directSearchImproved.search(`"${query}" processo judicial OR investigação OR tribunal`).catch(() => []),
-      transparenciaSPService.search(query).catch(() => [])
+      transparenciaSPService.search(query).catch(() => []),
+      jusBrasilScraper.searchAndScrape(query).catch(() => [])
     ]);
 
     const directResults = [
@@ -153,6 +155,13 @@ export class ScoutHybrid {
         snippet: r.description,
         source: 'Portal da Transparência SP',
         publishedAt: r.date
+      })),
+      ...jusBrasilResults.map(r => ({
+        title: r.title,
+        url: r.url,
+        snippet: r.content.substring(0, 500),
+        source: 'JusBrasil',
+        publishedAt: new Date().toISOString()
       }))
     ];
 

@@ -4,22 +4,16 @@ import { toast } from 'sonner';
 import { Moon, Sun, ShieldCheck, Database, Cpu, Search, History, BarChart3, FileText } from 'lucide-react';
 import SearchBar from '../components/SearchBar';
 import { Button } from '../components/Button';
-import { useTheme } from '../hooks/useTheme';
+import { useDarkMode } from '../hooks/useDarkMode';
 
 export default function Home() {
   const navigate = useNavigate();
-  const { theme, toggleTheme } = useTheme();
+  const { isDark, toggle } = useDarkMode();
 
   return (
-    <div className={`min-h-screen transition-colors ${
-      theme === 'dark' 
-        ? 'bg-slate-950 text-slate-100' 
-        : 'bg-slate-50 text-slate-900'
-    }`}>
+    <div className="min-h-screen transition-colors bg-background text-foreground">
       {/* Navigation */}
-      <nav className={`sticky top-0 z-50 border-b backdrop-blur-md ${
-        theme === 'dark' ? 'bg-slate-950/80 border-slate-800' : 'bg-white/80 border-slate-200'
-      }`}>
+      <nav className="sticky top-0 z-50 border-b backdrop-blur-md bg-background/80 border-border">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16 items-center">
             <div className="flex items-center gap-2">
@@ -29,25 +23,24 @@ export default function Home() {
               <span className="font-bold text-xl tracking-tight">Seth VII</span>
             </div>
             
-            <div className="hidden md:flex items-center gap-8">
-              <a href="/search" className="text-sm font-medium hover:text-blue-600 transition-colors flex items-center gap-1">
-                <Search size={16} /> Buscar
-              </a>
-              <a href="/history" className="text-sm font-medium hover:text-blue-600 transition-colors flex items-center gap-1">
-                <History size={16} /> Histórico
-              </a>
-              <a href="/statistics" className="text-sm font-medium hover:text-blue-600 transition-colors flex items-center gap-1">
-                <BarChart3 size={16} /> Estatísticas
-              </a>
-              <a href="/methodology" className="text-sm font-medium hover:text-blue-600 transition-colors flex items-center gap-1">
-                <FileText size={16} /> Metodologia
-              </a>
-              <div className="h-6 w-px bg-slate-200 dark:bg-slate-800 mx-2" />
+            <div className="flex items-center gap-4 md:gap-8">
+              <div className="hidden md:flex items-center gap-8">
+                <a href="/search" className="text-sm font-medium hover:text-blue-600 transition-colors flex items-center gap-1">
+                  <Search size={16} /> Buscar
+                </a>
+                <a href="/history" className="text-sm font-medium hover:text-blue-600 transition-colors flex items-center gap-1">
+                  <History size={16} /> Histórico
+                </a>
+                <a href="/methodology" className="text-sm font-medium hover:text-blue-600 transition-colors flex items-center gap-1">
+                  <FileText size={16} /> Metodologia
+                </a>
+              </div>
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={toggleTheme}
-                icon={theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+                onClick={toggle}
+                icon={isDark ? <Sun size={18} /> : <Moon size={18} />}
+                className="p-2"
               />
             </div>
           </div>
@@ -79,9 +72,7 @@ export default function Home() {
       </div>
 
       {/* Features Grid */}
-      <section className={`py-24 border-t ${
-        theme === 'dark' ? 'bg-slate-900/50 border-slate-800' : 'bg-slate-50 border-slate-200'
-      }`}>
+      <section className="py-24 border-t bg-muted/30 border-border">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
             <div className="flex flex-col items-center text-center">
@@ -118,9 +109,7 @@ export default function Home() {
       </section>
 
       {/* Footer */}
-      <footer className={`py-12 border-t ${
-        theme === 'dark' ? 'bg-slate-950 border-slate-800' : 'bg-white border-slate-200'
-      }`}>
+      <footer className="py-12 border-t bg-card border-border">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col md:flex-row justify-between items-center gap-8">
             <div className="flex items-center gap-2">

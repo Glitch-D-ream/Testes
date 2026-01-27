@@ -214,7 +214,9 @@ export function mapPromiseToSiconfiCategory(promiseCategory: string): { code: st
     'ADMINISTRACAO': { code: '04', name: 'Administração' }
   };
 
-  const normalized = promiseCategory.toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  // Proteção: Garantir que promiseCategory seja string antes de toUpperCase
+  const categoryStr = typeof promiseCategory === 'string' ? promiseCategory : String(promiseCategory || 'ADMINISTRACAO');
+  const normalized = categoryStr.toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
   return mapping[normalized] || { code: '04', name: 'Administração' };
 }
 

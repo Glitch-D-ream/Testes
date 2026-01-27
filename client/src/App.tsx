@@ -1,6 +1,7 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { Toaster } from 'sonner';
+import { ThemeToggle } from './components/ThemeToggle';
 import Home from './pages/Home';
 import Analysis from './pages/Analysis';
 import History from './pages/History';
@@ -23,6 +24,7 @@ function App() {
           <Route path="/politician/:id" element={<PoliticianProfile />} />
         </Routes>
         <Toaster />
+        <ThemeToggle />
       </div>
     </Router>
   );
