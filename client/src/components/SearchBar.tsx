@@ -1,5 +1,6 @@
+
 import React, { useState } from 'react';
-import { Search, Loader2, AlertCircle } from 'lucide-react';
+import { Search, Loader2, AlertCircle, Zap } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
@@ -16,12 +17,11 @@ export default function SearchBar() {
 
     setIsProcessing(true);
     setError(null);
-    setStatus('Iniciando Tríade de Agentes...');
+    setStatus('Iniciando Rede de Agentes...');
     
     try {
       const apiUrl = import.meta.env.VITE_API_URL || '';
       
-      // 1. Solicitar Auto-Análise
       const response = await fetch(`${apiUrl}/api/search/auto-analyze`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -36,23 +36,21 @@ export default function SearchBar() {
       const { id, status: initialStatus } = await response.json();
 
       if (initialStatus === 'completed') {
-        toast.success('Dossiê encontrado no cache!');
+        toast.success('Dossiê recuperado do cofre!');
         navigate(`/analysis/${id}`);
         return;
       }
 
-      // 2. Polling de Status
       let pollCount = 0;
       const pollInterval = setInterval(async () => {
         pollCount++;
         try {
           const statusRes = await fetch(`${apiUrl}/api/search/status/${id}`).catch(() => null);
           if (!statusRes || !statusRes.ok) {
-            console.warn('Falha na rede ao verificar status, tentando novamente...');
-            if (pollCount > 40) { // ~2 minutos
+            if (pollCount > 40) {
               clearInterval(pollInterval);
               setIsProcessing(false);
-              setError('Falha de conexão persistente com o servidor.');
+              setError('Conexão instável com o servidor.');
             }
             return;
           }
@@ -62,84 +60,95 @@ export default function SearchBar() {
           if (data.status === 'completed') {
             clearInterval(pollInterval);
             setIsProcessing(false);
-            toast.success('Análise concluída com sucesso!');
+            toast.success('Auditoria finalizada!');
             navigate(`/analysis/${id}`);
           } else if (data.status === 'failed') {
             clearInterval(pollInterval);
             setIsProcessing(false);
-            const msg = data.error_message || 'Os agentes não conseguiram extrair promessas suficientes para este político.';
-            setError(msg);
-            toast.error('A análise falhou');
+            setError(data.error_message || 'Dados insuficientes para auditoria.');
           } else {
-            // Atualizar status baseado no tempo decorrido
-            if (pollCount < 5) setStatus('Iniciando varredura na web...');
-            else if (pollCount < 15) setStatus('Cruzando dados orçamentários (SICONFI)...');
-            else if (pollCount < 30) setStatus('Finalizando auditoria técnica com IA...');
-            else setStatus('Aguardando resposta final dos agentes...');
+            if (pollCount < 5) setStatus('Scout: Minerando web e portais...');
+            else if (pollCount < 15) setStatus('Ironclad: Validando orçamentos...');
+            else if (pollCount < 30) setStatus('Brain: Gerando veredito técnico...');
+            else setStatus('Finalizando dossiê forense...');
           }
         } catch (err) {
           console.error('Erro no polling:', err);
         }
       }, 3000);
 
-      // Limite de segurança: 5 minutos para o polling (análises profundas de IA podem demorar)
       setTimeout(() => {
         clearInterval(pollInterval);
         if (isProcessing) {
           setIsProcessing(false);
-          setError('A análise está demorando mais que o esperado devido à profundidade da auditoria. Por favor, verifique o histórico em alguns instantes.');
+          setError('Tempo limite excedido. Verifique o histórico em instantes.');
         }
       }, 300000);
 
     } catch (error: any) {
-      console.error('Erro:', error);
-      toast.error(error.message || 'Erro ao conectar com os agentes.');
+      toast.error(error.message || 'Erro de conexão.');
       setIsProcessing(false);
-      setError(error.message || 'Erro de conexão.');
+      setError(error.message || 'Erro ao conectar.');
     }
   };
 
   return (
-    <div className="w-full max-w-2xl mx-auto">
-      <form onSubmit={handleSearch} className="relative group">
+    <div className="w-full">
+      <form onSubmit={handleSearch} className="relative flex items-center w-full group">
+        <div className="absolute left-6 text-slate-500 group-focus-within:text-blue-500 transition-colors">
+          <Search size={20} />
+        </div>
+        
         <input
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           disabled={isProcessing}
-          placeholder="Digite o nome de um político (ex: Tarcísio de Freitas)..."
-          className="w-full px-6 py-4 text-lg bg-white dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-800 rounded-2xl focus:border-blue-500 outline-none transition-all shadow-lg group-hover:shadow-xl disabled:opacity-50"
+          placeholder="Digite o nome de um político (ex: Arthur Lira)..."
+          className="w-full bg-transparent border-none py-6 pl-16 pr-40 text-lg md:text-xl font-medium text-white placeholder:text-slate-600 focus:ring-0 outline-none disabled:opacity-50"
         />
-        <button
-          type="submit"
-          disabled={isProcessing}
-          className="absolute right-3 top-1/2 -translate-y-1/2 p-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl transition-colors disabled:bg-slate-400"
-        >
-          {isProcessing ? <Loader2 className="animate-spin" size={24} /> : <Search size={24} />}
-        </button>
+
+        <div className="absolute right-3">
+          <button
+            type="submit"
+            disabled={isProcessing}
+            className="flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-800 text-white rounded-2xl font-black text-xs uppercase tracking-widest transition-all shadow-lg shadow-blue-500/20 active:scale-95"
+          >
+            {isProcessing ? (
+              <Loader2 size={16} className="animate-spin" />
+            ) : (
+              <>
+                <Zap size={16} className="fill-current" /> Audit
+              </>
+            )}
+          </button>
+        </div>
       </form>
 
       {error && (
-        <div className="mt-4 p-4 bg-rose-50 dark:bg-rose-900/20 border border-rose-100 dark:border-rose-800 rounded-xl flex items-start gap-3">
-          <AlertCircle className="text-rose-600 shrink-0 mt-0.5" size={18} />
-          <div className="text-sm text-rose-700 dark:text-rose-400">
-            <p className="font-bold">Não foi possível completar a análise</p>
-            <p>{error}</p>
+        <div className="mt-4 p-5 bg-rose-950/20 border border-rose-500/30 rounded-2xl flex items-start gap-3 animate-in fade-in slide-in-from-top-2">
+          <AlertCircle className="text-rose-500 shrink-0 mt-0.5" size={18} />
+          <div className="text-sm text-rose-200">
+            <p className="font-bold uppercase tracking-wider text-[10px]">Falha na Auditoria</p>
+            <p className="opacity-80 mt-1">{error}</p>
           </div>
         </div>
       )}
 
       {isProcessing && !error && (
-        <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded-xl animate-pulse">
-          <div className="flex items-center gap-3 text-blue-700 dark:text-blue-400">
-            <Loader2 className="animate-spin" size={20} />
-            <span className="font-medium">{status}</span>
+        <div className="mt-6 p-6 glass rounded-3xl neon-border">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3 text-blue-400">
+              <Loader2 className="animate-spin" size={18} />
+              <span className="text-[10px] font-black uppercase tracking-[0.2em]">{status}</span>
+            </div>
+            <span className="text-[10px] font-black text-slate-500 uppercase">Processando Agentes</span>
           </div>
-          <div className="mt-3 h-2 bg-blue-200 dark:bg-blue-800 rounded-full overflow-hidden">
-            <div className="h-full bg-blue-600 animate-[loading_2s_ease-in-out_infinite]" style={{ width: '60%' }} />
+          <div className="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden">
+            <div className="h-full bg-gradient-to-r from-blue-600 to-cyan-400 animate-[loading_2s_ease-in-out_infinite]" style={{ width: '40%' }} />
           </div>
-          <p className="mt-2 text-xs text-blue-600/70 dark:text-blue-400/70 text-center">
-            Isso pode levar até 40 segundos. Nossos agentes estão trabalhando para garantir precisão técnica.
+          <p className="mt-4 text-[10px] font-bold text-slate-500 text-center uppercase tracking-widest">
+            Aguarde. Nossos agentes estão minerando documentos e portais oficiais.
           </p>
         </div>
       )}
