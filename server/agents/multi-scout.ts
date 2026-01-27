@@ -43,10 +43,17 @@ export class MultiScoutAgent {
     let sources: RawSource[] = [];
 
     // Tentativa 1: Busca via DuckDuckGo (Custo Zero, Rápido)
-    sources = await this.searchViaDuckDuckGo(query);
-    if (sources.length > 0) {
-      logInfo(`[Multi-Scout] Sucesso na busca via DuckDuckGo. ${sources.length} fontes encontradas.`);
-      return sources;
+    const ddgSources = await this.searchViaDuckDuckGo(query);
+    if (ddgSources.length > 0) {
+      logInfo(`[Multi-Scout] Sucesso na busca via DuckDuckGo. ${ddgSources.length} fontes encontradas.`);
+      sources.push(...ddgSources);
+    }
+
+    // Busca Profunda: Se for Jones Manoel ou se tivermos poucas fontes, forçar busca em blogs e entrevistas
+    if (sources.length < 3 || query.toLowerCase().includes('jones manoel')) {
+      logInfo(`[Multi-Scout] Ativando BUSCA PROFUNDA para: ${query}`);
+      const deepSources = await this.searchViaDuckDuckGo(`${query} entrevista OR blog OR artigo OR "jones manoel"`);
+      sources.push(...deepSources);
     }
 
     // Tentativa 2: Busca via IA (Pollinations - Fallback)
@@ -82,7 +89,10 @@ export class MultiScoutAgent {
       logWarn(`[Multi-Scout] Falha na busca via RSS de Notícias.`, error as Error);
     }
 
-    if (sources.length > 0) return sources;
+    // Remover duplicatas por URL
+    const uniqueSources = Array.from(new Map(sources.map(s => [s.url, s])).values());
+
+    if (uniqueSources.length > 0) return uniqueSources;
 
     // Tentativa 4: Busca genérica (fallback de último recurso)
     try {

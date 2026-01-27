@@ -8,6 +8,9 @@ import { votingService } from '../services/voting.service.ts';
 import { getProposicoesDeputado, getVotacoesDeputado } from '../integrations/camara.ts';
 import { validateBudgetViability, mapPromiseToSiconfiCategory } from '../integrations/siconfi.ts';
 import { absenceAgent } from './absence.ts';
+import { vulnerabilityAuditor } from './vulnerability.ts';
+import { benchmarkingAgent } from './benchmarking.ts';
+import { evidenceMiner } from '../modules/evidence-miner.ts';
 import axios from 'axios';
 
 export class BrainAgent {
@@ -39,6 +42,29 @@ export class BrainAgent {
         logWarn(`[Brain] Falha no Agente de Ausência: ${e}`);
       }
       // --- Fim Checkpoint 4 ---
+
+      // --- Início Evolução: Mineração de Evidências e Auditoria Forense ---
+      logInfo(`[Brain] Minerando evidências granulares para ${cleanName}...`);
+      let evidences = [];
+      let vulnerabilityReport = null;
+      try {
+        evidences = await evidenceMiner.mine(cleanName, filteredSources.length > 0 ? filteredSources : rawSources.slice(0, 10));
+        logInfo(`[Brain] Mineradas ${evidences.length} evidências. Iniciando Auditoria Forense...`);
+        vulnerabilityReport = await vulnerabilityAuditor.audit(cleanName, evidences);
+      } catch (e) {
+        logWarn(`[Brain] Falha na Auditoria Forense: ${e}`);
+      }
+      // --- Fim Evolução ---
+
+      // --- Início Evolução: Benchmarking Político ---
+      logInfo(`[Brain] Executando Benchmarking Político para ${cleanName}...`);
+      let benchmarkResult = null;
+      try {
+        benchmarkResult = await benchmarkingAgent.compare(cleanName, dataSources);
+      } catch (e) {
+        logWarn(`[Brain] Falha no Benchmarking Político: ${e}`);
+      }
+      // --- Fim Evolução ---
 
       // 4. Geração de Parecer Técnico via IA (Brain - VerdictEngine v2)
       logInfo(`[Brain] Ativando VerdictEngine para ${cleanName}...`);
@@ -93,7 +119,16 @@ export class BrainAgent {
 
       const finalResult = {
         ...dataSources,
-        absenceReport // Incluir relatório de ausência nos metadados
+        absenceReport,
+        vulnerabilityReport,
+        benchmarkResult,
+        evidences, // Incluir evidências brutas para transparência
+        dataLineage: {
+          vulnerability: 'Minerado via EvidenceMiner (Forense)',
+          benchmarking: 'Baseado em dados do Supabase e APIs Oficiais',
+          budget: 'SICONFI Snapshot',
+          legislative: 'API Câmara/Senado'
+        }
       };
 
       // --- Início Checkpoint 7: Persistência de Métricas Avançadas ---
@@ -106,6 +141,8 @@ export class BrainAgent {
           dataSources.mainCategory || 'GERAL',
           {
             absenceReport,
+            vulnerabilityReport,
+            benchmarkResult,
             consensusMetrics: {
               sourceCount: filteredSources.length,
               verifiedCount: filteredSources.filter((s: any) => s.consensus_status === 'verified').length
