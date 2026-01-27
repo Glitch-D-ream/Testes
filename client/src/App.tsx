@@ -4,6 +4,7 @@ import { Toaster } from 'sonner';
 import { ThemeToggle } from './components/ThemeToggle';
 import Home from './pages/Home';
 import Analysis from './pages/Analysis';
+import './styles/modern.css';
 import History from './pages/History';
 import Methodology from './pages/Methodology';
 import PoliticianSearch from './pages/PoliticianSearch';
