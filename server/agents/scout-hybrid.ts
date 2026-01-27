@@ -11,6 +11,7 @@ import { multiScoutAgent } from './multi-scout.ts';
 import { contentScraper } from '../modules/content-scraper.ts';
 import { ingestionService } from '../services/ingestion.service.ts';
 import { douService } from '../services/dou.service.ts';
+import { transparenciaSPService } from '../services/transparencia-sp.service.ts';
 
 export interface RawSource {
   title: string;
@@ -46,7 +47,15 @@ export class ScoutHybrid {
     ];
 
     const searchPromises = absenceQueries.map(q => directSearchImproved.search(q).catch(() => []));
-    const results = await Promise.all(searchPromises);
+    
+    // Busca complementar no Portal da Transparência de SP
+    const spTransparenciaPromise = transparenciaSPService.search(query).catch(() => []);
+    
+    const [results, spResults] = await Promise.all([
+      Promise.all(searchPromises),
+      spTransparenciaPromise
+    ]);
+    
     const flatResults = results.flat();
 
     // Busca complementar no DOU (Diário Oficial da União)
@@ -61,7 +70,17 @@ export class ScoutHybrid {
     }));
 
     // Combinar resultados
-    const allResults = [...flatResults, ...douResults];
+    const allResults = [
+      ...flatResults, 
+      ...douResults,
+      ...spResults.map(r => ({
+        title: `[SP-Transparência] ${r.title}`,
+        url: r.url,
+        snippet: r.description,
+        source: 'Portal da Transparência SP',
+        publishedAt: r.date
+      }))
+    ];
 
     // Filtrar e formatar
     const sources: RawSource[] = [];
@@ -96,14 +115,26 @@ export class ScoutHybrid {
 
     // PARALELIZAR FASE 1 E FASE 2 + Buscas Especializadas
     logInfo(`[ScoutHybrid] FASE 1 & 2: Buscando em fontes oficiais, notícias e processos em paralelo...`);
-    const [officialResults, newsResults, interviewResults, legalResults] = await Promise.all([
+    const [officialResults, newsResults, interviewResults, legalResults, spResults] = await Promise.all([
       officialSourcesSearch.search(query).catch(e => { logWarn(`Oficiais falharam: ${e.message}`); return []; }),
       directSearchImproved.search(query).catch(e => { logWarn(`Busca direta falhou: ${e.message}`); return []; }),
       directSearchImproved.search(`"${query}" entrevista OR declarou OR anunciou`).catch(() => []),
-      directSearchImproved.search(`"${query}" processo judicial OR investigação OR tribunal`).catch(() => [])
+      directSearchImproved.search(`"${query}" processo judicial OR investigação OR tribunal`).catch(() => []),
+      transparenciaSPService.search(query).catch(() => [])
     ]);
 
-    const directResults = [...newsResults, ...interviewResults, ...legalResults];
+    const directResults = [
+      ...newsResults, 
+      ...interviewResults, 
+      ...legalResults,
+      ...spResults.map(r => ({
+        title: r.title,
+        url: r.url,
+        snippet: r.description,
+        source: 'Portal da Transparência SP',
+        publishedAt: r.date
+      }))
+    ];
 
     // Se poucas fontes, tentar variações
     if (directResults.length < 5) {
