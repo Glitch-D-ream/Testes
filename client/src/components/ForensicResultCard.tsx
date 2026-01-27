@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Shield, Info } from 'lucide-react';
+import { Shield, Activity, TrendingUp, AlertCircle } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 interface ForensicResultCardProps {
@@ -10,7 +10,6 @@ interface ForensicResultCardProps {
   analysisDate: string;
   confidence: number;
   category: string;
-  data?: any; // Para compatibilidade com dados extras
 }
 
 export const ForensicResultCard: React.FC<ForensicResultCardProps> = ({
@@ -20,87 +19,137 @@ export const ForensicResultCard: React.FC<ForensicResultCardProps> = ({
   analysisDate,
   confidence,
   category,
-  data
 }) => {
-  const getVerdictColor = (score: number) => {
-    if (score >= 70) return 'text-emerald-400 bg-emerald-400/10 border-emerald-500/20';
-    if (score < 40) return 'text-rose-400 bg-rose-400/10 border-rose-500/20';
-    return 'text-amber-400 bg-amber-400/10 border-amber-500/20';
-  };
-
   return (
     <motion.div 
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="glass rounded-[2rem] overflow-hidden border border-slate-800/50 shadow-2xl mb-8"
+      initial={{ opacity: 0, scale: 0.98 }}
+      animate={{ opacity: 1, scale: 1 }}
+      className="relative group"
     >
-      <div className="bg-slate-900/50 px-8 py-6 border-b border-slate-800/50 flex justify-between items-center">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-blue-500/20 rounded-lg flex items-center justify-center">
-            <Shield className="text-blue-400" size={18} />
-          </div>
-          <h3 className="text-xs font-black text-slate-200 uppercase tracking-[0.2em]">Dossiê Técnico • {category}</h3>
-        </div>
-        <span className="text-[10px] font-black bg-slate-800 text-slate-400 px-3 py-1 rounded-full uppercase tracking-widest">
-          v2.6 Ironclad
-        </span>
-      </div>
-
-      <div className="p-8">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-10">
-          <div className="md:col-span-2">
-            <h2 className="text-4xl font-black text-white mb-2 tracking-tight">{politicianName}</h2>
-            <p className="text-slate-400 font-medium flex items-center gap-2">
-              <Info size={14} className="text-blue-500" /> Auditoria realizada em {analysisDate}
-            </p>
-          </div>
-          <div className={`p-6 rounded-2xl border flex flex-col items-center justify-center text-center ${getVerdictColor(score)}`}>
-            <span className="text-[10px] font-black uppercase tracking-widest mb-1 opacity-70">Score de Credibilidade</span>
-            <span className="text-4xl font-black uppercase tracking-tight">{score}%</span>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="p-6 rounded-3xl bg-slate-900/30 border border-slate-800/50">
-            <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mb-4">Métricas de Confiança</h4>
-            <div className="space-y-4">
-              <MetricBar label="Rastreabilidade" value={confidence} color="blue" />
-              <MetricBar label="Consistência" value={score} color="cyan" />
-              <MetricBar label="Transparência" value={Math.min(confidence + 10, 100)} color="indigo" />
+      <div className="absolute -inset-1 bg-gradient-to-b from-blue-600/20 to-transparent rounded-2xl blur-xl opacity-50"></div>
+      <div className="relative bg-slate-950 border border-slate-800 rounded-2xl overflow-hidden shadow-2xl">
+        {/* Top Identification Bar */}
+        <div className="bg-slate-900/50 border-b border-slate-800 px-8 py-4 flex justify-between items-center">
+          <div className="flex items-center gap-4">
+            <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center shadow-lg shadow-blue-900/20">
+              <Shield className="text-white" size={20} />
+            </div>
+            <div>
+              <p className="text-[10px] font-black text-blue-500 uppercase tracking-[0.2em]">Relatório de Inteligência Forense</p>
+              <p className="text-xs font-bold text-slate-400">Ref: {analysisDate.replace(/\//g, '')}-IRONCLAD / v3.0</p>
             </div>
           </div>
-          
-          <div className="md:col-span-2 p-6 rounded-3xl bg-blue-500/5 border border-blue-500/10 flex flex-col justify-center">
-            <h4 className="text-[10px] font-black text-blue-400 uppercase tracking-[0.2em] mb-4">Veredito do Seth VII</h4>
-            <p className="text-sm text-slate-300 leading-relaxed font-medium">
-              {verdict}
-            </p>
+          <div className="text-right">
+            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Status da Auditoria</p>
+            <div className="flex items-center gap-2 justify-end">
+              <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
+              <span className="text-xs font-black text-emerald-500 uppercase">Dossiê Consolidado</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="p-10 flex flex-col lg:flex-row gap-12">
+          {/* Main Identity */}
+          <div className="flex-1 space-y-8">
+            <div className="space-y-2">
+              <h2 className="text-6xl font-black text-white tracking-tighter uppercase leading-none">
+                {politicianName}
+              </h2>
+              <div className="flex items-center gap-4">
+                <span className="px-3 py-1 bg-slate-900 border border-slate-800 rounded text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                  ALVO DE ALTA PRIORIDADE
+                </span>
+                <span className="text-sm text-slate-500 font-medium tracking-tight">Data da Análise: {analysisDate}</span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="bg-slate-900/30 border border-slate-800 p-6 rounded-xl space-y-4">
+                <div className="flex items-center gap-2 text-blue-400">
+                  <Activity size={16} />
+                  <span className="text-[10px] font-black uppercase tracking-widest">Quadro Executivo</span>
+                </div>
+                <p className="text-sm text-slate-300 leading-relaxed font-medium">
+                  {verdict}
+                </p>
+              </div>
+              
+              <div className="bg-slate-900/30 border border-slate-800 p-6 rounded-xl space-y-6">
+                <div className="flex items-center gap-2 text-cyan-400">
+                  <TrendingUp size={16} />
+                  <span className="text-[10px] font-black uppercase tracking-widest">Métricas de Exposição</span>
+                </div>
+                <div className="space-y-4">
+                  <MetricBar label="Rastreabilidade" value={confidence} color="bg-blue-500" />
+                  <MetricBar label="Densidade de Dados" value={85} color="bg-cyan-500" />
+                  <MetricBar label="Risco de Incoerência" value={100 - score} color="bg-red-500" />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Score Circle */}
+          <div className="flex flex-col items-center justify-center lg:border-l lg:border-slate-800 lg:pl-12">
+            <div className="relative w-48 h-48 flex items-center justify-center">
+              <svg className="w-full h-full transform -rotate-90">
+                <circle
+                  cx="96"
+                  cy="96"
+                  r="88"
+                  stroke="currentColor"
+                  strokeWidth="8"
+                  fill="transparent"
+                  className="text-slate-900"
+                />
+                <motion.circle
+                  cx="96"
+                  cy="96"
+                  r="88"
+                  stroke="currentColor"
+                  strokeWidth="8"
+                  fill="transparent"
+                  strokeDasharray={553}
+                  initial={{ strokeDashoffset: 553 }}
+                  animate={{ strokeDashoffset: 553 - (553 * score) / 100 }}
+                  transition={{ duration: 1.5, ease: "easeOut" }}
+                  className="text-blue-500"
+                />
+              </svg>
+              <div className="absolute inset-0 flex flex-col items-center justify-center">
+                <span className="text-5xl font-black text-white tracking-tighter">{score}%</span>
+                <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Credibilidade</span>
+              </div>
+            </div>
+            <div className="mt-8 text-center">
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Veredito Forense</p>
+              <span className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest ${
+                score >= 70 ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20' :
+                score >= 40 ? 'bg-yellow-500/10 text-yellow-500 border border-yellow-500/20' :
+                'bg-red-500/10 text-red-500 border border-red-500/20'
+              }`}>
+                {score >= 70 ? 'Viável / Estável' : score >= 40 ? 'Risco Moderado' : 'Crítico / Inconsistente'}
+              </span>
+            </div>
           </div>
         </div>
       </div>
     </motion.div>
   );
-}
+};
 
 function MetricBar({ label, value, color }: { label: string, value: number, color: string }) {
-  const colors: any = {
-    blue: "bg-blue-500",
-    cyan: "bg-cyan-500",
-    indigo: "bg-indigo-500"
-  };
-
   return (
     <div className="space-y-1.5">
       <div className="flex justify-between text-[10px] font-black uppercase tracking-widest">
-        <span className="text-slate-400">{label}</span>
+        <span className="text-slate-500">{label}</span>
         <span className="text-white">{value}%</span>
       </div>
-      <div className="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden">
+      <div className="h-1 w-full bg-slate-800 rounded-full overflow-hidden">
         <motion.div 
           initial={{ width: 0 }}
           animate={{ width: `${value}%` }}
           transition={{ duration: 1, ease: "easeOut" }}
-          className={`h-full rounded-full ${colors[color]}`}
+          className={`h-full rounded-full ${color}`}
         />
       </div>
     </div>

@@ -13,6 +13,7 @@ import { evidenceMiner } from '../modules/evidence-miner.ts';
 import { financeService } from '../services/finance.service.ts';
 import { proxyBenchmarkingAgent } from './proxy-benchmarking.ts';
 import { targetDiscoveryService } from '../services/target-discovery.service.ts';
+import { dataCorrelator } from './correlator.ts';
 
 export class BrainAgent {
   async analyze(politicianName: string, userId: string | null = null, existingId: string | null = null) {
@@ -59,14 +60,23 @@ export class BrainAgent {
 
       let evidences = [...(vulnerabilityReport?.evidences || []), ...financeEvidences];
       
-      // 3. Geração do Veredito (Double-Pass) - Injetando contexto de todos os agentes
+      // 3. Correlação Profunda de Dados
+      const correlations = await dataCorrelator.correlate({
+        absence: absenceReport,
+        vulnerability: vulnerabilityReport,
+        financial: financeEvidences,
+        sources: filteredSources
+      });
+
+      // 4. Geração do Veredito (Double-Pass) - Injetando contexto de todos os agentes + correlações
       const combinedContext = {
         officialProfile: dataSources,
         absence: absenceReport,
         vulnerability: vulnerabilityReport,
         benchmarking: benchmarkResult,
         financial: financeEvidences,
-        sources: filteredSources.map(s => ({ title: s.title, content: s.content.substring(0, 500) }))
+        correlations: correlations,
+        sources: filteredSources.map(s => ({ title: s.title, content: s.content.substring(0, 800), url: s.url }))
       };
 
       const { finalReport, finalPromises } = await this.generateDoublePassAIVeredict(cleanName, combinedContext, filteredSources, rawSources, regionContext);
@@ -115,31 +125,31 @@ export class BrainAgent {
 
     try {
       const strictPrompt = `
-AUDITORIA FORENSE POLÍTICA - SETH VII v2.6
+DOSSIÊ DE INTELIGÊNCIA FORENSE - SETH VII v3.0 (IRONCLAD DEEP)
 ALVO: ${cleanName}
-CONTEXTO REGIONAL: ${region.state} / ${region.city}
+IDENTIDADE: ${combinedContext.officialProfile.politician.office} (${combinedContext.officialProfile.politician.party})
 
-DADOS TÉCNICOS DOS AGENTES:
-- Perfil: ${JSON.stringify(combinedContext.officialProfile)}
-- Relatório de Ausência: ${JSON.stringify(combinedContext.absence)}
-- Vulnerabilidades: ${JSON.stringify(combinedContext.vulnerability)}
-- Benchmarking: ${JSON.stringify(combinedContext.benchmarking)}
-- Fontes Relevantes: ${JSON.stringify(combinedContext.sources)}
+DADOS BRUTOS PARA CORRELAÇÃO:
+- PERFIL OFICIAL: ${JSON.stringify(combinedContext.officialProfile)}
+- AUDITORIA DE AUSÊNCIA: ${JSON.stringify(combinedContext.absence)}
+- VULNERABILIDADES TÉCNICAS: ${JSON.stringify(combinedContext.vulnerability)}
+- CORRELAÇÕES DETECTADAS: ${JSON.stringify(combinedContext.correlations)}
+- FONTES PRIMÁRIAS (CITE-AS): ${JSON.stringify(combinedContext.sources)}
 
-INSTRUÇÕES PARA O PARECER:
-1. INTEGRAÇÃO TOTAL: Você DEVE usar os dados dos agentes acima. Se houver vulnerabilidades ou ausências, cite-as.
-2. FOCO EM FATOS: Analise apenas o que está nos dados. Não invente trajetórias.
-3. TOM CLÍNICO: Use linguagem técnica e fria.
-4. ESTRUTURA OBRIGATÓRIA:
-   - Resumo Executivo (Fatos principais)
-   - Análise de Coerência (Discurso vs Atos Oficiais)
-   - Pontos de Atenção (Vulnerabilidades e Ausências detectadas)
-   - Conclusão Técnica (Veredito final)
+INSTRUÇÕES MANDATÓRIAS:
+1. SEJA INCISIVO: Não use "pode ser", use "os dados indicam". Conecte o dinheiro (emendas) com os votos e discursos.
+2. CITAÇÃO DIRETA: Você DEVE citar nomes de projetos, valores em Reais (R$) e títulos de notícias/documentos presentes nas fontes.
+3. ANÁLISE DE IMPACTO: Explique O QUE a ausência ou vulnerabilidade significa para o cidadão.
+4. ESTRUTURA DE ALTO NÍVEL:
+   - QUADRO EXECUTIVO: Fatos de impacto imediato.
+   - CORRELAÇÃO DE DADOS: Onde o dinheiro e o poder se encontram (conecte as fontes).
+   - VETORES DE RISCO: Vulnerabilidades e inconsistências detectadas com evidências.
+   - VEREDITO FORENSE: Parecer final baseado na densidade de dados.
 
-Se os dados forem insuficientes, declare: "DADOS INSUFICIENTES PARA AUDITORIA COMPLETA".
-NÃO invente biografia. Use apenas o que os agentes coletaram.
+Se os dados forem mínimos, não invente, mas explore ao máximo as conexões entre o pouco que existe.
+NÃO use tom de biografia. Use tom de relatório de agência de inteligência.
 
-PARECER:`;
+PARECER TÉCNICO:`;
       aiAnalysis = await aiService.generateReport(strictPrompt);
       const extractionPrompt = `Extraia JSON de promessas do parecer: ${aiAnalysis}`;
       const structuredResult = await aiService.analyzeText(extractionPrompt);
