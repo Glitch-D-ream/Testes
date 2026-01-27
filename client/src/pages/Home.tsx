@@ -40,12 +40,12 @@ export default function Home() {
           </div>
           
           <h1 className="text-5xl md:text-7xl font-extrabold text-slate-900 dark:text-white tracking-tight mb-6">
-            A verdade por trás dos <br className="hidden md:block" /> 
-            <span className="text-blue-600">discursos políticos.</span>
+            Auditoria Forense <br className="hidden md:block" /> 
+            <span className="text-blue-600">de Discursos Políticos.</span>
           </h1>
           
           <p className="text-lg md:text-xl text-slate-600 dark:text-slate-400 mb-12 max-w-2xl mx-auto leading-relaxed">
-            O Seth VII utiliza inteligência artificial para cruzar promessas e discursos com dados oficiais de execução orçamentária e legislativa.
+            O **Seth VII** é a plataforma definitiva para cruzar declarações, entrevistas e promessas com dados reais de execução orçamentária, votações e rastreabilidade financeira.
           </p>
 
           <div className="max-w-2xl mx-auto bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-2 rounded-2xl shadow-xl shadow-blue-500/5">

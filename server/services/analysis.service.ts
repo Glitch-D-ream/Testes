@@ -14,10 +14,6 @@ export class AnalysisService {
   async createAnalysis(userId: string | null, text: string, author: string, category: string, extraData: any = {}) {
     let promises;
     let aiAnalysis = null;
-    const openRouterKey = process.env.OPENROUTER_API_KEY;
-
-    // Validar se o userId é um UUID válido para o Supabase
-    const validUserId = (userId && userId.length === 36) ? userId : null;
     
     try {
       // Priorizar Groq via aiService.analyzeText (que já foi otimizado)
@@ -57,16 +53,28 @@ export class AnalysisService {
         .from('analyses')
         .insert([{
           id: analysisId,
-          user_id: validUserId,
+          user_id: (userId && userId.length === 36) ? userId : null,
           text,
           author,
+          politician_name: extraData.politicianName || author,
+          office: extraData.office || null,
+          party: extraData.party || null,
+          state: extraData.state || null,
           category,
           extracted_promises: DataCompressor.compress(promises),
           probability_score: probabilityScore,
           data_sources: {
             consensusMetrics: extraData.consensusMetrics || {},
             absenceReport: extraData.absenceReport || null,
-            trajectoryAnalysis: extraData.trajectoryAnalysis || null
+            vulnerabilityReport: extraData.vulnerabilityReport || null,
+            benchmarkResult: extraData.benchmarkResult || null,
+            trajectoryAnalysis: extraData.trajectoryAnalysis || null,
+            contradictions: extraData.contradictions || [],
+            budgetVerdict: extraData.budgetVerdict || null,
+            budgetSummary: extraData.budgetSummary || null,
+            contrastAnalysis: extraData.contrastAnalysis || null,
+            projects: extraData.projects || [],
+            votingHistory: extraData.votingHistory || []
           }
         }]);
 

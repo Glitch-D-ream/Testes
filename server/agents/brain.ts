@@ -33,6 +33,14 @@ export class BrainAgent {
       // 3. Enriquecimento com Dados Oficiais e Orçamentários
       const dataSources = await this.generateOfficialProfile(cleanName, filteredSources);
       
+      // Recuperar o objeto canônico para uso nos agentes subsequentes
+      const supabase = getSupabase();
+      let { data: canonical } = await supabase
+        .from('canonical_politicians')
+        .select('*')
+        .ilike('name', `%${cleanName}%`)
+        .maybeSingle();
+      
       // --- Início Checkpoint 4: Agente de Ausência ---
       logInfo(`[Brain] Executando Agente de Ausência para ${cleanName}...`);
       let absenceReport = null;
@@ -60,9 +68,9 @@ export class BrainAgent {
 
       // --- Início Evolução: Rastreabilidade Financeira e Emendas ---
       logInfo(`[Brain] Executando Rastreabilidade Financeira para ${cleanName}...`);
-      let financeEvidences = [];
+      let financeEvidences: any[] = [];
       try {
-        if (canonical?.camara_id) {
+        if (canonical && canonical.camara_id) {
           const expenses = await financeService.getParlamentaryExpenses(canonical.camara_id);
           const proposals = await financeService.getProposals(canonical.camara_id);
           financeEvidences = [...expenses, ...proposals];
@@ -89,7 +97,7 @@ export class BrainAgent {
       logInfo(`[Brain] Executando Benchmarking Político para ${cleanName}...`);
       let benchmarkResult = null;
       try {
-        if (!canonical?.camara_id && !canonical?.senado_id) {
+        if (!canonical || (!canonical.camara_id && !canonical.senado_id)) {
           logInfo(`[Brain] Político sem mandato. Ativando Proxy Benchmarking para ${cleanName}...`);
           const proxyResult = await proxyBenchmarkingAgent.getProxyAnalysis(cleanName);
           benchmarkResult = {
@@ -137,7 +145,6 @@ export class BrainAgent {
         }
       } catch (error) {
         logWarn(`[Brain] Falha no VerdictEngine primário, tentando fallbacks...`);
-        // Fallback para o comportamento anterior se o VerdictEngine falhar
         if (!aiAnalysis) aiAnalysis = await aiService.generateReport(analysisPrompt);
         if (extractedPromisesFromAI.length === 0) {
           const structuredResult = await aiService.analyzeText(aiAnalysis);
@@ -179,42 +186,39 @@ export class BrainAgent {
         }
       };
 
-      // --- Início Checkpoint 7: Persistência de Métricas Avançadas ---
+      // --- Início Checkpoint 7: Persistência Unificada (Seth VII) ---
       try {
         const { analysisService } = await import('../services/analysis.service.ts');
-        await analysisService.createAnalysis(
+        const analysisResult = await analysisService.createAnalysis(
           userId,
-          `Auditoria Técnica Consolidada para ${cleanName}`,
+          finalReport,
           cleanName,
           dataSources.mainCategory || 'GERAL',
           {
+            politicianName: dataSources.politicianName || cleanName,
+            office: dataSources.politician.office,
+            party: dataSources.politician.party,
+            state: dataSources.politician.state,
             absenceReport,
             vulnerabilityReport,
             benchmarkResult,
             consensusMetrics: {
               sourceCount: filteredSources.length,
               verifiedCount: filteredSources.filter((s: any) => s.consensus_status === 'verified').length
-            }
+            },
+            contradictions: vulnerabilityReport?.vulnerabilities || [],
+            budgetVerdict: dataSources.budgetVerdict,
+            budgetSummary: dataSources.budgetSummary,
+            contrastAnalysis: dataSources.contrastAnalysis,
+            projects: dataSources.projects,
+            votingHistory: dataSources.votingHistory
           }
         );
+        logInfo(`[Brain] Análise persistida com sucesso. ID: ${analysisResult.id}`);
       } catch (e) {
         logWarn(`[Brain] Falha ao persistir métricas avançadas: ${e}`);
       }
       // --- Fim Checkpoint 7 ---
-
-      await this.saveAnalysis(userId, existingId, {
-        politicianName: dataSources.politicianName || cleanName,
-        office: dataSources.politician.office,
-        party: dataSources.politician.party,
-        state: dataSources.politician.state,
-        aiAnalysis: finalReport,
-        mainCategory: dataSources.mainCategory,
-        promises: finalPromises,
-        dataSources: {
-          ...finalResult,
-          contradictions: vulnerabilityReport?.vulnerabilities || []
-        }
-      });
 
       return finalResult;
     } catch (error) {
@@ -223,20 +227,25 @@ export class BrainAgent {
     }
   }
 
-  private async generateOfficialProfile(politicianName: string, sources: FilteredSource[], ignoreCache: boolean = false) {
-    const cleanName = politicianName.trim();
+  private async getCachedAnalysis(cleanName: string) {
     const supabase = getSupabase();
+    const { data: cachedAnalysis } = await supabase
+      .from('analyses')
+      .select('*')
+      .eq('politician_name', cleanName)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    
+    return cachedAnalysis;
+  }
 
-    // 1.1 Verificar Cache de Análise Completa
-    if (false) { // Forçado a ignorar cache
-      const { data: cachedAnalysis } = await supabase
-        .from('analyses')
-        .select('*')
-        .or(`politician_name.eq."${cleanName}",author.eq."${cleanName}"`)
-        .eq('status', 'completed')
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
+  private async generateOfficialProfile(cleanName: string, sources: FilteredSource[], ignoreCache: boolean = false) {
+    const supabase = getSupabase();
+    
+    // 1.1 Tentar cache recente (24h)
+    if (!process.env.FORCE_REGENERATE_PROFILE) {
+      const cachedAnalysis = await this.getCachedAnalysis(cleanName);
 
       if (cachedAnalysis) {
         const ageInHours = (new Date().getTime() - new Date(cachedAnalysis.created_at).getTime()) / (1000 * 60 * 60);
@@ -318,8 +327,7 @@ export class BrainAgent {
     if (canonical) {
       try {
         const siconfiCategory = mapPromiseToSiconfiCategory(mainCategory);
-        // A função validateBudgetViability no siconfi.ts espera (category, estimatedValue, year, sphere)
-        budgetViability = await validateBudgetViability(mainCategory, 1000000, 2023, 'FEDERAL');
+        budgetViability = await validateBudgetViability(siconfiCategory.name, 1000000, new Date().getFullYear() - 1, 'FEDERAL');
       } catch (e) {
         logWarn(`[Brain] Falha ao validar viabilidade orçamentária: ${e}`);
       }
@@ -330,7 +338,13 @@ export class BrainAgent {
       }
       
       const safeVotingHistory = Array.isArray(votingHistory) ? votingHistory : [];
-      partyAlignment = safeVotingHistory.length > 0 ? 85 : 0;
+      if (safeVotingHistory.length > 0) {
+        const totalVotes = safeVotingHistory.length;
+        const nonRebelliousVotes = safeVotingHistory.filter(v => !v.rebeldia).length;
+        partyAlignment = totalVotes > 0 ? (nonRebelliousVotes / totalVotes) * 100 : 0;
+      } else {
+        partyAlignment = 0;
+      }
 
       const authorThemes = Array.isArray(projects) ? projects.map(p => p.ementa?.toLowerCase() || '') : [];
       topicalCoherence = [
@@ -386,12 +400,10 @@ export class BrainAgent {
 
   private detectMainCategory(sources: FilteredSource[]): string {
     const text = sources.map(s => (s.content || '') + ' ' + (s.title || '')).join(' ');
-    // Importação dinâmica para usar o novo motor semântico gratuito
     try {
       const { detectCategorySemantic } = require('../modules/nlp.ts');
       return detectCategorySemantic(text);
     } catch (e) {
-      // Fallback para o motor simples se a importação falhar
       const textLower = text.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
       if (textLower.includes('saude') || textLower.includes('sus')) return 'SAUDE';
       if (textLower.includes('educacao') || textLower.includes('escola')) return 'EDUCACAO';
@@ -407,99 +419,35 @@ export class BrainAgent {
     return (matches / themes.length) * 100;
   }
 
-  private async saveAnalysis(userId: string | null, existingId: string | null, data: any) {
-    const supabase = getSupabase();
-    
-    // Garantir que os campos de dados oficiais não sejam perdidos na persistência
-    const legacyDataSources = {
-      ...data.dataSources,
-      budgetVerdict: data.dataSources.budgetVerdict || data.dataSources.budgetViability?.viable ? 'Viável' : 'Análise indisponível',
-      budgetSummary: data.dataSources.budgetSummary || data.dataSources.budgetViability?.reason || 'Dados orçamentários insuficientes.',
-      contrastAnalysis: data.dataSources.contrastAnalysis || 'Análise de contraste não realizada.'
-    };
-
-    const { DataCompressor } = await import('../core/compression.ts');
-
-    const analysisData: any = {
-      user_id: userId,
-      author: data.politicianName,
-      politician_name: data.politicianName,
-      office: data.office,
-      party: data.party,
-      state: data.state,
-      text: data.aiAnalysis,
-      category: data.mainCategory,
-      data_sources: typeof legacyDataSources === 'string' ? JSON.parse(legacyDataSources) : legacyDataSources,
-      extracted_promises: DataCompressor.compress(data.promises || []),
-      probability_score: data.dataSources.consistencyScore || 0,
-      status: 'completed',
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
-    };
-
-    try {
-      let saveError;
-      if (existingId) {
-        const { error } = await supabase.from('analyses').update(analysisData).eq('id', existingId);
-        saveError = error;
-      } else {
-        const newId = Math.random().toString(36).substring(7);
-        analysisData.id = newId;
-        const { error } = await supabase.from('analyses').insert([analysisData]);
-        saveError = error;
-      }
-      if (saveError) throw saveError;
-    } catch (error) {
-      logError(`[Brain] Erro crítico ao salvar análise no Supabase`, error as Error);
-    }
-  }
-
   private generateAnalysisPrompt(name: string, data: any, sources: FilteredSource[]): string {
     return `Você é um Auditor Político de Elite do sistema Seth VII. Sua missão é realizar uma análise profunda, técnica e CRÍTICA do político ${name}.
-		
-		DADOS DO POLÍTICO:
-		- Nome: ${name}
-		- Cargo: ${data.politician?.office || 'Não identificado'}
-		- Partido: ${data.politician?.party || 'N/A'}
-		- Estado: ${data.politician?.state || 'N/A'}
-		
-		FONTES DE NOTÍCIAS E DECLARAÇÕES (CONTEXTO REAL):
-		${sources.length > 0 ? sources.map(s => `- [${s.source}] ${s.title}: ${s.content.substring(0, 1000)}...`).join('\n') : 'Nenhuma notícia recente encontrada.'}
-
-		DADOS OFICIAIS E ORÇAMENTÁRIOS (BASE TÉCNICA):
-		- Alinhamento Partidário: ${data.partyAlignment}%
-		- Veredito Orçamentário (${data.mainCategory}): ${data.budgetVerdict}
-		- Resumo Orçamentário: ${data.budgetSummary || 'Dados não disponíveis'}
-		- Histórico de Votações: ${data.votingHistory?.length > 0 ? data.votingHistory.map((v: any) => `${v.data}: ${v.tema} (Voto: ${v.voto})`).join('; ') : 'Nenhum voto nominal recente encontrado.'}
-		- Auditoria de Contradições: ${data.contrastAnalysis}
-
+			
+			DADOS DO POLÍTICO:
+			- Nome: ${name}
+			- Cargo: ${data.politician?.office || 'Não identificado'}
+			- Partido: ${data.politician?.party || 'N/A'}
+			- Estado: ${data.politician?.state || 'N/A'}
+			
+			FONTES DE NOTÍCIAS E DECLARAÇÕES (CONTEXTO REAL):
+			${sources.length > 0 ? sources.map(s => `- [${s.source}] ${s.title}: ${s.content.substring(0, 1000)}...`).join('\n') : 'Nenhuma notícia recente encontrada.'}
+	
+			DADOS OFICIAIS E ORÇAMENTÁRIOS (BASE TÉCNICA):
+			- Alinhamento Partidário: ${data.partyAlignment}%
+			- Veredito Orçamentário (${data.mainCategory}): ${data.budgetVerdict}
+			- Resumo Orçamentário: ${data.budgetSummary || 'Dados não disponíveis'}
+			- Histórico de Votações: ${data.votingHistory?.length > 0 ? data.votingHistory.map((v: any) => `${v.data}: ${v.tema} (Voto: ${v.voto})`).join('; ') : 'Nenhum voto nominal recente encontrado.'}
+			- Auditoria de Contradições: ${data.contrastAnalysis}
+	
     SUA TAREFA:
     Gere um PARECER TÉCNICO DE INTELIGÊNCIA fundamentado e crítico, baseado ESTRITAMENTE nas evidências fornecidas. Você deve agir como um auditor que confronta o discurso político com a realidade orçamentária e legislativa.
-
-    REGRAS DE INTEGRIDADE E FUNDAMENTAÇÃO (RIGOR MÁXIMO):
-    1. CITAÇÃO DE FONTES: Ao mencionar uma declaração ou fato, cite a fonte entre parênteses, ex: (Fonte: G1, 2024).
-    2. CONFRONTO DE DADOS: Utilize os dados do SICONFI para validar se as promessas mencionadas nas notícias são financeiramente exequíveis.
-    3. AUDITORIA LEGISLATIVA: Compare o discurso recente com o histórico de votações fornecido. Se ele diz apoiar a Saúde mas votou contra o piso da enfermagem, aponte a contradição com a data do voto.
-    4. PROIBIDO ALUCINAR: Não invente datas, valores, projetos ou votos. Se a informação não está nas fontes, não a mencione como fato.
-    5. ANÁLISE DE LACUNAS: Se os dados oficiais forem escassos, seu papel é EXPLICAR O PORQUÊ e analisar a TENDÊNCIA baseada apenas no programa partidário e notícias reais.
-
+	
     ESTRUTURA DO PARECER (OBRIGATÓRIA):
     ### 🛡️ PARECER TÉCNICO DE INTELIGÊNCIA - SETH VII
-
     #### 1. Contexto e Discurso Atual
-    (Resumo das declarações recentes citando as fontes encontradas pelo Scout)
-
     #### 2. Auditoria de Realidade (Dados Oficiais)
-    (Análise baseada no SICONFI e histórico da Câmara. Confrontar os valores das promessas com o orçamento real da categoria)
-
     #### 3. Auditoria de Contradições e Consistência
-    (Confronto direto entre o que o político diz nas notícias vs. como ele votou na prática)
-
     #### 4. Veredito de Viabilidade e Integridade
-    (Conclusão técnica sobre a consistência do político e a viabilidade fiscal de suas propostas)
-
-    #### 5. Fontes Auditadas
-    (Lista numerada das fontes utilizadas para este veredito)`;
+    #### 5. Fontes Auditadas`;
   }
 }
 

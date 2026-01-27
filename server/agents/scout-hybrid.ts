@@ -135,13 +135,17 @@ export class ScoutHybrid {
       // FASE 1 & 2: Paralelismo Massivo (Deep Scout)
       logInfo(`[ScoutHybrid] FASE 1 & 2: Buscando em fontes oficiais, notícias, redes sociais e processos em paralelo...`);
       
-      // Consultas variadas para simular comportamento humano
+      // Consultas variadas para simular comportamento humano e capturar discursos reais
       const variations = [
         query,
         `"${query}" promessas`,
         `"${query}" declarações recentes`,
         `"${query}" plano de governo`,
-        `"${query}" polêmicas OR investigação`
+        `"${query}" polêmicas OR investigação`,
+        `"${query}" entrevista completa`,
+        `"${query}" discurso na íntegra`,
+        `"${query}" declarou em entrevista`,
+        `"${query}" disse ao vivo`
       ];
 
       const [officialResults, newsResults, interviewResults, legalResults, spResults, jusBrasilResults, socialResults, ...extraResults] = await Promise.all([
@@ -170,6 +174,13 @@ export class ScoutHybrid {
         ...jusBrasilResults.map(r => ({ title: r.title, url: r.url, snippet: r.content.substring(0, 500), source: 'JusBrasil', publishedAt: new Date().toISOString() })),
         ...socialResults.map((r: any) => ({ title: r.title, url: r.url, snippet: r.content, source: r.source, publishedAt: r.publishedAt }))
       ];
+
+      // Se tivermos poucas fontes de discursos, forçar uma busca específica
+      if (directResults.filter(r => r.title.toLowerCase().includes('entrevista') || r.title.toLowerCase().includes('discurso')).length < 3) {
+        logInfo(`[ScoutHybrid] Poucos discursos encontrados. Forçando busca de entrevistas...`);
+        const speechResults = await directSearchImproved.search(`"${query}" entrevista OR discurso OR declarou`).catch(() => []);
+        directResults.push(...speechResults);
+      }
 
       if (directResults.length < 5) {
         const extraResults = await directSearchImproved.search(`${query} promessa política`).catch(() => []);

@@ -16,12 +16,14 @@ export class AnalysisController {
 
       const { text, author, category } = validation.data;
       const userId = (req as any).userId || null;
+      const extraData = (req as any).body.extraData || {};
 
       const result = await analysisService.createAnalysis(
         userId, 
         text, 
         author || 'Autor Desconhecido', 
-        category || 'GERAL'
+        category || 'GERAL',
+        extraData
       );
 
       await createAuditLog(

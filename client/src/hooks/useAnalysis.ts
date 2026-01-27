@@ -44,7 +44,8 @@ export function useAnalysis(options?: UseAnalysisOptions) {
         const normalized = {
           ...result,
           probabilityScore: result.probability_score || result.probabilityScore || 0,
-          createdAt: result.created_at || result.createdAt
+          createdAt: result.created_at || result.createdAt,
+          data_sources: typeof result.data_sources === 'string' ? JSON.parse(result.data_sources) : result.data_sources
         };
         setData(normalized);
         options?.onSuccess?.(normalized);
@@ -78,7 +79,8 @@ export function useAnalysis(options?: UseAnalysisOptions) {
         const normalized = {
           ...result,
           probabilityScore: result.probability_score || result.probabilityScore || 0,
-          createdAt: result.created_at || result.createdAt
+          createdAt: result.created_at || result.createdAt,
+          data_sources: typeof result.data_sources === 'string' ? JSON.parse(result.data_sources) : result.data_sources
         };
         setData(normalized);
         options?.onSuccess?.(normalized);

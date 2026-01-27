@@ -58,11 +58,9 @@ export async function getVotacoesDeputado(deputadoId: number): Promise<Vote[]> {
     const cached = await cacheService.getGenericData<Vote[]>(cacheKey);
     if (cached) return cached;
 
-    // Buscar votações recentes do deputado específico
-    // Nota: A API da Câmara não suporta idDeputado diretamente no /votacoes de forma confiável em todos os ambientes
-    // Vamos buscar as votações gerais e filtrar, mas aumentando o range para encontrar votos do deputado
+    // Buscar votações recentes gerais e filtrar pelo deputado
     const responseVotacoes = await axios.get(`${CAMARA_API_BASE}/votacoes`, {
-      params: { ordem: 'DESC', ordenarPor: 'dataHoraRegistro', itens: 50 },
+      params: { ordem: 'DESC', ordenarPor: 'dataHoraRegistro', itens: 20 },
       headers: { 'Accept': 'application/json' }
     });
 

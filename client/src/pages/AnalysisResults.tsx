@@ -103,9 +103,9 @@ export function AnalysisResults() {
         <div className="bg-white rounded-lg shadow-md p-8 mb-8">
           <div className="flex items-start justify-between mb-6">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">Resultado da Análise</h1>
+              <h1 className="text-3xl font-bold text-gray-900 mb-2">🛡️ Auditoria Forense Seth VII</h1>
               <p className="text-gray-600">
-                {data.author ? `Autor: ${data.author}` : 'Análise de promessa política'}
+                {data.author ? `Alvo: ${data.author}` : 'Análise de promessa política'}
               </p>
             </div>
             <div className="flex gap-2">
@@ -154,18 +154,64 @@ export function AnalysisResults() {
           </div>
 
           {/* Checkpoint 7: Painéis de Inteligência Avançada */}
-          <IntelligencePanel 
-            consensusMetrics={data.data_sources?.consensusMetrics}
-            absenceReport={data.data_sources?.absenceReport}
-          />
+          <div className="space-y-6">
+            <IntelligencePanel 
+              consensusMetrics={data.data_sources?.consensusMetrics}
+              absenceReport={data.data_sources?.absenceReport}
+            />
 
-          {data.data_sources?.vulnerabilityReport && (
-            <ForensicVulnerabilityPanel report={data.data_sources.vulnerabilityReport} />
-          )}
+            {data.data_sources?.vulnerabilityReport && (
+              <ForensicVulnerabilityPanel report={data.data_sources.vulnerabilityReport} />
+            )}
 
-          {data.data_sources?.benchmarkResult && (
-            <BenchmarkingPanel benchmark={data.data_sources.benchmarkResult} />
-          )}
+            {data.data_sources?.benchmarkResult && (
+              <BenchmarkingPanel benchmark={data.data_sources.benchmarkResult} />
+            )}
+
+            {/* Novo Painel: Rastreabilidade Financeira e Projetos */}
+            {(data.data_sources?.projects?.length > 0 || data.data_sources?.budgetVerdict) && (
+              <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                <div className="bg-slate-50 px-6 py-4 border-b border-slate-200 flex justify-between items-center">
+                  <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">📊 Rastreabilidade e Atos Oficiais</h3>
+                  <span className="text-[10px] font-bold bg-blue-100 text-blue-700 px-2 py-0.5 rounded">SICONFI / CÂMARA</span>
+                </div>
+                <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <h4 className="text-xs font-bold text-slate-500 uppercase mb-3">Veredito Orçamentário</h4>
+                    <div className={`p-4 rounded-lg border ${data.data_sources.budgetVerdict === 'Viável' ? 'bg-green-50 border-green-100' : 'bg-amber-50 border-amber-100'}`}>
+                      <p className={`text-sm font-bold ${data.data_sources.budgetVerdict === 'Viável' ? 'text-green-700' : 'text-amber-700'} mb-1`}>
+                        {data.data_sources.budgetVerdict || 'Análise Indisponível'}
+                      </p>
+                      <p className="text-xs text-slate-600 leading-relaxed">
+                        {data.data_sources.budgetSummary || 'Dados insuficientes para veredito fiscal.'}
+                      </p>
+                    </div>
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-slate-500 uppercase mb-3">Projetos e Atuação Recente</h4>
+                    <div className="space-y-2">
+                      {data.data_sources.projects?.slice(0, 3).map((p: any, i: number) => (
+                        <div key={i} className="text-xs p-2 bg-slate-50 rounded border border-slate-100">
+                          <p className="font-semibold text-slate-700 line-clamp-1">{p.ementa}</p>
+                          <p className="text-slate-500 mt-1">ID: {p.id} | {p.siglaTipo}</p>
+                        </div>
+                      )) || <p className="text-xs text-slate-400 italic">Nenhum projeto recente mapeado.</p>}
+                    </div>
+                  </div>
+                </div>
+                {data.data_sources.contrastAnalysis && (
+                  <div className="px-6 pb-6">
+                    <h4 className="text-xs font-bold text-slate-500 uppercase mb-3">Análise de Contraste (Discurso vs. Ação)</h4>
+                    <div className="p-4 bg-indigo-50 border border-indigo-100 rounded-lg">
+                      <p className="text-xs text-indigo-800 leading-relaxed italic">
+                        "{data.data_sources.contrastAnalysis}"
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
 
           {/* Texto Original */}
           <div className="mt-8 pt-8 border-t border-gray-200">
