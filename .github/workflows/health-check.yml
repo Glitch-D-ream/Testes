@@ -1,0 +1,30 @@
+name: Health Check & Alerts
+
+on:
+  schedule:
+    - cron: '*/30 * * * *'  # A cada 30 minutos
+  workflow_dispatch:
+
+jobs:
+  health-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check Seth VII Health
+        run: |
+          # Nota: Usando um placeholder para a URL, o usuário deve configurar o secret APP_URL
+          APP_URL="${{ secrets.APP_URL }}"
+          if [ -z "$APP_URL" ]; then
+            echo "APP_URL não configurada. Pulando check."
+            exit 0
+          fi
+          
+          RESPONSE=$(curl -s "$APP_URL/health")
+          STATUS=$(echo $RESPONSE | jq -r '.status')
+          
+          if [ "$STATUS" != "healthy" ]; then
+            MESSAGE="⚠️ *Seth VII Health Check Failed!*%0A%0A*Status:* $STATUS%0A*Timestamp:* $(date)%0A*Response:* $RESPONSE"
+            curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+              -d "chat_id=${{ secrets.TELEGRAM_CHAT_ID }}" \
+              -d "parse_mode=Markdown" \
+              -d "text=$MESSAGE"
+          fi
