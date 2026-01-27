@@ -12,6 +12,7 @@ import { contentScraper } from '../modules/content-scraper.ts';
 import { ingestionService } from '../services/ingestion.service.ts';
 import { douService } from '../services/dou.service.ts';
 import { transparenciaSPService } from '../services/transparencia-sp.service.ts';
+import { portalTransparenciaService } from '../integrations/portal-transparencia.ts';
 
 export interface RawSource {
   title: string;
@@ -48,12 +49,14 @@ export class ScoutHybrid {
 
     const searchPromises = absenceQueries.map(q => directSearchImproved.search(q).catch(() => []));
     
-    // Busca complementar no Portal da Transparência de SP
+    // Busca complementar nos Portais de Transparência (SP e Federal)
     const spTransparenciaPromise = transparenciaSPService.search(query).catch(() => []);
+    const federalTransparenciaPromise = portalTransparenciaService.searchExpenses(query).catch(() => []);
     
-    const [results, spResults] = await Promise.all([
+    const [results, spResults, federalResults] = await Promise.all([
       Promise.all(searchPromises),
-      spTransparenciaPromise
+      spTransparenciaPromise,
+      federalTransparenciaPromise
     ]);
     
     const flatResults = results.flat();
@@ -78,6 +81,13 @@ export class ScoutHybrid {
         url: r.url,
         snippet: r.description,
         source: 'Portal da Transparência SP',
+        publishedAt: r.date
+      })),
+      ...federalResults.map(r => ({
+        title: `[Federal-Transparência] ${r.description}`,
+        url: r.url || '',
+        snippet: `Valor: ${r.value} | Órgão: ${r.organ}`,
+        source: 'Portal da Transparência Federal',
         publishedAt: r.date
       }))
     ];
