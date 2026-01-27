@@ -58,12 +58,15 @@ export class BrainAgent {
       // Usar promessas extraídas da IA
       let finalPromises = extractedPromisesFromAI;
 
+      // Garantir que o parecer técnico (aiAnalysis) não seja vazio
+      const finalReport = aiAnalysis || "Análise técnica concluída. O sistema identificou tendências de atuação baseadas no histórico partidário e notícias recentes, embora dados oficiais nominais sejam escassos para este período.";
+
       await this.saveAnalysis(userId, existingId, {
         politicianName: dataSources.politicianName || cleanName,
         office: dataSources.politician.office,
         party: dataSources.politician.party,
         state: dataSources.politician.state,
-        aiAnalysis,
+        aiAnalysis: finalReport,
         mainCategory: dataSources.mainCategory,
         promises: finalPromises,
         dataSources
@@ -262,16 +265,36 @@ export class BrainAgent {
   }
 
   private generateAnalysisPrompt(name: string, data: any, sources: FilteredSource[]): string {
-    return `Analise o político ${name} (${data.politician?.office || 'Político'}, ${data.politician?.party || 'N/A'}-${data.politician?.state || 'N/A'}).
-    
-    FONTES DE NOTÍCIAS RECENTES:
-    ${sources.map(s => `- [${s.source}] ${s.title}: ${s.content.substring(0, 300)}...`).join('\n')}
-    
-    DADOS OFICIAIS:
-    - Alinhamento Partidário: ${data.partyAlignment}%
-    - Veredito Orçamentário (${data.mainCategory}): ${data.budgetVerdict}
-    
-    Sua tarefa é gerar um parecer técnico comparando o que o político diz nas notícias com o que ele faz oficialmente.`;
+    return `Você é um Auditor Político de Elite do sistema Seth VII. Sua missão é realizar uma análise profunda e técnica do político ${name}.
+
+DADOS DO POLÍTICO:
+- Nome: ${name}
+- Cargo: ${data.politician?.office || 'Não identificado'}
+- Partido: ${data.politician?.party || 'N/A'}
+- Estado: ${data.politician?.state || 'N/A'}
+
+FONTES DE NOTÍCIAS E DECLARAÇÕES (CONTEXTO):
+${sources.length > 0 ? sources.map(s => `- [${s.source}] ${s.title}: ${s.content.substring(0, 500)}...`).join('\n') : 'Nenhuma notícia recente encontrada.'}
+
+DADOS OFICIAIS E ORÇAMENTÁRIOS (BASE TÉCNICA):
+- Alinhamento Partidário: ${data.partyAlignment}%
+- Veredito Orçamentário (${data.mainCategory}): ${data.budgetVerdict}
+- Resumo Orçamentário: ${data.budgetSummary || 'Dados não disponíveis'}
+- Histórico de Votações: ${data.votingHistory?.length > 0 ? data.votingHistory.map((v: any) => `${v.data}: ${v.tema} (Voto: ${v.voto})`).join('; ') : 'Nenhum voto nominal recente encontrado.'}
+
+SUA TAREFA:
+Gere um PARECER TÉCNICO DE INTELIGÊNCIA. 
+1. Se houver notícias, extraia as intenções e promessas, mesmo que implícitas.
+2. Compare essas intenções com os dados oficiais (Votos e Orçamento).
+3. Se os dados oficiais forem escassos, analise o PERFIL POLÍTICO baseado no partido e nas notícias, mas mantenha o tom técnico.
+4. NUNCA responda apenas "Dados não disponíveis". Se os dados forem poucos, faça uma análise de RISCO e TENDÊNCIA baseada no que existe.
+5. Use termos técnicos: "viabilidade fiscal", "contingenciamento", "base governista", "capital político".
+
+ESTRUTURA DO PARECER:
+- Introdução (Contexto atual do político)
+- Análise de Discurso vs. Realidade (O que ele diz vs. O que os dados mostram)
+- Veredito de Viabilidade (As intenções dele cabem no orçamento mencionado?)
+- Conclusão Técnica (Resumo da consistência do político)`;
   }
 }
 

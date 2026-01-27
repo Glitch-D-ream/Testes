@@ -8,43 +8,36 @@ import { AIAnalysisResult } from './ai.service.ts';
  */
 export class DeepSeekService {
   private readonly API_URL = 'https://openrouter.ai/api/v1/chat/completions';
-  private readonly MODEL = 'deepseek/deepseek-r1'; // Ou 'deepseek/deepseek-r1:free' se disponível
+  private readonly MODEL = 'deepseek/deepseek-r1';
 
   private promptTemplate(text: string): string {
-    return `Você é um Auditor Técnico Independente e Analista de Viabilidade Orçamentária da Seth VII. Sua missão é realizar uma auditoria fria, imparcial e estritamente técnica do conteúdo fornecido.
+    return `Você é o Auditor-Chefe da Seth VII, especializado em análise de risco político e viabilidade fiscal. Sua missão é dissecar o texto fornecido e extrair inteligência acionável.
 
-### O QUE É UMA PROMESSA (CRITÉRIO RIGOROSO):
-- **SIM:** "Vou construir 50 escolas até 2026", "Anunciamos investimento de 10 bi na saúde", "Votarei contra o aumento de impostos".
-- **NÃO:** Notícias sobre o político ("Lula viaja para a China"), ataques a adversários ("Fulano é fascista"), descrições de eventos passados sem compromisso futuro.
+DIRETRIZES DE AUDITORIA:
+1. EXTRAÇÃO DE INTENÇÕES: Identifique não apenas promessas diretas, mas intenções políticas claras, projetos mencionados ou posicionamentos fortes.
+2. ANÁLISE DE RISCO: Para cada item, identifique por que ele pode falhar (falta de verba, oposição política, entraves jurídicos).
+3. VEREDITO TÉCNICO: Use seu raciocínio profundo para avaliar se o que está sendo dito tem pé no chão ou é apenas retórica.
+4. RESILIÊNCIA: Se o texto for vago, extraia a "Tendência de Atuação" do político.
 
-### PRINCÍPIOS DE AUDITORIA:
-1. **FILTRAGEM DE RUÍDO:** Ignore ataques políticos, fofocas de bastidores ou notícias puramente informativas que não contenham um compromisso de ação futura.
-2. **HONESTIDADE INTELECTUAL:** Se o texto for apenas uma notícia sem promessas, a lista "promises" deve estar VAZIA [].
-3. **FOCO EM VIABILIDADE:** Analise se a promessa tem base orçamentária ou se é apenas retórica eleitoral.
-
-### SISTEMA DE VEREDITO EM DUAS ETAPAS:
-1. **FATOS:** Liste apenas dados concretos e compromissos reais identificados.
-2. **CETICISMO:** Liste os obstáculos reais (Teto de Gastos, LRF, Oposição no Congresso).
-
-Responda estritamente em formato JSON puro:
+Responda estritamente em formato JSON:
 {
   "promises": [
     {
-      "text": "A promessa exata (ex: 'Vou reduzir o IPI')",
+      "text": "A promessa ou intenção clara",
       "category": "Saúde|Educação|Economia|Segurança|Infraestrutura|Geral",
       "estimatedValue": 0, 
       "confidence": 0.0 a 1.0,
       "negated": false,
       "conditional": false,
-      "reasoning": "Por que isso é viável ou inviável? Cite leis ou orçamento se possível.",
-      "risks": ["Risco 1", "Risco 2"]
+      "reasoning": "Análise técnica detalhada sobre a viabilidade.",
+      "risks": ["Risco técnico 1", "Risco político 2"]
     }
   ],
-  "overallSentiment": "Técnico|Populista|Informativo",
+  "overallSentiment": "Técnico|Populista|Informativo|Oportunista",
   "credibilityScore": 0-100,
   "verdict": {
-    "facts": ["Fato concreto extraído"],
-    "skepticism": ["Obstáculo técnico identificado"]
+    "facts": ["Fato principal identificado"],
+    "skepticism": ["Obstáculo crítico para o sucesso do político"]
   }
 }
 
@@ -71,16 +64,22 @@ ${text}`;
         headers: {
           'Authorization': `Bearer ${apiKey}`,
           'Content-Type': 'application/json',
-          'HTTP-Referer': 'https://github.com/Glitch-D-ream/Testes', // Opcional para OpenRouter
+          'HTTP-Referer': 'https://github.com/Glitch-D-ream/Testes',
           'X-Title': 'Detector de Promessa Vazia'
         },
-        timeout: 90000 // DeepSeek R1 pode demorar mais para "pensar"
+        timeout: 90000
       });
 
       let content = response.data.choices[0].message.content;
       
       if (typeof content === 'string') {
-        content = JSON.parse(content.replace(/```json\n?|\n?```/g, '').trim());
+        // Limpar possíveis blocos de código markdown
+        const jsonMatch = content.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          content = JSON.parse(jsonMatch[0]);
+        } else {
+          content = JSON.parse(content);
+        }
       }
 
       logInfo(`[DeepSeek-R1] Análise concluída com sucesso.`);
