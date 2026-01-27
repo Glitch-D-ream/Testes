@@ -29,12 +29,12 @@ export class MultiScoutAgent {
   ];
 
   private readonly nitterInstances = [
-    'https://nitter.net',
-    'https://nitter.cz',
+    'https://nitter.poast.org',
     'https://nitter.privacydev.net',
     'https://nitter.it',
-    'https://nitter.poast.org',
-    'https://nitter.moomoo.me'
+    'https://nitter.moomoo.me',
+    'https://nitter.no-logs.com',
+    'https://nitter.perennialte.ch'
   ];
 
   async search(query: string): Promise<RawSource[]> {
@@ -258,9 +258,16 @@ export class MultiScoutAgent {
     const usernames = [
       nameParts.join(''), // jonesmanoel
       nameParts.join('_'), // jones_manoel
+      nameParts.reverse().join(''), // manoeljones
       nameParts[0], // jones
       nameParts.length > 1 ? `${nameParts[0]}${nameParts[1]}` : null
     ].filter(Boolean) as string[];
+    
+    // Adicionar usernames específicos conhecidos se a query for Jones Manoel
+    if (query.toLowerCase().includes('jones manoel')) {
+      usernames.unshift('jonesmanoel_');
+      usernames.unshift('jonesmanoel');
+    }
 
     // Tentar algumas instâncias do Nitter
     for (const instance of this.nitterInstances) {

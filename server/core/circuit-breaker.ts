@@ -15,8 +15,8 @@ interface BreakerStatus {
  */
 export class CircuitBreaker {
   private static states = new Map<string, BreakerStatus>();
-  private static readonly FAILURE_THRESHOLD = 5;
-  private static readonly RESET_TIMEOUT = 30000; // 30 segundos
+  private static readonly FAILURE_THRESHOLD = 5; // Mais tolerante para instabilidades temporárias
+  private static readonly RESET_TIMEOUT = 30000; // 30 segundos para recuperação rápida
 
   private static getBreaker(service: string): BreakerStatus {
     if (!this.states.has(service)) {

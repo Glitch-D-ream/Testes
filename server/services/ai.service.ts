@@ -75,20 +75,25 @@ ${text}`;
           ],
           model: model,
           jsonMode: true
-        }, { timeout: 20000 });
+        }, { timeout: 40000 });
 
         let content = response.data;
         if (typeof content === 'string') {
-          const jsonMatch = content.match(/\{[\s\S]*\}/);
-          content = JSON.parse(jsonMatch ? jsonMatch[0] : content);
+          try {
+            const jsonMatch = content.match(/\{[\s\S]*\}/);
+            content = JSON.parse(jsonMatch ? jsonMatch[0] : content);
+          } catch (e) {
+            logWarn(`[AI] Falha ao parsear JSON do modelo ${model}. Tentando próximo.`);
+            continue;
+          }
         }
 
-        if (content && (content.promises || content.verdict)) {
+        if (content && (content.promises || content.verdict || content.facts)) {
           return {
             promises: content.promises || [],
             overallSentiment: content.overallSentiment || 'Informativo',
             credibilityScore: content.credibilityScore || 50,
-            verdict: content.verdict || { facts: [], skepticism: [] }
+            verdict: content.verdict || { facts: content.facts || [], skepticism: content.skepticism || [] }
           };
         }
       } catch (error) {
@@ -174,19 +179,28 @@ ${text}`;
       if (result) return result;
     }
 
-    const models = ['mistral', 'llama', 'deepseek-r1'];
+    const models = ['mistral', 'llama', 'deepseek-r1', 'qwen-qwq', 'mistral-large'];
     for (const model of models) {
       try {
+        logInfo(`[AI] Tentando Pollinations (${model}) para relatório final...`);
         const response = await axios.post('https://text.pollinations.ai/', {
           messages: [{ role: 'user', content: prompt }],
           model: model
-        }, { timeout: 20000 });
-        if (response.data) return typeof response.data === 'string' ? response.data : JSON.stringify(response.data);
+        }, { timeout: 40000 });
+        
+        let content = response.data;
+        if (content) {
+          return typeof content === 'string' ? content : JSON.stringify(content);
+        }
       } catch (error) {
+        logWarn(`[AI] Modelo ${model} falhou no relatório: ${error}`);
         continue;
       }
     }
-    throw new Error('Falha ao gerar relatório profissional');
+
+    // Fallback de Emergência: Se tudo falhar, retornar o prompt original estruturado minimamente
+    logError(`[AI] Todas as APIs de relatório falharam. Usando fallback de texto bruto.`);
+    return `PARECER TÉCNICO DE EMERGÊNCIA (FALHA DE IA)\n\nO sistema não conseguiu gerar um relatório formatado devido à instabilidade nas APIs. No entanto, os dados foram coletados.\n\nCONTEÚDO BRUTO DA ANÁLISE:\n${prompt.substring(0, 1000)}...`;
   }
 }
 

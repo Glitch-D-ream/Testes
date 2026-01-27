@@ -12,6 +12,11 @@ async function runTriadTest() {
   try {
     // 1. Inicializar Banco
     await initializeDatabase();
+
+    // Limpar cache para garantir teste real do Scout e Circuit Breaker
+    const { IntelligentCache } = await import('../server/core/intelligent-cache.ts');
+    IntelligentCache.clearL1();
+    logInfo('🧹 Cache L1 limpo para teste de validação real.');
     
     // 2. Executar Brain Agent (que orquestra Scout e Filter internamente)
     const politician = "Jones Manoel";

@@ -170,52 +170,90 @@ export class BrowserScraper {
    */
   private async scrapeStatic(url: string): Promise<string | null> {
     try {
+      logInfo(`[BrowserScraper] Tentando extração estática para: ${url}`);
+      
       // Tentar resolver redirecionamentos (especialmente Google News)
       const response = await axios.get(url, {
         headers: {
           'User-Agent': this.getRandomUserAgent(),
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8'
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+          'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7'
         },
-        timeout: 8000,
-        maxRedirects: 3
+        timeout: 10000,
+        maxRedirects: 5,
+        validateStatus: () => true // Aceitar qualquer status para tentar extrair algo
       });
+
+      if (response.status >= 400) {
+        logWarn(`[BrowserScraper] Status ${response.status} para ${url}. Tentando extrair mesmo assim.`);
+      }
 
       const $ = cheerio.load(response.data);
       
       // Se cair em página de redirecionamento do Google News (meta refresh)
       const metaRefresh = $('meta[http-equiv="refresh"]').attr('content');
       if (metaRefresh && metaRefresh.includes('url=')) {
-        const nextUrl = metaRefresh.split('url=')[1];
+        let nextUrl = metaRefresh.split('url=')[1];
+        if (nextUrl.startsWith("'") || nextUrl.startsWith('"')) nextUrl = nextUrl.substring(1, nextUrl.length - 1);
         logInfo(`[BrowserScraper] Seguindo meta-refresh para: ${nextUrl}`);
         return await this.scrapeStatic(nextUrl);
       }
+
+      // Se for Google News, tentar extrair o link real do script se o meta refresh falhar
+      if (url.includes('news.google.com')) {
+        const scriptContent = $('script').text();
+        const urlMatch = scriptContent.match(/window\.location\.replace\("([^"]+)"\)/) || 
+                         scriptContent.match(/window\.location\.href\s*=\s*"([^"]+)"/);
+        if (urlMatch && urlMatch[1]) {
+          logInfo(`[BrowserScraper] Seguindo redirecionamento JS para: ${urlMatch[1]}`);
+          return await this.scrapeStatic(urlMatch[1]);
+        }
+      }
       
-      // Remover ruído
-      $('script, style, nav, footer, header, aside, .ads, .comments').remove();
+      // Remover ruído agressivamente
+      $('script, style, nav, footer, header, aside, .ads, .comments, .cookie-banner, .paywall, iframe, noscript').remove();
 
       const selectors = [
         'article', 'main', '.content', '.post-content', '.entry-content', 
-        '.materia-conteudo', '.texto-noticia'
+        '.materia-conteudo', '.texto-noticia', '.article-body', '.story-body',
+        '.c-news__body', '.c-article__content', '.texto-materia', '.c-content-text'
       ];
 
       let content = '';
       for (const s of selectors) {
-        const text = $(s).text().trim();
-        if (text.length > 500) {
-          content = text;
-          break;
+        const el = $(s);
+        if (el.length) {
+          // Tentar pegar parágrafos primeiro para evitar menus
+          const paragraphs = el.find('p').map((i, p) => $(p).text().trim()).get().join('\n\n');
+          if (paragraphs.length > 400) {
+            content = paragraphs;
+            break;
+          }
+          // Fallback para o texto bruto do seletor
+          const text = el.text().trim();
+          if (text.length > 600) {
+            content = text;
+            break;
+          }
         }
       }
 
-      if (!content) content = $('body').text().trim();
+      if (!content) {
+        // Fallback final: pegar todos os parágrafos da página
+        content = $('p').map((i, p) => $(p).text().trim()).get().join('\n\n');
+      }
+
+      if (!content || content.length < 100) {
+        content = $('body').text().trim();
+      }
 
       const cleanContent = content
         .replace(/\s+/g, ' ')
         .replace(/\n+/g, '\n\n')
-        .substring(0, 15000); // Limite de segurança
+        .substring(0, 20000); // Limite de segurança aumentado
 
       logInfo(`[BrowserScraper] Sucesso via Fallback Estático: ${cleanContent.length} chars.`);
-      return cleanContent.length > 200 ? cleanContent : null;
+      return cleanContent.length > 150 ? cleanContent : null;
     } catch (e: any) {
       logError(`[BrowserScraper] Falha total na extração de ${url}: ${e.message}`);
       return null;
