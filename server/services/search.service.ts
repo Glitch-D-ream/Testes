@@ -116,7 +116,9 @@ export class SearchService {
         
         // FASE 3: Brain - Consolidação com Dados Oficiais (Câmara, Senado, SICONFI)
         logInfo(`[Orchestrator] [Job:${analysisId}] Chamando Brain para análise consolidada...`);
-        await brainAgent.analyze(politicianName, filteredSources, userId, analysisId);
+        // CORREÇÃO: A assinatura do BrainAgent.analyze é (politicianName, userId, existingId)
+        // O parâmetro filteredSources não deve ser passado aqui, pois o BrainAgent já faz sua própria busca/filtro internamente.
+        await brainAgent.analyze(politicianName, userId, analysisId);
         
         logInfo(`[Orchestrator] [Job:${analysisId}] Análise concluída com sucesso.`);
       } catch (error: any) {

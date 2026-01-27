@@ -82,14 +82,14 @@ export default function SearchBar() {
         }
       }, 3000);
 
-      // Limite de segurança: 2 minutos para o polling
+      // Limite de segurança: 5 minutos para o polling (análises profundas de IA podem demorar)
       setTimeout(() => {
         clearInterval(pollInterval);
         if (isProcessing) {
           setIsProcessing(false);
-          setError('A análise está demorando mais que o esperado. Tente novamente em instantes.');
+          setError('A análise está demorando mais que o esperado devido à profundidade da auditoria. Por favor, verifique o histórico em alguns instantes.');
         }
-      }, 120000);
+      }, 300000);
 
     } catch (error: any) {
       console.error('Erro:', error);
