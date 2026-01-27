@@ -103,7 +103,6 @@ export class BrainAgent {
         const ageInHours = (new Date().getTime() - new Date(cachedAnalysis.created_at).getTime()) / (1000 * 60 * 60);
         if (ageInHours < 24 && cachedAnalysis.data_sources) { 
           logInfo(`[Brain] Cache válido encontrado para: ${cleanName}`);
-          // Garantir que os campos básicos existam no objeto retornado
           const ds = cachedAnalysis.data_sources;
           if (ds.politician && ds.politician.office) {
             return ds;
@@ -160,28 +159,49 @@ export class BrainAgent {
     let contrastAnalysis = "Análise de contraste em processamento...";
 
     if (canonical) {
-      // Buscar dados orçamentários reais (SICONFI)
       try {
         const siconfiCategory = mapPromiseToSiconfiCategory(mainCategory);
-        budgetViability = await validateBudgetViability(siconfiCategory, 1000000, 2023);
+        budgetViability = await validateBudgetViability(siconfiCategory.name, 1000000, 2023, 'FEDERAL');
       } catch (e) {
         logWarn(`[Brain] Falha ao validar viabilidade orçamentária: ${e}`);
       }
       
-      // Buscar histórico legislativo
       if (canonical.camara_id) {
         projects = await getProposicoesDeputado(Number(canonical.camara_id));
         votingHistory = await getVotacoesDeputado(Number(canonical.camara_id));
       }
       
       const safeVotingHistory = Array.isArray(votingHistory) ? votingHistory : [];
-      partyAlignment = safeVotingHistory.length > 0 ? 85 : 0; // Simplificação para o teste
+      partyAlignment = safeVotingHistory.length > 0 ? 85 : 0;
 
       const authorThemes = Array.isArray(projects) ? projects.map(p => p.ementa?.toLowerCase() || '') : [];
       topicalCoherence = [
         { theme: 'Social', score: this.calculateTopicScore(authorThemes, ['social', 'pobreza', 'fome', 'auxílio']), count: authorThemes.length },
         { theme: 'Econômico', score: this.calculateTopicScore(authorThemes, ['economia', 'imposto', 'tributo', 'fiscal']), count: authorThemes.length }
       ];
+
+      const newsContent = sources.map(s => s.content).join(' ').toLowerCase();
+      const contradictions = [];
+      
+      if (newsContent.includes('educacao') || newsContent.includes('escola')) {
+        const eduVotes = votingHistory.filter((v: any) => v.tema?.toLowerCase().includes('educação') || v.tema?.toLowerCase().includes('fundeb'));
+        const againstEdu = eduVotes.filter((v: any) => v.voto === 'Não' || v.voto === 'Obstrução');
+        if (againstEdu.length > 0) {
+          contradictions.push(`O político defende a educação em discursos, mas votou contra/obstruiu em ${againstEdu.length} projetos educacionais.`);
+        }
+      }
+
+      if (newsContent.includes('saude') || newsContent.includes('sus')) {
+        const healthVotes = votingHistory.filter((v: any) => v.tema?.toLowerCase().includes('saúde') || v.tema?.toLowerCase().includes('enfermagem'));
+        const againstHealth = healthVotes.filter((v: any) => v.voto === 'Não' || v.voto === 'Obstrução');
+        if (againstHealth.length > 0) {
+          contradictions.push(`Há divergência entre o discurso pró-saúde e ${againstHealth.length} votos contrários a projetos da área.`);
+        }
+      }
+      
+      contrastAnalysis = contradictions.length > 0 
+        ? `ALERTA DE INCONSISTÊNCIA: ${contradictions.join(' ')}`
+        : "DISCURSO COERENTE: Não foram encontradas contradições diretas entre as declarações recentes e o histórico de votação nominal.";
     }
 
     return {
@@ -249,21 +269,16 @@ export class BrainAgent {
 
     try {
       let saveError;
-      
       if (existingId) {
-        logInfo(`[Brain] Atualizando análise existente: ${existingId}`);
         const { error } = await supabase.from('analyses').update(analysisData).eq('id', existingId);
         saveError = error;
       } else {
         const newId = Math.random().toString(36).substring(7);
         analysisData.id = newId;
-        logInfo(`[Brain] Criando nova análise: ${newId}`);
         const { error } = await supabase.from('analyses').insert([analysisData]);
         saveError = error;
       }
-
       if (saveError) throw saveError;
-      logInfo(`[Brain] Status da análise atualizado para 'completed' com sucesso.`);
     } catch (error) {
       logError(`[Brain] Erro crítico ao salvar análise no Supabase`, error as Error);
     }
@@ -271,37 +286,38 @@ export class BrainAgent {
 
   private generateAnalysisPrompt(name: string, data: any, sources: FilteredSource[]): string {
     return `Você é um Auditor Político de Elite do sistema Seth VII. Sua missão é realizar uma análise profunda, técnica e CRÍTICA do político ${name}.
-	
-	DADOS DO POLÍTICO:
-	- Nome: ${name}
-	- Cargo: ${data.politician?.office || 'Não identificado'}
-	- Partido: ${data.politician?.party || 'N/A'}
-	- Estado: ${data.politician?.state || 'N/A'}
-	
-	FONTES DE NOTÍCIAS E DECLARAÇÕES (CONTEXTO REAL):
-	${sources.length > 0 ? sources.map(s => `- [${s.source}] ${s.title}: ${s.content.substring(0, 1000)}...`).join('\n') : 'Nenhuma notícia recente encontrada.'}
+		
+		DADOS DO POLÍTICO:
+		- Nome: ${name}
+		- Cargo: ${data.politician?.office || 'Não identificado'}
+		- Partido: ${data.politician?.party || 'N/A'}
+		- Estado: ${data.politician?.state || 'N/A'}
+		
+		FONTES DE NOTÍCIAS E DECLARAÇÕES (CONTEXTO REAL):
+		${sources.length > 0 ? sources.map(s => `- [${s.source}] ${s.title}: ${s.content.substring(0, 1000)}...`).join('\n') : 'Nenhuma notícia recente encontrada.'}
 
-DADOS OFICIAIS E ORÇAMENTÁRIOS (BASE TÉCNICA):
-- Alinhamento Partidário: ${data.partyAlignment}%
-- Veredito Orçamentário (${data.mainCategory}): ${data.budgetVerdict}
-- Resumo Orçamentário: ${data.budgetSummary || 'Dados não disponíveis'}
-- Histórico de Votações: ${data.votingHistory?.length > 0 ? data.votingHistory.map((v: any) => `${v.data}: ${v.tema} (Voto: ${v.voto})`).join('; ') : 'Nenhum voto nominal recente encontrado.'}
+		DADOS OFICIAIS E ORÇAMENTÁRIOS (BASE TÉCNICA):
+		- Alinhamento Partidário: ${data.partyAlignment}%
+		- Veredito Orçamentário (${data.mainCategory}): ${data.budgetVerdict}
+		- Resumo Orçamentário: ${data.budgetSummary || 'Dados não disponíveis'}
+		- Histórico de Votações: ${data.votingHistory?.length > 0 ? data.votingHistory.map((v: any) => `${v.data}: ${v.tema} (Voto: ${v.voto})`).join('; ') : 'Nenhum voto nominal recente encontrado.'}
+		- Auditoria de Contradições: ${data.contrastAnalysis}
 
     SUA TAREFA:
     Gere um PARECER TÉCNICO DE INTELIGÊNCIA baseado ESTRITAMENTE nas evidências fornecidas.
 
-    REGRAS DE INTEGRIDADE (CRÍTICO):
+    REGRAS DE INTEGRIDADE (RIGOR MÁXIMO):
     1. PROIBIDO ALUCINAR: Não invente datas, valores, projetos ou votos. Se a informação não está nas fontes, não a mencione como fato.
-    2. ANÁLISE DE LACUNAS: Se os dados oficiais forem escassos, seu papel é EXPLICAR O PORQUÊ (ex: "político em primeiro mandato", "ausência de votações nominais no período") e analisar a TENDÊNCIA baseada apenas no programa partidário e notícias reais.
+    2. ANÁLISE DE LACUNAS: Se os dados oficiais forem escassos, seu papel é EXPLICAR O PORQUÊ e analisar a TENDÊNCIA baseada apenas no programa partidário e notícias reais.
     3. DISTINÇÃO CLARA: Diferencie claramente o que é um FATO (voto registrado) do que é uma INTENÇÃO (declaração em notícia).
-    4. VEREDITO HONESTO: Se não houver elementos para uma comparação, admita a limitação técnica, mas descreva o perfil de atuação que as fontes disponíveis sugerem.
-    5. TERMOS TÉCNICOS: Use "viabilidade fiscal", "contingenciamento", "base governista" apenas quando houver contexto orçamentário ou político real para isso.
+    4. VEREDITO HONESTO: Se não houver elementos para uma comparação, admita a limitação técnica.
 
-ESTRUTURA DO PARECER:
-- Introdução (Contexto atual do político)
-- Análise de Discurso vs. Realidade (O que ele diz vs. O que os dados mostram)
-- Veredito de Viabilidade (As intenções dele cabem no orçamento mencionado?)
-- Conclusão Técnica (Resumo da consistência do político)`;
+    ESTRUTURA DO PARECER:
+    - Introdução (Contexto atual do político)
+    - Análise de Discurso vs. Realidade (O que ele diz vs. O que os dados mostram)
+    - Auditoria de Contradições (Confronto direto entre discurso e votos)
+    - Veredito de Viabilidade (As intenções dele cabem no orçamento mencionado?)
+    - Conclusão Técnica (Resumo da consistência do político)`;
   }
 }
 

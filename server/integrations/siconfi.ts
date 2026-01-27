@@ -52,10 +52,11 @@ export async function getBudgetData(
 
     logger.info(`[SICONFI] Buscando dados reais no Tesouro: ${category} (${year})`);
 
-    // A GRANDE SIMPLIFICAÇÃO: Usando o código da União (1) para análise federal
-    // Nota: 2024 pode ainda não ter o DCA fechado, forçando 2023 para estabilidade
+    // Evolução Técnica: Suporte a Subfunções e Anexo I-E (Despesas por Função/Subfunção)
     const queryYear = year > 2023 ? 2023 : year;
     const idEnte = sphere === 'FEDERAL' ? '1' : '35';
+    const categoryInfo = mapPromiseToSiconfiCategory(category);
+    
     const params = { 
       an_exercicio: queryYear, 
       id_ente: idEnte,
@@ -79,14 +80,15 @@ export async function getBudgetData(
 
     // Filtrar dados de Empenho e Liquidação
     // Nota: No Anexo I-E (Despesas por Função), as colunas são "Despesas Empenhadas" e "Despesas Liquidadas"
+    // Busca precisa por código de função/subfunção para evitar ambiguidades de nomes
     const empenhadoItem = response.data.items.find((i: any) => 
       i.coluna.includes('Despesas Empenhadas') && 
-      i.conta.toUpperCase().includes(category.toUpperCase())
+      (i.conta.includes(categoryInfo.code) || i.conta.toUpperCase().includes(categoryInfo.name.toUpperCase()))
     );
     
     const liquidadoItem = response.data.items.find((i: any) => 
       i.coluna.includes('Despesas Liquidadas') && 
-      i.conta.toUpperCase().includes(category.toUpperCase())
+      (i.conta.includes(categoryInfo.code) || i.conta.toUpperCase().includes(categoryInfo.name.toUpperCase()))
     );
 
     const empenhado = empenhadoItem ? parseFloat(empenhadoItem.valor) : 1000000000;
@@ -176,36 +178,32 @@ export async function validateBudgetViability(
   };
 }
 
-export function mapPromiseToSiconfiCategory(promiseCategory: string): string {
-  const mapping: Record<string, string> = {
-    'SAUDE': '10 - Saúde',
-    'HEALTH': '10 - Saúde',
-    'EDUCACAO': '12 - Educação',
-    'EDUCATION': '12 - Educação',
-    'INFRAESTRUTURA': '15 - Urbanismo',
-    'INFRASTRUCTURE': '15 - Urbanismo',
-    'SEGURANCA': '06 - Segurança Pública',
-    'SECURITY': '06 - Segurança Pública',
-    'ECONOMIA': '04 - Administração',
-    'ECONOMY': '04 - Administração',
-    'AGRICULTURA': '20 - Agricultura',
-    'AGRICULTURE': '20 - Agricultura',
-    'CULTURA': '13 - Cultura',
-    'CULTURE': '13 - Cultura',
-    'TRANSPORTE': '26 - Transporte',
-    'TRANSPORT': '26 - Transporte',
-    'HABITACAO': '16 - Habitação',
-    'HOUSING': '16 - Habitação',
-    'SANEAMENTO': '17 - Saneamento',
-    'SANITATION': '17 - Saneamento',
-    'CIENCIA': '19 - Ciência e Tecnologia',
-    'SCIENCE': '19 - Ciência e Tecnologia',
-    'TRABALHO': '11 - Trabalho',
-    'EMPLOYMENT': '11 - Trabalho',
-    'SOCIAL': '08 - Assistência Social',
+/**
+ * Mapeia categorias de promessas para códigos de Função ou Subfunção do SICONFI.
+ * Permite uma análise muito mais granular (ex: Saúde Bucal vs Saúde Hospitalar).
+ */
+export function mapPromiseToSiconfiCategory(promiseCategory: string): { code: string, name: string } {
+  const mapping: Record<string, { code: string, name: string }> = {
+    'SAUDE': { code: '10', name: 'Saúde' },
+    'SAUDE_BASICA': { code: '10.301', name: 'Atenção Básica' },
+    'SAUDE_HOSPITALAR': { code: '10.302', name: 'Assistência Hospitalar' },
+    'EDUCACAO': { code: '12', name: 'Educação' },
+    'ENSINO_SUPERIOR': { code: '12.364', name: 'Ensino Superior' },
+    'SEGURANCA': { code: '06', name: 'Segurança Pública' },
+    'POLICIAMENTO': { code: '06.181', name: 'Policiamento' },
+    'URBANISMO': { code: '15', name: 'Urbanismo' },
+    'HABITACAO': { code: '16', name: 'Habitação' },
+    'SANEAMENTO': { code: '17', name: 'Saneamento' },
+    'GESTAO_AMBIENTAL': { code: '18', name: 'Gestão Ambiental' },
+    'CIENCIA_TECNOLOGIA': { code: '19', name: 'Ciência e Tecnologia' },
+    'AGRICULTURA': { code: '20', name: 'Agricultura' },
+    'TRANSPORTE': { code: '26', name: 'Transporte' },
+    'ASSISTENCIA_SOCIAL': { code: '08', name: 'Assistência Social' },
+    'ADMINISTRACAO': { code: '04', name: 'Administração' }
   };
+
   const normalized = promiseCategory.toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-  return mapping[normalized] || 'ADMINISTRACAO';
+  return mapping[normalized] || { code: '04', name: 'Administração' };
 }
 
 /**

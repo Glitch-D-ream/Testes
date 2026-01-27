@@ -40,9 +40,11 @@ Responda estritamente em formato JSON:
       "category": "Saúde|Educação|Economia|Segurança|Infraestrutura|Geral",
       "estimatedValue": 0, 
       "confidence": 0.0 a 1.0,
+      "source_url": "URL da fonte onde a promessa foi identificada",
+      "quote": "Citação exata do texto que comprova a promessa",
       "negated": false,
       "conditional": false,
-      "reasoning": "Análise técnica detalhada sobre a viabilidade.",
+      "reasoning": "Análise técnica detalhada sobre a viabilidade fiscal e política.",
       "risks": ["Risco técnico 1", "Risco político 2"]
     }
   ],
@@ -123,6 +125,26 @@ ${text}`;
   }
 
   async generateReport(prompt: string): Promise<string> {
+    const openRouterKey = process.env.OPENROUTER_API_KEY;
+    if (openRouterKey && !openRouterKey.includes('your-')) {
+      try {
+        logInfo(`[AI] Tentando OpenRouter (DeepSeek) para relatório...`);
+        const response = await axios.post('https://openrouter.ai/api/v1/chat/completions', {
+          model: 'deepseek/deepseek-r1-distill-llama-70b',
+          messages: [
+            { role: 'system', content: 'Você é o núcleo de inteligência do sistema Seth VII. Auditoria técnica pura.' },
+            { role: 'user', content: prompt }
+          ]
+        }, { 
+          headers: { 'Authorization': `Bearer ${openRouterKey}` },
+          timeout: 40000 
+        });
+        return response.data.choices[0].message.content;
+      } catch (error) {
+        logWarn(`[AI] OpenRouter falhou no relatório, tentando Groq...`);
+      }
+    }
+
     const groqKey = process.env.GROQ_API_KEY;
     if (groqKey && !groqKey.includes('your-')) {
       try {
