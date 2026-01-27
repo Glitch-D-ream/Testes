@@ -50,7 +50,7 @@ const __dirname = globalThis.__dirname;
         'express', 'jsonwebtoken', 'bcryptjs', 'winston', 'dotenv', 
         '@supabase/supabase-js', 'nanoid', 'express-rate-limit', 
         'cookie-parser', 'telegraf', 'jspdf', 'jspdf-autotable', 
-        'node-html-to-image', 'axios', 'zod', 'tsx', 'prom-client', '@sentry/node',
+        'axios', 'zod', 'tsx', 'prom-client', '@sentry/node',
         'cheerio', 'puppeteer-core', 'playwright', 'playwright-core'
       ],
     });

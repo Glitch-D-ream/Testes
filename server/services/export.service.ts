@@ -1,6 +1,6 @@
 import { jsPDF } from 'jspdf';
 import 'jspdf-autotable';
-import nodeHtmlToImage from 'node-html-to-image';
+// import nodeHtmlToImage from 'node-html-to-image';
 import { AnalysisService } from './analysis.service.ts';
 
 export class ExportService {
@@ -83,6 +83,10 @@ export class ExportService {
       </html>
     `;
 
+    // Implementação temporária: Retornar buffer vazio ou erro controlado
+    // O node-html-to-image está causando erros de DOMMatrix no ambiente Node.js puro
+    throw new Error('Geração de imagem desativada temporariamente para correção de deploy');
+    /*
     const image = await nodeHtmlToImage({
       html,
       type: 'jpeg',
@@ -94,6 +98,7 @@ export class ExportService {
     });
 
     return image as Buffer;
+    */
   }
 
   async generateAnalysisPDF(analysisId: string): Promise<Buffer> {
