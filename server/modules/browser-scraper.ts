@@ -80,18 +80,18 @@ export class BrowserScraper {
 
       const page = await context.newPage();
       
-      // Definir timeout de 25 segundos
-      await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 25000 });
+      // Otimização: Reduzir timeout de 25s para 12s e usar 'commit' para ser mais rápido
+      await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 12000 });
       
-      // Lidar com redirecionamento do Google News
+      // Lidar com redirecionamento do Google News (Otimizado: menos retries e delay menor)
       let retries = 0;
-      while (page.url().includes('news.google.com') && retries < 5) {
-        await page.waitForTimeout(1500);
+      while (page.url().includes('news.google.com') && retries < 3) {
+        await page.waitForTimeout(800);
         retries++;
       }
       
-      // Esperar a página carregar com timeout flexível
-      await page.waitForLoadState('networkidle', { timeout: 8000 }).catch(() => {});
+      // Esperar a página carregar com timeout flexível (Otimizado: 8s -> 4s)
+      await page.waitForLoadState('networkidle', { timeout: 4000 }).catch(() => {});
       
       const finalUrl = page.url();
       logInfo(`[BrowserScraper] URL final: ${finalUrl} | UA: ${userAgent.substring(0, 30)}...`);
@@ -162,8 +162,8 @@ export class BrowserScraper {
           'User-Agent': this.getRandomUserAgent(),
           'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8'
         },
-        timeout: 12000,
-        maxRedirects: 5
+        timeout: 8000,
+        maxRedirects: 3
       });
 
       const $ = cheerio.load(response.data);

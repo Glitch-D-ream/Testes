@@ -216,13 +216,22 @@ export class ScoutHybrid {
       logInfo(`[ScoutHybrid] FASE 3: Deep Search em portais de elite...`);
       const elitePortals = ['g1.globo.com', 'folha.uol.com.br', 'estadao.com.br', 'poder360.com.br'];
       
-      const elitePromises = elitePortals.map(async (portal) => {
+      // Otimização: Limitar o número de portais de elite e processar em paralelo com controle de concorrência
+      const elitePromises = elitePortals.slice(0, 3).map(async (portal) => {
         const eliteQuery = `site:${portal} ${query} promessa OR anunciou OR projeto`;
-        const varResults = await directSearchImproved.search(eliteQuery);
+        const varResults = await directSearchImproved.search(eliteQuery).catch(() => []);
         
-        const uniqueVarResults = varResults.filter(r => !sources.some(s => s.url === r.url));
+        const uniqueVarResults = varResults
+          .filter(r => !sources.some(s => s.url === r.url))
+          .slice(0, 3); // Limitar a 3 resultados por portal para manter a velocidade
+
         return Promise.all(uniqueVarResults.map(async (r) => {
-          const fullContent = await contentScraper.scrape(r.url);
+          // Otimização: Usar Promise.race ou timeout para o scrape individual
+          const fullContent = await Promise.race([
+            contentScraper.scrape(r.url),
+            new Promise<null>(resolve => setTimeout(() => resolve(null), 15000)) // Timeout de 15s por página
+          ]);
+
           return {
             title: r.title,
             url: r.url,
@@ -231,7 +240,7 @@ export class ScoutHybrid {
             publishedAt: r.publishedAt,
             type: 'news' as const,
             confidence: 'high' as const,
-            credibilityLayer: 'B' as const // Portais de elite são Camada B
+            credibilityLayer: 'B' as const
           };
         }));
       });
