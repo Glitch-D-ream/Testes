@@ -1,4 +1,14 @@
-import { createRequire } from 'module'; const require = createRequire(import.meta.url);
+
+import { createRequire as __createRequire } from 'module';
+import { fileURLToPath as __fileURLToPath } from 'url';
+import { dirname as __dirnameFunc } from 'path';
+globalThis.require = __createRequire(import.meta.url);
+globalThis.__filename = __fileURLToPath(import.meta.url);
+globalThis.__dirname = __dirnameFunc(globalThis.__filename);
+const require = globalThis.require;
+const __filename = globalThis.__filename;
+const __dirname = globalThis.__dirname;
+
 var __defProp = Object.defineProperty;
 var __getOwnPropNames = Object.getOwnPropertyNames;
 var __esm = (fn, res) => function __init() {
@@ -11,8 +21,6 @@ var __export = (target, all) => {
 
 // server/core/logger.ts
 import winston from "winston";
-import path from "path";
-import { fileURLToPath } from "url";
 function logInfo(message, meta) {
   logger.info(message, meta);
 }
@@ -26,11 +34,9 @@ function logError(message, error, meta) {
 function logWarn(message, meta) {
   logger.warn(message, meta);
 }
-var __filename, __dirname, logger, logger_default;
+var logger, logger_default;
 var init_logger = __esm({
   "server/core/logger.ts"() {
-    __filename = fileURLToPath(import.meta.url);
-    __dirname = path.dirname(__filename);
     logger = winston.createLogger({
       level: process.env.LOG_LEVEL || "info",
       format: winston.format.combine(
@@ -236,504 +242,240 @@ var init_database = __esm({
   }
 });
 
-// server/services/ai-groq.service.ts
-import axios5 from "axios";
-var GroqService, groqService;
-var init_ai_groq_service = __esm({
-  "server/services/ai-groq.service.ts"() {
-    init_logger();
-    GroqService = class {
-      get apiKey() {
-        return process.env.GROQ_API_KEY;
+// server/modules/nlp.ts
+var nlp_exports = {};
+__export(nlp_exports, {
+  analyzePromiseReliability: () => analyzePromiseReliability,
+  extractPromises: () => extractPromises
+});
+function extractPromises(text) {
+  const promises = [];
+  const sentences = splitSentences(text);
+  for (const sentence of sentences) {
+    const sentenceLower = sentence.toLowerCase();
+    for (const verb of PROMISE_VERBS) {
+      if (sentenceLower.includes(verb)) {
+        const promise = analyzeSentence(sentence, verb);
+        if (promise) {
+          promises.push(promise);
+        }
+        break;
       }
-      apiUrl = "https://api.groq.com/openai/v1/chat/completions";
-      model = "llama-3.3-70b-versatile";
-      // Modelo estável e versátil
-      async generateCompletion(systemPrompt, userPrompt) {
-        if (!this.apiKey) {
-          throw new Error("GROQ_API_KEY n\xE3o configurada");
-        }
+    }
+  }
+  return promises;
+}
+function splitSentences(text) {
+  return text.split(/[.!?;]+/).map((s) => s.trim()).filter((s) => s.length > 0);
+}
+function analyzeSentence(sentence, verb) {
+  const sentenceLower = sentence.toLowerCase();
+  const numbers = extractNumbers(sentence);
+  const nouns = extractNouns(sentence);
+  let category = "GERAL";
+  for (const [cat, keywords] of Object.entries(PROMISE_CATEGORIES)) {
+    if (keywords.some((kw) => sentenceLower.includes(kw))) {
+      category = cat;
+      break;
+    }
+  }
+  let confidence = 0.5;
+  if (numbers.length > 0) confidence += 0.2;
+  if (/\b(até|em|durante|próximo|ano|mês|semana|dia)\b/i.test(sentence)) {
+    confidence += 0.1;
+  }
+  if (/\b(mil|milhão|bilhão|centenas|dezenas|todas|todos|100%)\b/i.test(sentence)) {
+    confidence += 0.1;
+  }
+  confidence = Math.min(confidence, 1);
+  return {
+    text: sentence.trim(),
+    confidence,
+    category,
+    entities: {
+      verbs: [verb],
+      nouns,
+      numbers
+    },
+    negated: false,
+    conditional: false
+  };
+}
+function extractNumbers(text) {
+  const numberPattern = /\b\d+(?:[.,]\d+)?\s*(?:mil|milhão|bilhão|%|reais|R\$)?\b/gi;
+  const matches = text.match(numberPattern);
+  return matches || [];
+}
+function extractNouns(sentence) {
+  const nounPattern = /\b([A-Z][a-záéíóúâêôãõç]*|(?:de|em|para|por|com)\s+([a-záéíóúâêôãõç]+))\b/g;
+  const matches = [];
+  let match;
+  while ((match = nounPattern.exec(sentence)) !== null) {
+    matches.push(match[1] || match[2]);
+  }
+  return [...new Set(matches)];
+}
+function analyzePromiseReliability(promise) {
+  let score = promise.confidence;
+  if (promise.entities.numbers.length > 0) {
+    score += 0.15;
+  }
+  if (promise.text.match(/\b(até|em|durante|próximo|ano|mês|semana|dia)\b/i)) {
+    score += 0.1;
+  }
+  if (promise.text.length < 20) {
+    score -= 0.1;
+  }
+  return Math.min(Math.max(score, 0), 1);
+}
+var PROMISE_VERBS, PROMISE_CATEGORIES;
+var init_nlp = __esm({
+  "server/modules/nlp.ts"() {
+    PROMISE_VERBS = [
+      "vou",
+      "vamos",
+      "iremos",
+      "irei",
+      "prometo",
+      "prometemos",
+      "prometerem",
+      "farei",
+      "faremos",
+      "far\xE3o",
+      "construirei",
+      "construiremos",
+      "construir\xE3o",
+      "implementarei",
+      "implementaremos",
+      "implementar\xE3o",
+      "criarei",
+      "criaremos",
+      "criar\xE3o",
+      "aumentarei",
+      "aumentaremos",
+      "aumentar\xE3o",
+      "reduzirei",
+      "reduziremos",
+      "reduzir\xE3o",
+      "melhorarei",
+      "melhoraremos",
+      "melhorar\xE3o",
+      "investirei",
+      "investiremos",
+      "investir\xE3o",
+      "garantirei",
+      "garantiremos",
+      "garantir\xE3o",
+      "assegurarei",
+      "asseguraremos",
+      "assegurar\xE3o",
+      "realizarei",
+      "realizaremos",
+      "realizar\xE3o",
+      "executarei",
+      "executaremos",
+      "executar\xE3o",
+      "entreguei",
+      "entregamos",
+      "entregarei",
+      "entregaremos",
+      "desenvolvi",
+      "desenvolvemos",
+      "desenvolverei",
+      "desenvolveremos",
+      "ampliarei",
+      "ampliaremos",
+      "ampliar\xE3o",
+      "expandirei",
+      "expandiremos",
+      "expandir\xE3o",
+      "modernizarei",
+      "modernizaremos",
+      "modernizar\xE3o",
+      "reformarei",
+      "reformaremos",
+      "reformar\xE3o",
+      "restaurarei",
+      "restauraremos",
+      "restaurar\xE3o",
+      "recuperarei",
+      "recuperaremos",
+      "recuperar\xE3o",
+      "revitalizarei",
+      "revitalizaremos",
+      "revitalizar\xE3o"
+    ];
+    PROMISE_CATEGORIES = {
+      INFRASTRUCTURE: ["construir", "obra", "estrada", "ponte", "rodovia", "ferrovia", "aeroporto", "porto", "infraestrutura"],
+      EDUCATION: ["escola", "educa\xE7\xE3o", "ensino", "universidade", "bolsa", "professor", "aluno", "aprendizado"],
+      HEALTH: ["sa\xFAde", "hospital", "m\xE9dico", "medicamento", "ambul\xE2ncia", "cl\xEDnica", "enfermeiro", "atendimento"],
+      EMPLOYMENT: ["emprego", "trabalho", "desemprego", "renda", "sal\xE1rio", "profiss\xE3o", "ocupa\xE7\xE3o", "contrata\xE7\xE3o"],
+      SECURITY: ["seguran\xE7a", "pol\xEDcia", "crime", "viol\xEAncia", "patrulha", "delegacia", "pres\xEDdio", "criminalidade"],
+      ENVIRONMENT: ["ambiente", "sustentabilidade", "verde", "parque", "floresta", "polui\xE7\xE3o", "reciclagem", "energia"],
+      SOCIAL: ["social", "pobreza", "assist\xEAncia", "benef\xEDcio", "aux\xEDlio", "vulner\xE1vel", "comunidade", "inclus\xE3o"],
+      ECONOMY: ["economia", "neg\xF3cio", "empresa", "investimento", "crescimento", "PIB", "renda", "desenvolvimento"],
+      AGRICULTURE: ["agricultura", "fazenda", "agropecu\xE1ria", "planta\xE7\xE3o", "colheita", "subs\xEDdio", "produtor"],
+      CULTURE: ["cultura", "arte", "m\xFAsica", "cinema", "museu", "patrim\xF4nio", "evento", "festival"]
+    };
+  }
+});
+
+// server/core/compression.ts
+var compression_exports = {};
+__export(compression_exports, {
+  DataCompressor: () => DataCompressor
+});
+import zlib from "zlib";
+var DataCompressor;
+var init_compression = __esm({
+  "server/core/compression.ts"() {
+    init_logger();
+    DataCompressor = class {
+      /**
+       * Comprime um objeto ou string usando Gzip.
+       * Retorna uma string Base64 para fácil armazenamento em colunas de texto.
+       */
+      static compress(data) {
         try {
-          logInfo(`[Groq] Iniciando gera\xE7\xE3o com modelo: ${this.model}`);
-          const startTime = Date.now();
-          const response = await axios5.post(
-            this.apiUrl,
-            {
-              model: this.model,
-              messages: [
-                { role: "system", content: systemPrompt },
-                { role: "user", content: userPrompt }
-              ],
-              temperature: 0.1,
-              // Baixa temperatura para maior precisão técnica
-              max_tokens: 4096
-            },
-            {
-              headers: {
-                "Authorization": `Bearer ${this.apiKey}`,
-                "Content-Type": "application/json"
-              },
-              timeout: 3e4
-            }
-          );
-          const duration = Date.now() - startTime;
-          logInfo(`[Groq] Resposta recebida em ${duration}ms`);
-          return response.data.choices[0]?.message?.content || "";
+          const content = typeof data === "string" ? data : JSON.stringify(data);
+          const buffer = zlib.gzipSync(content);
+          return buffer.toString("base64");
         } catch (error) {
-          logError("[Groq] Erro na chamada da API", error);
-          throw error;
+          logError("[Compression] Erro ao comprimir dados", error);
+          return typeof data === "string" ? data : JSON.stringify(data);
         }
+      }
+      /**
+       * Descomprime uma string Base64 (Gzip) de volta para o formato original.
+       */
+      static decompress(compressedData) {
+        try {
+          const buffer = Buffer.from(compressedData, "base64");
+          const decompressed = zlib.gunzipSync(buffer).toString();
+          try {
+            return JSON.parse(decompressed);
+          } catch {
+            return decompressed;
+          }
+        } catch (error) {
+          logError("[Compression] Erro ao descomprimir dados", error);
+          return compressedData;
+        }
+      }
+      /**
+       * Verifica se uma string parece estar comprimida (Base64 Gzip).
+       */
+      static isCompressed(data) {
+        return typeof data === "string" && data.startsWith("H4sIA");
       }
     };
-    groqService = new GroqService();
-  }
-});
-
-// server/services/ai.service.ts
-var ai_service_exports = {};
-__export(ai_service_exports, {
-  AIService: () => AIService,
-  aiService: () => aiService
-});
-import axios6 from "axios";
-var AIService, aiService;
-var init_ai_service = __esm({
-  "server/services/ai.service.ts"() {
-    init_logger();
-    init_ai_groq_service();
-    AIService = class {
-      /**
-       * Prompt de Alta Performance (Versão Restaurada e Melhorada)
-       * Focado em profundidade, utilidade e análise técnica rigorosa.
-       */
-      promptTemplate(text) {
-        return `Voc\xEA \xE9 um analista pol\xEDtico de elite, especializado em auditoria de promessas e an\xE1lise de viabilidade.
-    Sua miss\xE3o \xE9 transformar o texto bruto em um relat\xF3rio de intelig\xEAncia profundo, \xFAtil e extremamente detalhado.
-    
-    DIRETRIZES DE QUALIDADE:
-    1. PROFUNDIDADE: N\xE3o seja superficial. Analise as implica\xE7\xF5es de cada promessa baseando-se EXCLUSIVAMENTE no texto fornecido.
-    2. UTILIDADE: O texto deve servir para um cidad\xE3o decidir se a promessa \xE9 realista ou n\xE3o.
-    3. RIGOR T\xC9CNICO: Use termos t\xE9cnicos de administra\xE7\xE3o p\xFAblica quando apropriado (ex: PPA, LOA, dota\xE7\xE3o or\xE7ament\xE1ria).
-    4. DETEC\xC7\xC3O DE NUANCES: Identifique se a promessa depende de aprova\xE7\xE3o do Congresso ou se \xE9 ato exclusivo do Executivo.
-    5. ANTI-ALUCINA\xC7\xC3O: Se o texto n\xE3o contiver promessas claras, N\xC3O as invente. Retorne uma lista vazia de promessas.
-    6. ESPECIFICIDADE: Evite riscos gen\xE9ricos como "rigidez fiscal". Identifique riscos espec\xEDficos \xE0 promessa (ex: "depende de altera\xE7\xE3o na Lei de Diretrizes Or\xE7ament\xE1rias").
-    
-    SISTEMA DE VEREDITO EM DUAS ETAPAS:
-    Para cada an\xE1lise, voc\xEA deve obrigatoriamente responder a duas perguntas internas:
-    1. "Quais s\xE3o os fatos?" (Baseado em dados e realidade atual)
-    2. "Por que isso pode dar errado?" (An\xE1lise de riscos, obst\xE1culos e ceticismo)
-
-    Para cada promessa extra\xEDda, forne\xE7a:
-    - Um racioc\xEDnio (reasoning) t\xE9cnico.
-    - Uma lista de "riscos" (risks) espec\xEDficos de descumprimento.
-    
-    Responda estritamente em formato JSON seguindo esta estrutura:
-    {
-      "promises": [
-        {
-          "text": "Texto integral da promessa",
-          "category": "Sa\xFAde/Educa\xE7\xE3o/Economia/etc",
-          "estimatedValue": 1000000,
-          "confidence": 0.95,
-          "negated": false,
-          "conditional": true,
-          "reasoning": "An\xE1lise t\xE9cnica profunda sobre a viabilidade e impacto desta promessa espec\xEDfica.",
-          "risks": ["Risco 1", "Risco 2"]
-        }
-      ],
-      "overallSentiment": "An\xE1lise qualitativa do tom do discurso (ex: Populista, T\xE9cnico, Austero)",
-      "credibilityScore": 85,
-      "verdict": {
-        "facts": ["Fato 1", "Fato 2"],
-        "skepticism": ["Obst\xE1culo 1", "Motivo de falha 2"]
-      }
-    }
-    
-    Texto para an\xE1lise:
-    ${text}`;
-      }
-      /**
-       * Provedor de Código Aberto (Pollinations AI) com Multi-Model Fallback
-       * Usando modelos de alto nível para garantir a qualidade do texto.
-       */
-      async analyzeWithOpenSource(text) {
-        const models = [
-          "openai",
-          "mistral",
-          "llama",
-          // Originais (Pollinations)
-          "deepseek-r1",
-          "llama-3.3-70b",
-          "mistral-large"
-          // Backups de Segurança
-        ];
-        let lastError;
-        for (const model of models) {
-          try {
-            logInfo(`[AI] Gerando relat\xF3rio de alta qualidade com modelo: ${model}...`);
-            const response = await axios6.post("https://text.pollinations.ai/", {
-              messages: [
-                {
-                  role: "system",
-                  content: "Voc\xEA \xE9 um analista pol\xEDtico s\xEAnior. Seus relat\xF3rios s\xE3o famosos pela profundidade t\xE9cnica e utilidade pr\xE1tica. Voc\xEA nunca \xE9 superficial. Responda apenas JSON."
-                },
-                { role: "user", content: this.promptTemplate(text) }
-              ],
-              model,
-              jsonMode: true
-            }, { timeout: 15e3 });
-            let content = response.data;
-            if (typeof content === "object" && content.choices) {
-              content = content.choices[0]?.message?.content || content;
-            }
-            if (typeof content === "string") {
-              let cleanContent = content.trim();
-              const jsonMatch = cleanContent.match(/\{[\s\S]*\}/);
-              if (jsonMatch) {
-                cleanContent = jsonMatch[0];
-              }
-              try {
-                const parsed = JSON.parse(cleanContent);
-                if (!parsed.verdict) {
-                  parsed.verdict = { facts: [], skepticism: [] };
-                }
-                if (parsed.promises) {
-                  parsed.promises = parsed.promises.map((p) => ({
-                    ...p,
-                    risks: p.risks || []
-                  }));
-                }
-                return parsed;
-              } catch (parseError) {
-                logError(`[AI] Erro ao parsear JSON do modelo ${model}`, parseError);
-                throw parseError;
-              }
-            }
-            if (content && content.promises) {
-              const result = content;
-              if (!result.verdict) {
-                result.verdict = { facts: [], skepticism: [] };
-              }
-              result.promises = result.promises.map((p) => ({
-                ...p,
-                risks: p.risks || []
-              }));
-              return result;
-            }
-            throw new Error(`Modelo ${model} n\xE3o gerou a profundidade esperada`);
-          } catch (error) {
-            logError(`[AI] Falha na tentativa com ${model}`, error);
-            lastError = error;
-            continue;
-          }
-        }
-        throw lastError || new Error("Falha ao gerar relat\xF3rio de alta qualidade");
-      }
-      async analyzeText(text) {
-        try {
-          logInfo("[AI] Tentando Groq para an\xE1lise estruturada...");
-          const systemPrompt = "Voc\xEA \xE9 um analista pol\xEDtico s\xEAnior. Responda estritamente em JSON.";
-          const prompt = this.promptTemplate(text);
-          const result = await groqService.generateCompletion(systemPrompt, prompt);
-          if (result) {
-            const jsonMatch = result.match(/\{[\s\S]*\}/);
-            if (jsonMatch) {
-              const parsed = JSON.parse(jsonMatch[0]);
-              if (!parsed.verdict) parsed.verdict = { facts: [], skepticism: [] };
-              if (parsed.promises) {
-                parsed.promises = parsed.promises.map((p) => ({
-                  ...p,
-                  risks: p.risks || []
-                }));
-              }
-              return parsed;
-            }
-          }
-        } catch (error) {
-          logWarn(`[AI] Groq falhou na an\xE1lise estruturada: ${error.message}. Tentando fallback...`);
-        }
-        try {
-          return await this.analyzeWithOpenSource(text);
-        } catch (error) {
-          logError("Erro cr\xEDtico na gera\xE7\xE3o do relat\xF3rio", error);
-          throw new Error("N\xE3o foi poss\xEDvel gerar o relat\xF3rio detalhado no momento.");
-        }
-      }
-      /**
-       * Geração de texto livre (Markdown) para relatórios profissionais
-       */
-      async generateReport(prompt) {
-        try {
-          logInfo("[AI] Tentando Groq como provedor prim\xE1rio...");
-          const systemPrompt = `Voc\xEA \xE9 o n\xFAcleo de intelig\xEAncia do sistema Seth VII. 
-      Sua fun\xE7\xE3o \xE9 AUDITORIA T\xC9CNICA PURA. 
-      REGRAS INVIOL\xC1VEIS:
-      1. PROIBIDO EMO\xC7\xC3O: N\xE3o use exclama\xE7\xF5es, adjetivos elogiosos ou pejorativos.
-      2. PROIBIDO ALUCINA\xC7\xC3O: Se um dado n\xE3o foi fornecido no prompt, voc\xEA N\xC3O pode invent\xE1-lo. Responda "Dados n\xE3o dispon\xEDveis".
-      3. IMPARCIALIDADE: Trate todos os pol\xEDticos com o mesmo rigor frio, seja de direita, esquerda ou centro.
-      4. FOCO OR\xC7AMENT\xC1RIO: Priorize sempre a viabilidade fiscal (SICONFI) sobre a ret\xF3rica pol\xEDtica.`;
-          const result = await groqService.generateCompletion(systemPrompt, prompt);
-          if (result) return result;
-        } catch (error) {
-          logWarn(`[AI] Groq falhou: ${error.message}. Tentando fallbacks tradicionais...`);
-        }
-        const models = ["openai", "mistral", "llama"];
-        let lastError;
-        for (const model of models) {
-          try {
-            logInfo(`[AI] Gerando relat\xF3rio profissional com modelo: ${model}...`);
-            const response = await axios6.post("https://text.pollinations.ai/", {
-              messages: [
-                {
-                  role: "system",
-                  content: `Voc\xEA \xE9 o n\xFAcleo de intelig\xEAncia do sistema Seth VII. 
-              Sua fun\xE7\xE3o \xE9 AUDITORIA T\xC9CNICA PURA. 
-              REGRAS INVIOL\xC1VEIS:
-              1. PROIBIDO EMO\xC7\xC3O: N\xE3o use exclama\xE7\xF5es, adjetivos elogiosos ou pejorativos.
-              2. PROIBIDO ALUCINA\xC7\xC3O: Se um dado n\xE3o foi fornecido no prompt, voc\xEA N\xC3O pode invent\xE1-lo. Responda "Dados n\xE3o dispon\xEDveis".
-              3. IMPARCIALIDADE: Trate todos os pol\xEDticos com o mesmo rigor frio, seja de direita, esquerda ou centro.
-              4. FOCO OR\xC7AMENT\xC1RIO: Priorize sempre a viabilidade fiscal (SICONFI) sobre a ret\xF3rica pol\xEDtica.`
-                },
-                { role: "user", content: prompt }
-              ],
-              model
-            }, { timeout: 2e4 });
-            if (response.data && typeof response.data === "string") {
-              return response.data;
-            }
-            if (response.data && response.data.choices) {
-              return response.data.choices[0]?.message?.content || "";
-            }
-            throw new Error(`Modelo ${model} n\xE3o gerou texto v\xE1lido`);
-          } catch (error) {
-            logError(`[AI] Falha na gera\xE7\xE3o de relat\xF3rio com ${model}`, error);
-            lastError = error;
-            continue;
-          }
-        }
-        throw lastError || new Error("Falha ao gerar relat\xF3rio profissional");
-      }
-    };
-    aiService = new AIService();
-  }
-});
-
-// server/integrations/camara.ts
-var camara_exports = {};
-__export(camara_exports, {
-  analisarIncoerencia: () => analisarIncoerencia,
-  getDeputadoId: () => getDeputadoId,
-  getProposicoesDeputado: () => getProposicoesDeputado,
-  getVotacoesDeputado: () => getVotacoesDeputado
-});
-import axios8 from "axios";
-async function getDeputadoId(nome) {
-  try {
-    const cacheKey = `deputado_id_${nome}`;
-    const cached = await getPublicDataCache("CAMARA", cacheKey);
-    if (cached) return cached.id;
-    const response = await axios8.get(`${CAMARA_API_BASE}/deputados`, {
-      params: { nome, ordem: "ASC", ordenarPor: "nome" }
-    });
-    const deputado = response.data.dados[0];
-    if (deputado) {
-      await savePublicDataCache("CAMARA", cacheKey, { id: deputado.id });
-      return deputado.id;
-    }
-    return null;
-  } catch (error) {
-    logger_default.error(`[Camara] Erro ao buscar ID do deputado ${nome}: ${error}`);
-    return null;
-  }
-}
-async function getVotacoesDeputado(deputadoId) {
-  try {
-    const cacheKey = `votacoes_v6_${deputadoId}`;
-    const cached = await getPublicDataCache("CAMARA", cacheKey);
-    if (cached) return cached;
-    const responseVotacoes = await axios8.get(`${CAMARA_API_BASE}/votacoes`, {
-      params: { ordem: "DESC", ordenarPor: "dataHoraRegistro", itens: 20 },
-      headers: { "Accept": "application/json" }
-    });
-    const votosEncontrados = [];
-    for (const votacao of responseVotacoes.data.dados) {
-      try {
-        const resVoto = await axios8.get(`${CAMARA_API_BASE}/votacoes/${votacao.id}/votos`, {
-          headers: { "Accept": "application/json" }
-        });
-        const votoDoDeputado = resVoto.data.dados.find((v) => v.deputado?.id === deputadoId);
-        if (votoDoDeputado) {
-          votosEncontrados.push({
-            idVotacao: votacao.id,
-            data: votacao.dataHoraRegistro,
-            proposicao: votacao.proposicaoExterna?.siglaTipo + " " + votacao.proposicaoExterna?.numero + "/" + votacao.proposicaoExterna?.ano,
-            voto: votoDoDeputado.tipoVoto,
-            ementa: votacao.proposicaoExterna?.ementa || votacao.descricao || "Sem ementa dispon\xEDvel"
-          });
-        }
-      } catch (e) {
-        continue;
-      }
-    }
-    if (votosEncontrados.length > 0) {
-      await savePublicDataCache("CAMARA", cacheKey, votosEncontrados);
-    }
-    return votosEncontrados;
-  } catch (error) {
-    logger_default.error(`[Camara] Erro ao buscar vota\xE7\xF5es do deputado ${deputadoId}: ${error}`);
-    return [];
-  }
-}
-function analisarIncoerencia(promessa, voto) {
-  const textoPromessa = promessa.toLowerCase();
-  const ementaVoto = voto.ementa.toLowerCase();
-  const temas = [
-    { nome: "educa\xE7\xE3o", keywords: ["educa\xE7\xE3o", "escola", "ensino", "universidade", "professor", "merenda"] },
-    { nome: "sa\xFAde", keywords: ["sa\xFAde", "hospital", "m\xE9dico", "sus", "vacina", "medicamento"] },
-    { nome: "seguran\xE7a", keywords: ["seguran\xE7a", "pol\xEDcia", "crime", "viol\xEAncia", "armas"] },
-    { nome: "economia", keywords: ["economia", "imposto", "tributo", "fiscal", "or\xE7amento", "gasto"] }
-  ];
-  for (const tema of temas) {
-    const promessaSobreTema = tema.keywords.some((k) => textoPromessa.includes(k));
-    const votoSobreTema = tema.keywords.some((k) => ementaVoto.includes(k));
-    if (promessaSobreTema && votoSobreTema) {
-      const votoContra = voto.voto === "N\xE3o" || voto.voto === "Obstru\xE7\xE3o" || voto.voto.includes("Contra");
-      const promessaPositiva = ["aumentar", "investir", "apoiar", "criar", "melhorar"].some((p) => textoPromessa.includes(p));
-      if (promessaPositiva && votoContra) {
-        return {
-          incoerente: true,
-          justificativa: `O pol\xEDtico prometeu apoio \xE0 \xE1rea de ${tema.nome}, mas votou "${voto.voto}" na proposi\xE7\xE3o ${voto.proposicao} que trata de: ${voto.ementa}`
-        };
-      }
-    }
-  }
-  return { incoerente: false, justificativa: "" };
-}
-async function getProposicoesDeputado(deputadoId) {
-  try {
-    const cacheKey = `proposicoes_camara_${deputadoId}`;
-    const cached = await getPublicDataCache("CAMARA", cacheKey);
-    if (cached) return cached;
-    const response = await axios8.get(`${CAMARA_API_BASE}/proposicoes`, {
-      params: { idDeputadoAutor: deputadoId, ordem: "DESC", ordenarPor: "id", itens: 10 },
-      headers: { "Accept": "application/json" }
-    });
-    const proposicoes = response.data.dados.map((p) => ({
-      id: p.id,
-      sigla: p.siglaTipo,
-      numero: p.numero,
-      ano: p.ano,
-      ementa: p.ementa,
-      url: `https://www.camara.leg.br/proposicoesWeb/fichadetramitacao?idProposicao=${p.id}`
-    }));
-    await savePublicDataCache("CAMARA", cacheKey, proposicoes);
-    return proposicoes;
-  } catch (error) {
-    logger_default.error(`[Camara] Erro ao buscar proposi\xE7\xF5es do deputado ${deputadoId}: ${error}`);
-    return [];
-  }
-}
-var CAMARA_API_BASE;
-var init_camara = __esm({
-  "server/integrations/camara.ts"() {
-    init_logger();
-    init_database();
-    CAMARA_API_BASE = "https://dadosabertos.camara.leg.br/api/v2";
-  }
-});
-
-// server/integrations/senado.ts
-var senado_exports = {};
-__export(senado_exports, {
-  getMateriasSenador: () => getMateriasSenador,
-  getSenadorCodigo: () => getSenadorCodigo,
-  getVotacoesSenador: () => getVotacoesSenador
-});
-import axios9 from "axios";
-async function getSenadorCodigo(nome) {
-  try {
-    const cacheKey = `senador_codigo_${nome}`;
-    const cached = await getPublicDataCache("SENADO", cacheKey);
-    if (cached) return cached.codigo;
-    const response = await axios9.get(`${SENADO_API_BASE}/lista/atual`, {
-      headers: { "Accept": "application/json" }
-    });
-    const senadores = response.data.ListaParlamentarEmExercicio.Parlamentares.Parlamentar;
-    const senador = senadores.find((s) => s.IdentificacaoParlamentar.NomeParlamentar.toLowerCase().includes(nome.toLowerCase()));
-    if (senador) {
-      const codigo = senador.IdentificacaoParlamentar.CodigoParlamentar;
-      await savePublicDataCache("SENADO", cacheKey, { codigo });
-      return codigo;
-    }
-    return null;
-  } catch (error) {
-    logger_default.error(`[Senado] Erro ao buscar c\xF3digo do senador ${nome}: ${error}`);
-    return null;
-  }
-}
-async function getVotacoesSenador(codigoSenador) {
-  try {
-    const cacheKey = `votacoes_senado_${codigoSenador}`;
-    const cached = await getPublicDataCache("SENADO", cacheKey);
-    if (cached) return cached;
-    const response = await axios9.get(`${SENADO_API_BASE}/${codigoSenador}/votacoes`, {
-      headers: { "Accept": "application/json" }
-    });
-    const votacoesRaw = response.data.VotacaoParlamentar.Parlamentar.Votacoes.Votacao;
-    const votacoes = votacoesRaw.map((v) => ({
-      codigoSessao: v.CodigoSessao,
-      data: v.DataSessao,
-      siglaMateria: v.Materia.Sigla,
-      numeroMateria: v.Materia.Numero,
-      anoMateria: v.Materia.Ano,
-      voto: v.DescricaoVoto,
-      ementa: v.Materia.Ementa || "Sem ementa dispon\xEDvel"
-    }));
-    await savePublicDataCache("SENADO", cacheKey, votacoes);
-    return votacoes;
-  } catch (error) {
-    logger_default.error(`[Senado] Erro ao buscar vota\xE7\xF5es do senador ${codigoSenador}: ${error}`);
-    return [];
-  }
-}
-async function getMateriasSenador(codigoSenador) {
-  try {
-    const cacheKey = `materias_senado_${codigoSenador}`;
-    const cached = await getPublicDataCache("SENADO", cacheKey);
-    if (cached) return cached;
-    const response = await axios9.get(`${SENADO_API_BASE}/materia/autor/${codigoSenador}`, {
-      headers: { "Accept": "application/json" }
-    });
-    const materiasRaw = response.data.ListaMateriasAutoria.Materias.Materia;
-    const materias = (Array.isArray(materiasRaw) ? materiasRaw : [materiasRaw]).slice(0, 10).map((m) => ({
-      id: m.CodigoMateria,
-      sigla: m.SiglaMateria,
-      numero: m.NumeroMateria,
-      ano: m.AnoMateria,
-      ementa: m.EmentaMateria || "Sem ementa dispon\xEDvel",
-      url: `https://www25.senado.leg.br/web/atividade/materias/-/materia/${m.CodigoMateria}`
-    }));
-    await savePublicDataCache("SENADO", cacheKey, materias);
-    return materias;
-  } catch (error) {
-    logger_default.error(`[Senado] Erro ao buscar mat\xE9rias do senador ${codigoSenador}: ${error}`);
-    return [];
-  }
-}
-var SENADO_API_BASE;
-var init_senado = __esm({
-  "server/integrations/senado.ts"() {
-    init_logger();
-    init_database();
-    SENADO_API_BASE = "https://legis.senado.leg.br/dadosabertos/senador";
   }
 });
 
 // server/index.ts
 init_database();
 import express from "express";
-import path2 from "path";
-import { fileURLToPath as fileURLToPath2 } from "url";
+import path from "path";
 
 // server/core/routes.ts
 import rateLimit3 from "express-rate-limit";
@@ -1084,192 +826,119 @@ import { Router as Router2 } from "express";
 
 // server/services/analysis.service.ts
 init_database();
+init_nlp();
 import { nanoid as nanoid4 } from "nanoid";
-
-// server/modules/nlp.ts
-var PROMISE_VERBS = [
-  "vou",
-  "vamos",
-  "iremos",
-  "irei",
-  "prometo",
-  "prometemos",
-  "prometerem",
-  "farei",
-  "faremos",
-  "far\xE3o",
-  "construirei",
-  "construiremos",
-  "construir\xE3o",
-  "implementarei",
-  "implementaremos",
-  "implementar\xE3o",
-  "criarei",
-  "criaremos",
-  "criar\xE3o",
-  "aumentarei",
-  "aumentaremos",
-  "aumentar\xE3o",
-  "reduzirei",
-  "reduziremos",
-  "reduzir\xE3o",
-  "melhorarei",
-  "melhoraremos",
-  "melhorar\xE3o",
-  "investirei",
-  "investiremos",
-  "investir\xE3o",
-  "garantirei",
-  "garantiremos",
-  "garantir\xE3o",
-  "assegurarei",
-  "asseguraremos",
-  "assegurar\xE3o",
-  "realizarei",
-  "realizaremos",
-  "realizar\xE3o",
-  "executarei",
-  "executaremos",
-  "executar\xE3o",
-  "entreguei",
-  "entregamos",
-  "entregarei",
-  "entregaremos",
-  "desenvolvi",
-  "desenvolvemos",
-  "desenvolverei",
-  "desenvolveremos",
-  "ampliarei",
-  "ampliaremos",
-  "ampliar\xE3o",
-  "expandirei",
-  "expandiremos",
-  "expandir\xE3o",
-  "modernizarei",
-  "modernizaremos",
-  "modernizar\xE3o",
-  "reformarei",
-  "reformaremos",
-  "reformar\xE3o",
-  "restaurarei",
-  "restauraremos",
-  "restaurar\xE3o",
-  "recuperarei",
-  "recuperaremos",
-  "recuperar\xE3o",
-  "revitalizarei",
-  "revitalizaremos",
-  "revitalizar\xE3o"
-];
-var PROMISE_CATEGORIES = {
-  INFRASTRUCTURE: ["construir", "obra", "estrada", "ponte", "rodovia", "ferrovia", "aeroporto", "porto", "infraestrutura"],
-  EDUCATION: ["escola", "educa\xE7\xE3o", "ensino", "universidade", "bolsa", "professor", "aluno", "aprendizado"],
-  HEALTH: ["sa\xFAde", "hospital", "m\xE9dico", "medicamento", "ambul\xE2ncia", "cl\xEDnica", "enfermeiro", "atendimento"],
-  EMPLOYMENT: ["emprego", "trabalho", "desemprego", "renda", "sal\xE1rio", "profiss\xE3o", "ocupa\xE7\xE3o", "contrata\xE7\xE3o"],
-  SECURITY: ["seguran\xE7a", "pol\xEDcia", "crime", "viol\xEAncia", "patrulha", "delegacia", "pres\xEDdio", "criminalidade"],
-  ENVIRONMENT: ["ambiente", "sustentabilidade", "verde", "parque", "floresta", "polui\xE7\xE3o", "reciclagem", "energia"],
-  SOCIAL: ["social", "pobreza", "assist\xEAncia", "benef\xEDcio", "aux\xEDlio", "vulner\xE1vel", "comunidade", "inclus\xE3o"],
-  ECONOMY: ["economia", "neg\xF3cio", "empresa", "investimento", "crescimento", "PIB", "renda", "desenvolvimento"],
-  AGRICULTURE: ["agricultura", "fazenda", "agropecu\xE1ria", "planta\xE7\xE3o", "colheita", "subs\xEDdio", "produtor"],
-  CULTURE: ["cultura", "arte", "m\xFAsica", "cinema", "museu", "patrim\xF4nio", "evento", "festival"]
-};
-function extractPromises(text) {
-  const promises = [];
-  const sentences = splitSentences(text);
-  for (const sentence of sentences) {
-    const sentenceLower = sentence.toLowerCase();
-    for (const verb of PROMISE_VERBS) {
-      if (sentenceLower.includes(verb)) {
-        const promise = analyzeSentence(sentence, verb);
-        if (promise) {
-          promises.push(promise);
-        }
-        break;
-      }
-    }
-  }
-  return promises;
-}
-function splitSentences(text) {
-  return text.split(/[.!?;]+/).map((s) => s.trim()).filter((s) => s.length > 0);
-}
-function analyzeSentence(sentence, verb) {
-  const sentenceLower = sentence.toLowerCase();
-  const numbers = extractNumbers(sentence);
-  const nouns = extractNouns(sentence);
-  let category = "GERAL";
-  for (const [cat, keywords] of Object.entries(PROMISE_CATEGORIES)) {
-    if (keywords.some((kw) => sentenceLower.includes(kw))) {
-      category = cat;
-      break;
-    }
-  }
-  let confidence = 0.5;
-  if (numbers.length > 0) confidence += 0.2;
-  if (/\b(até|em|durante|próximo|ano|mês|semana|dia)\b/i.test(sentence)) {
-    confidence += 0.1;
-  }
-  if (/\b(mil|milhão|bilhão|centenas|dezenas|todas|todos|100%)\b/i.test(sentence)) {
-    confidence += 0.1;
-  }
-  confidence = Math.min(confidence, 1);
-  return {
-    text: sentence.trim(),
-    confidence,
-    category,
-    entities: {
-      verbs: [verb],
-      nouns,
-      numbers
-    },
-    negated: false,
-    conditional: false
-  };
-}
-function extractNumbers(text) {
-  const numberPattern = /\b\d+(?:[.,]\d+)?\s*(?:mil|milhão|bilhão|%|reais|R\$)?\b/gi;
-  const matches = text.match(numberPattern);
-  return matches || [];
-}
-function extractNouns(sentence) {
-  const nounPattern = /\b([A-Z][a-záéíóúâêôãõç]*|(?:de|em|para|por|com)\s+([a-záéíóúâêôãõç]+))\b/g;
-  const matches = [];
-  let match;
-  while ((match = nounPattern.exec(sentence)) !== null) {
-    matches.push(match[1] || match[2]);
-  }
-  return [...new Set(matches)];
-}
 
 // server/integrations/siconfi.ts
 init_logger();
+import axios from "axios";
+
+// server/services/cache.service.ts
 init_database();
-import axios2 from "axios";
-var SICONFI_API_BASE = "https://apidatalake.tesouro.gov.br/api/siconfi/index.php/conteudo";
+init_logger();
+var CacheService = class {
+  CACHE_TTL_DAYS = 7;
+  async getAnalysis(politicianName) {
+    try {
+      const supabase2 = getSupabase();
+      const now = (/* @__PURE__ */ new Date()).toISOString();
+      const { data, error } = await supabase2.from("analysis_cache").select("*").eq("politician_name", politicianName).gt("expires_at", now).single();
+      if (error || !data) return null;
+      return data.analysis_data;
+    } catch (error) {
+      return null;
+    }
+  }
+  async saveAnalysis(politicianName, analysisData) {
+    try {
+      const supabase2 = getSupabase();
+      const expiresAt = new Date(Date.now() + this.CACHE_TTL_DAYS * 24 * 60 * 60 * 1e3).toISOString();
+      await supabase2.from("analysis_cache").upsert({
+        politician_name: politicianName,
+        analysis_data: analysisData,
+        expires_at: expiresAt,
+        updated_at: (/* @__PURE__ */ new Date()).toISOString()
+      }, { onConflict: "politician_name" });
+      return true;
+    } catch (error) {
+      return false;
+    }
+  }
+  /**
+   * Buscar dados genéricos em cache (SICONFI, Câmara, Senado)
+   */
+  async getGenericData(key) {
+    try {
+      const supabase2 = getSupabase();
+      const now = (/* @__PURE__ */ new Date()).toISOString();
+      const { data, error } = await supabase2.from("public_data_cache").select("data_content, expiry_date").eq("data_source", key).gt("expiry_date", now).maybeSingle();
+      if (error || !data) return null;
+      return data.data_content;
+    } catch (error) {
+      logWarn(`[Cache] Erro ao buscar dado gen\xE9rico: ${key}`, error);
+      return null;
+    }
+  }
+  /**
+   * Salvar dados genéricos em cache
+   */
+  async saveGenericData(key, source, data, ttlDays = 7) {
+    try {
+      const supabase2 = getSupabase();
+      const expiresAt = new Date(Date.now() + ttlDays * 24 * 60 * 60 * 1e3).toISOString();
+      const { data: existing } = await supabase2.from("public_data_cache").select("id").eq("data_source", key).maybeSingle();
+      if (existing) {
+        await supabase2.from("public_data_cache").update({
+          data_content: data,
+          expiry_date: expiresAt,
+          last_updated: (/* @__PURE__ */ new Date()).toISOString()
+        }).eq("id", existing.id);
+      } else {
+        await supabase2.from("public_data_cache").insert({
+          id: Math.random().toString(36).substring(7),
+          data_type: source,
+          data_source: key,
+          data_content: data,
+          expiry_date: expiresAt
+        });
+      }
+      logInfo(`[Cache] Dado governamental cacheado: ${key} (${source})`);
+    } catch (error) {
+      logWarn(`[Cache] Erro ao salvar dado gen\xE9rico: ${key}`, error);
+    }
+  }
+};
+var cacheService = new CacheService();
+
+// server/integrations/siconfi.ts
+var SICONFI_API_BASE = "https://apidatalake.tesouro.gov.br/ords/siconfi/tt/dca";
 async function getBudgetData(category, year, sphere = "FEDERAL") {
   try {
-    const cacheKey = `${category}_${year}_${sphere}`;
-    const cached = await getPublicDataCache("SICONFI", cacheKey);
+    const cacheKey = `siconfi:${category}:${year}:${sphere}`;
+    const cached = await cacheService.getGenericData(cacheKey);
     if (cached) {
+      logger_default.info(`[SICONFI] Usando dados em cache para ${category} (${year})`);
       return { ...cached, lastUpdated: new Date(cached.lastUpdated) };
     }
     logger_default.info(`[SICONFI] Buscando dados reais no Tesouro: ${category} (${year})`);
+    const queryYear = year > 2023 ? 2023 : year;
     const idEnte = sphere === "FEDERAL" ? "1" : "35";
-    logger_default.info(`[SICONFI] Consultando SICONFI para ente: ${idEnte} (Uni\xE3o), ano: ${year}`);
-    const response = await axios2.get(`${SICONFI_API_BASE}/dca`, {
-      params: {
-        an_exercicio: year,
-        id_ente: idEnte,
-        no_anexo: "DCA-AnexoI-C"
-      },
-      timeout: 8e3
+    const params = {
+      an_exercicio: queryYear,
+      id_ente: idEnte,
+      no_anexo: "DCA-AnexoI-C"
+    };
+    logger_default.info(`[SICONFI] [DEBUG] Query: ${JSON.stringify(params)} | Categoria: ${category}`);
+    const response = await axios.get(SICONFI_API_BASE, {
+      params,
+      timeout: 1e4
     }).catch((err) => {
-      logger_default.warn(`[SICONFI] Erro na chamada API: ${err.message}`);
+      logger_default.warn(`[SICONFI] [DEBUG] Erro na chamada API: ${err.message} | URL: ${err.config?.url} | Params: ${JSON.stringify(err.config?.params)}`);
       return { data: null };
     });
     if (!response.data || !response.data.items) {
-      logger_default.warn(`[SICONFI] API inst\xE1vel. Usando estimativa hist\xF3rica para ${category}`);
-      return getHistoricalFallback(category, year, sphere);
+      logger_default.error(`[SICONFI] Dados n\xE3o encontrados ou API inst\xE1vel para ${category} em ${year}.`);
+      throw new Error(`Dados or\xE7ament\xE1rios oficiais para ${category} n\xE3o est\xE3o dispon\xEDveis no momento.`);
     }
     const empenhadoItem = response.data.items.find(
       (i) => i.coluna.includes("Despesas Empenhadas") && i.conta.toUpperCase().includes(category.toUpperCase())
@@ -1294,31 +963,12 @@ async function getBudgetData(category, year, sphere = "FEDERAL") {
         // Estimativa para o campo Pago
       }
     };
-    await savePublicDataCache("SICONFI", cacheKey, result);
+    await cacheService.saveGenericData(cacheKey, "SICONFI", result, 30);
     return result;
   } catch (error) {
-    logger_default.error(`[SICONFI] Erro ao buscar dados: ${error}`);
-    return getHistoricalFallback(category, year, sphere);
+    logger_default.error(`[SICONFI] Erro ao buscar dados: ${error.message}`);
+    throw error;
   }
-}
-function getHistoricalFallback(category, year, sphere) {
-  const fallbacks = {
-    "SAUDE": 15e10,
-    "EDUCACAO": 12e10,
-    "SEGURANCA": 4e10,
-    "INFRAESTRUTURA": 3e10,
-    "GERAL": 5e10
-  };
-  const baseValue = fallbacks[category.toUpperCase()] || fallbacks["GERAL"];
-  return {
-    year,
-    sphere,
-    category,
-    budgeted: baseValue,
-    executed: baseValue * 0.85,
-    percentage: 85,
-    lastUpdated: /* @__PURE__ */ new Date()
-  };
 }
 async function getBudgetHistory(category, startYear, endYear, sphere = "FEDERAL") {
   const comparisons = [];
@@ -1341,7 +991,7 @@ async function validateBudgetViability(category, estimatedValue, year, sphere = 
   const currentYear = (/* @__PURE__ */ new Date()).getFullYear();
   const history = await getBudgetHistory(category, currentYear - 2, currentYear - 1, sphere);
   if (history.length === 0) {
-    return { viable: true, confidence: 0.3, reason: "Sem dados hist\xF3ricos dispon\xEDveis", historicalData: [] };
+    throw new Error(`N\xE3o foi poss\xEDvel validar a viabilidade or\xE7ament\xE1ria para ${category} devido \xE0 aus\xEAncia de dados hist\xF3ricos oficiais.`);
   }
   const avgBudget = history.reduce((sum, h) => sum + h.budgeted, 0) / history.length;
   const isViable = estimatedValue < avgBudget * 0.1;
@@ -1405,7 +1055,7 @@ async function syncSiconfiData(categories) {
 // server/integrations/tse.ts
 init_logger();
 init_database();
-import axios3 from "axios";
+import axios2 from "axios";
 var TSE_API_BASE = "https://divulgacandcontas.tse.jus.br/divulga/rest/v1";
 async function getPoliticalHistory(candidateName, state) {
   try {
@@ -1413,7 +1063,7 @@ async function getPoliticalHistory(candidateName, state) {
     const cached = await getPublicDataCache("TSE", cacheKey);
     if (cached) return cached;
     logger_default.info(`[TSE] Buscando hist\xF3rico: ${candidateName}`);
-    const searchResponse = await axios3.get(`${TSE_API_BASE}/eleicao/buscar/${state}/2024/1/1/candidatos`, {
+    const searchResponse = await axios2.get(`${TSE_API_BASE}/eleicao/buscar/${state}/2024/1/1/candidatos`, {
       params: { nome: candidateName },
       timeout: 1e4
     }).catch(() => null);
@@ -1470,7 +1120,7 @@ async function syncTSEData(candidates) {
 // server/integrations/ibge.ts
 init_logger();
 init_database();
-import axios4 from "axios";
+import axios3 from "axios";
 var IBGE_API_BASE = "https://servicodados.ibge.gov.br/api/v3";
 async function getNationalSocioEconomicData() {
   try {
@@ -1478,9 +1128,9 @@ async function getNationalSocioEconomicData() {
     const cached = await getPublicDataCache("IBGE", cacheKey);
     if (cached) return cached;
     logger_default.info("[IBGE] Buscando dados socioecon\xF4micos nacionais...");
-    const popRes = await axios4.get(`${IBGE_API_BASE}/agregados/6579/periodos/-6/variaveis/93?localidades=N1[all]`, { timeout: 5e3 });
+    const popRes = await axios3.get(`${IBGE_API_BASE}/agregados/6579/periodos/-6/variaveis/93?localidades=N1[all]`, { timeout: 5e3 });
     const population = parseInt(popRes.data[0].resumos[0].valor);
-    const pibRes = await axios4.get(`${IBGE_API_BASE}/agregados/5938/periodos/-1/variaveis/37?localidades=N1[all]`, { timeout: 5e3 });
+    const pibRes = await axios3.get(`${IBGE_API_BASE}/agregados/5938/periodos/-1/variaveis/37?localidades=N1[all]`, { timeout: 5e3 });
     const pib = parseFloat(pibRes.data[0].resumos[0].valor) * 1e6;
     const data = {
       population,
@@ -1622,52 +1272,380 @@ async function calculateProbabilityWithDetails(promises, author, category) {
   };
 }
 
-// server/services/analysis.service.ts
-init_ai_service();
+// server/services/ai.service.ts
 init_logger();
+import axios6 from "axios";
 
-// server/core/compression.ts
+// server/services/ai-groq.service.ts
 init_logger();
-import zlib from "zlib";
-var DataCompressor = class {
-  /**
-   * Comprime um objeto ou string usando Gzip.
-   * Retorna uma string Base64 para fácil armazenamento em colunas de texto.
-   */
-  static compress(data) {
-    try {
-      const content = typeof data === "string" ? data : JSON.stringify(data);
-      const buffer = zlib.gzipSync(content);
-      return buffer.toString("base64");
-    } catch (error) {
-      logError("[Compression] Erro ao comprimir dados", error);
-      return typeof data === "string" ? data : JSON.stringify(data);
-    }
+import axios4 from "axios";
+var GroqService = class {
+  get apiKey() {
+    return process.env.GROQ_API_KEY;
   }
-  /**
-   * Descomprime uma string Base64 (Gzip) de volta para o formato original.
-   */
-  static decompress(compressedData) {
-    try {
-      const buffer = Buffer.from(compressedData, "base64");
-      const decompressed = zlib.gunzipSync(buffer).toString();
-      try {
-        return JSON.parse(decompressed);
-      } catch {
-        return decompressed;
-      }
-    } catch (error) {
-      logError("[Compression] Erro ao descomprimir dados", error);
-      return compressedData;
+  apiUrl = "https://api.groq.com/openai/v1/chat/completions";
+  model = "llama-3.3-70b-versatile";
+  // Modelo estável e versátil
+  async generateCompletion(systemPrompt, userPrompt) {
+    if (!this.apiKey) {
+      throw new Error("GROQ_API_KEY n\xE3o configurada");
     }
-  }
-  /**
-   * Verifica se uma string parece estar comprimida (Base64 Gzip).
-   */
-  static isCompressed(data) {
-    return typeof data === "string" && data.startsWith("H4sIA");
+    try {
+      logInfo(`[Groq] Iniciando gera\xE7\xE3o com modelo: ${this.model}`);
+      const startTime = Date.now();
+      const response = await axios4.post(
+        this.apiUrl,
+        {
+          model: this.model,
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userPrompt }
+          ],
+          temperature: 0.1,
+          // Baixa temperatura para maior precisão técnica
+          max_tokens: 4096
+        },
+        {
+          headers: {
+            "Authorization": `Bearer ${this.apiKey}`,
+            "Content-Type": "application/json"
+          },
+          timeout: 3e4
+        }
+      );
+      const duration = Date.now() - startTime;
+      logInfo(`[Groq] Resposta recebida em ${duration}ms`);
+      return response.data.choices[0]?.message?.content || "";
+    } catch (error) {
+      logError("[Groq] Erro na chamada da API", error);
+      throw error;
+    }
   }
 };
+var groqService = new GroqService();
+
+// server/services/ai-deepseek.service.ts
+init_logger();
+import axios5 from "axios";
+var DeepSeekService = class {
+  API_URL = "https://openrouter.ai/api/v1/chat/completions";
+  MODEL = "deepseek/deepseek-r1";
+  // Ou 'deepseek/deepseek-r1:free' se disponível
+  promptTemplate(text) {
+    return `Voc\xEA \xE9 um Auditor T\xE9cnico Independente e Analista de Viabilidade Or\xE7ament\xE1ria da Seth VII. Sua miss\xE3o \xE9 realizar uma auditoria fria, imparcial e estritamente t\xE9cnica do conte\xFAdo fornecido.
+
+### O QUE \xC9 UMA PROMESSA (CRIT\xC9RIO RIGOROSO):
+- **SIM:** "Vou construir 50 escolas at\xE9 2026", "Anunciamos investimento de 10 bi na sa\xFAde", "Votarei contra o aumento de impostos".
+- **N\xC3O:** Not\xEDcias sobre o pol\xEDtico ("Lula viaja para a China"), ataques a advers\xE1rios ("Fulano \xE9 fascista"), descri\xE7\xF5es de eventos passados sem compromisso futuro.
+
+### PRINC\xCDPIOS DE AUDITORIA:
+1. **FILTRAGEM DE RU\xCDDO:** Ignore ataques pol\xEDticos, fofocas de bastidores ou not\xEDcias puramente informativas que n\xE3o contenham um compromisso de a\xE7\xE3o futura.
+2. **HONESTIDADE INTELECTUAL:** Se o texto for apenas uma not\xEDcia sem promessas, a lista "promises" deve estar VAZIA [].
+3. **FOCO EM VIABILIDADE:** Analise se a promessa tem base or\xE7ament\xE1ria ou se \xE9 apenas ret\xF3rica eleitoral.
+
+### SISTEMA DE VEREDITO EM DUAS ETAPAS:
+1. **FATOS:** Liste apenas dados concretos e compromissos reais identificados.
+2. **CETICISMO:** Liste os obst\xE1culos reais (Teto de Gastos, LRF, Oposi\xE7\xE3o no Congresso).
+
+Responda estritamente em formato JSON puro:
+{
+  "promises": [
+    {
+      "text": "A promessa exata (ex: 'Vou reduzir o IPI')",
+      "category": "Sa\xFAde|Educa\xE7\xE3o|Economia|Seguran\xE7a|Infraestrutura|Geral",
+      "estimatedValue": 0, 
+      "confidence": 0.0 a 1.0,
+      "negated": false,
+      "conditional": false,
+      "reasoning": "Por que isso \xE9 vi\xE1vel ou invi\xE1vel? Cite leis ou or\xE7amento se poss\xEDvel.",
+      "risks": ["Risco 1", "Risco 2"]
+    }
+  ],
+  "overallSentiment": "T\xE9cnico|Populista|Informativo",
+  "credibilityScore": 0-100,
+  "verdict": {
+    "facts": ["Fato concreto extra\xEDdo"],
+    "skepticism": ["Obst\xE1culo t\xE9cnico identificado"]
+  }
+}
+
+Texto para an\xE1lise:
+${text}`;
+  }
+  async analyzeText(text, apiKey) {
+    try {
+      logInfo(`[DeepSeek-R1] Iniciando an\xE1lise de racioc\xEDnio profundo...`);
+      const response = await axios5.post(this.API_URL, {
+        model: this.MODEL,
+        messages: [
+          {
+            role: "system",
+            content: "Voc\xEA \xE9 um auditor pol\xEDtico de elite. Voc\xEA pensa profundamente antes de responder. Responda apenas JSON."
+          },
+          { role: "user", content: this.promptTemplate(text) }
+        ],
+        response_format: { type: "json_object" },
+        max_tokens: 2e3
+      }, {
+        headers: {
+          "Authorization": `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+          "HTTP-Referer": "https://github.com/Glitch-D-ream/Testes",
+          // Opcional para OpenRouter
+          "X-Title": "Detector de Promessa Vazia"
+        },
+        timeout: 9e4
+        // DeepSeek R1 pode demorar mais para "pensar"
+      });
+      let content = response.data.choices[0].message.content;
+      if (typeof content === "string") {
+        content = JSON.parse(content.replace(/```json\n?|\n?```/g, "").trim());
+      }
+      logInfo(`[DeepSeek-R1] An\xE1lise conclu\xEDda com sucesso.`);
+      return content;
+    } catch (error) {
+      logError(`[DeepSeek-R1] Erro na integra\xE7\xE3o`, error);
+      throw new Error("Falha na an\xE1lise profunda via DeepSeek R1.");
+    }
+  }
+};
+var deepSeekService = new DeepSeekService();
+
+// server/services/ai.service.ts
+var AIService = class {
+  /**
+   * Prompt de Alta Performance (Versão Restaurada e Melhorada)
+   * Focado em profundidade, utilidade e análise técnica rigorosa.
+   */
+  promptTemplate(text) {
+    return `Voc\xEA \xE9 um analista pol\xEDtico de elite, especializado em auditoria de promessas e an\xE1lise de viabilidade.
+    Sua miss\xE3o \xE9 transformar o texto bruto em um relat\xF3rio de intelig\xEAncia profundo, \xFAtil e extremamente detalhado.
+    
+    DIRETRIZES DE QUALIDADE:
+    1. PROFUNDIDADE: Analise as implica\xE7\xF5es t\xE9cnicas de cada promessa.
+    2. UTILIDADE: Ajude o cidad\xE3o a entender se a promessa \xE9 realista.
+    3. RIGOR T\xC9CNICO: Use termos como dota\xE7\xE3o or\xE7ament\xE1ria e viabilidade fiscal.
+    4. RESILI\xCANCIA: Se n\xE3o houver promessas expl\xEDcitas, identifique a principal inten\xE7\xE3o pol\xEDtica ou projeto mencionado.
+    5. ESPECIFICIDADE: Identifique riscos concretos de descumprimento.
+    6. FOCO EM CONTRASTE: Se houver dados de hist\xF3rico legislativo, use-os para validar ou refutar a promessa.
+    
+    SISTEMA DE VEREDITO:
+    Para cada an\xE1lise, identifique os fatos principais e os obst\xE1culos (por que isso pode dar errado).
+
+    Para cada promessa extra\xEDda, forne\xE7a:
+    - Um racioc\xEDnio (reasoning) t\xE9cnico.
+    - Uma lista de "riscos" (risks) espec\xEDficos de descumprimento.
+    
+    Responda estritamente em formato JSON seguindo esta estrutura:
+    {
+      "promises": [
+        {
+          "text": "Texto integral da promessa",
+          "category": "Sa\xFAde/Educa\xE7\xE3o/Economia/etc",
+          "estimatedValue": 1000000,
+          "confidence": 0.95,
+          "negated": false,
+          "conditional": true,
+          "reasoning": "An\xE1lise t\xE9cnica profunda sobre a viabilidade e impacto desta promessa espec\xEDfica.",
+          "risks": ["Risco 1", "Risco 2"]
+        }
+      ],
+      "overallSentiment": "An\xE1lise qualitativa do tom do discurso (ex: Populista, T\xE9cnico, Austero)",
+      "credibilityScore": 85,
+      "verdict": {
+        "facts": ["Fato 1", "Fato 2"],
+        "skepticism": ["Obst\xE1culo 1", "Motivo de falha 2"]
+      }
+    }
+    
+    Texto para an\xE1lise:
+    ${text}`;
+  }
+  /**
+   * Provedor de Código Aberto (Pollinations AI) com Multi-Model Fallback
+   * Usando modelos de alto nível para garantir a qualidade do texto.
+   */
+  async analyzeWithOpenSource(text) {
+    const models = [
+      "mistral",
+      "llama",
+      "deepseek-r1",
+      "llama-3.3-70b",
+      "mistral-large",
+      "qwen-qwq"
+    ];
+    let lastError;
+    for (const model of models) {
+      try {
+        logInfo(`[AI] Gerando relat\xF3rio de alta qualidade com modelo: ${model}...`);
+        const response = await axios6.post("https://text.pollinations.ai/", {
+          messages: [
+            {
+              role: "system",
+              content: "Voc\xEA \xE9 um analista pol\xEDtico s\xEAnior. Seus relat\xF3rios s\xE3o famosos pela profundidade t\xE9cnica e utilidade pr\xE1tica. Voc\xEA nunca \xE9 superficial. Responda apenas JSON."
+            },
+            { role: "user", content: this.promptTemplate(text) }
+          ],
+          model,
+          jsonMode: true
+        }, { timeout: 15e3 });
+        let content = response.data;
+        if (typeof content === "object" && content.choices) {
+          content = content.choices[0]?.message?.content || content;
+        }
+        if (typeof content === "string") {
+          let cleanContent = content.trim();
+          const jsonMatch = cleanContent.match(/\{[\s\S]*\}/);
+          if (jsonMatch) {
+            cleanContent = jsonMatch[0];
+          }
+          try {
+            const parsed = JSON.parse(cleanContent);
+            if (!parsed.verdict) {
+              parsed.verdict = { facts: [], skepticism: [] };
+            }
+            if (parsed.promises) {
+              parsed.promises = parsed.promises.map((p) => ({
+                ...p,
+                risks: p.risks || []
+              }));
+            }
+            return parsed;
+          } catch (parseError) {
+            logError(`[AI] Erro ao parsear JSON do modelo ${model}`, parseError);
+            throw parseError;
+          }
+        }
+        if (content && content.promises) {
+          const result = content;
+          if (!result.verdict) {
+            result.verdict = { facts: [], skepticism: [] };
+          }
+          result.promises = result.promises.map((p) => ({
+            ...p,
+            risks: p.risks || []
+          }));
+          return result;
+        }
+        throw new Error(`Modelo ${model} n\xE3o gerou a profundidade esperada`);
+      } catch (error) {
+        logError(`[AI] Falha na tentativa com ${model}`, error);
+        lastError = error;
+        continue;
+      }
+    }
+    logError("[AI] Todos os modelos de alta qualidade falharam.");
+    throw new Error("N\xE3o foi poss\xEDvel gerar uma an\xE1lise t\xE9cnica precisa devido \xE0 instabilidade nos provedores de IA.");
+  }
+  async analyzeText(text) {
+    const openRouterKey = process.env.OPENROUTER_API_KEY;
+    if (openRouterKey) {
+      try {
+        logInfo("[AI] Tentando DeepSeek R1 para an\xE1lise de racioc\xEDnio profundo...");
+        return await deepSeekService.analyzeText(text, openRouterKey);
+      } catch (error) {
+        logWarn(`[AI] DeepSeek R1 falhou: ${error.message}. Tentando Groq...`);
+      }
+    }
+    const groqKey = process.env.GROQ_API_KEY;
+    if (groqKey && !groqKey.includes("your-")) {
+      try {
+        logInfo("[AI] Tentando Groq para an\xE1lise estruturada...");
+        const systemPrompt = "Voc\xEA \xE9 um analista pol\xEDtico s\xEAnior. Responda estritamente em JSON.";
+        const prompt = this.promptTemplate(text);
+        const result = await groqService.generateCompletion(systemPrompt, prompt);
+        if (result) {
+          const jsonMatch = result.match(/\{[\s\S]*\}/);
+          if (jsonMatch) {
+            const parsed = JSON.parse(jsonMatch[0]);
+            if (!parsed.verdict) parsed.verdict = { facts: [], skepticism: [] };
+            if (parsed.promises) {
+              parsed.promises = parsed.promises.map((p) => ({
+                ...p,
+                risks: p.risks || []
+              }));
+            }
+            return parsed;
+          }
+        }
+      } catch (error) {
+        logWarn(`[AI] Groq falhou na an\xE1lise estruturada: ${error.message}. Tentando Pollinations...`);
+      }
+    } else {
+      logWarn("[AI] GROQ_API_KEY n\xE3o configurada corretamente. Pulando para Pollinations.");
+    }
+    try {
+      return await this.analyzeWithOpenSource(text);
+    } catch (error) {
+      logError("Erro cr\xEDtico na gera\xE7\xE3o do relat\xF3rio", error);
+      throw new Error("N\xE3o foi poss\xEDvel gerar o relat\xF3rio detalhado no momento.");
+    }
+  }
+  /**
+   * Geração de texto livre (Markdown) para relatórios profissionais
+   */
+  async generateReport(prompt) {
+    const groqKey = process.env.GROQ_API_KEY;
+    if (groqKey && !groqKey.includes("your-")) {
+      try {
+        logInfo("[AI] Tentando Groq como provedor prim\xE1rio...");
+        const systemPrompt = `Voc\xEA \xE9 o n\xFAcleo de intelig\xEAncia do sistema Seth VII. 
+        Sua fun\xE7\xE3o \xE9 AUDITORIA T\xC9CNICA PURA. 
+        REGRAS INVIOL\xC1VEIS:
+        1. PROIBIDO EMO\xC7\xC3O: N\xE3o use exclama\xE7\xF5es, adjetivos elogiosos ou pejorativos.
+        2. PROIBIDO ALUCINA\xC7\xC3O: Se um dado n\xE3o foi fornecido no prompt, voc\xEA N\xC3O pode invent\xE1-lo. Responda "Dados n\xE3o dispon\xEDveis".
+        3. IMPARCIALIDADE: Trate todos os pol\xEDticos com o mesmo rigor frio, seja de direita, esquerda ou centro.
+        4. FOCO OR\xC7AMENT\xC1RIO: Priorize sempre a viabilidade fiscal (SICONFI) sobre a ret\xF3rica pol\xEDtica.`;
+        const result = await groqService.generateCompletion(systemPrompt, prompt);
+        if (result) return result;
+      } catch (error) {
+        logWarn(`[AI] Groq falhou: ${error.message}. Tentando fallbacks tradicionais...`);
+      }
+    } else {
+      logWarn("[AI] GROQ_API_KEY n\xE3o configurada corretamente. Pulando para fallbacks.");
+    }
+    const models = ["mistral", "llama", "deepseek-r1", "qwen-qwq"];
+    let lastError;
+    for (const model of models) {
+      try {
+        logInfo(`[AI] Gerando relat\xF3rio profissional com modelo: ${model}...`);
+        const response = await axios6.post("https://text.pollinations.ai/", {
+          messages: [
+            {
+              role: "system",
+              content: `Voc\xEA \xE9 o n\xFAcleo de intelig\xEAncia do sistema Seth VII. 
+              Sua fun\xE7\xE3o \xE9 AUDITORIA T\xC9CNICA PURA. 
+              REGRAS INVIOL\xC1VEIS:
+              1. PROIBIDO EMO\xC7\xC3O: N\xE3o use exclama\xE7\xF5es, adjetivos elogiosos ou pejorativos.
+              2. PROIBIDO ALUCINA\xC7\xC3O: Se um dado n\xE3o foi fornecido no prompt, voc\xEA N\xC3O pode invent\xE1-lo. Responda "Dados n\xE3o dispon\xEDveis".
+              3. IMPARCIALIDADE: Trate todos os pol\xEDticos com o mesmo rigor frio, seja de direita, esquerda ou centro.
+              4. FOCO OR\xC7AMENT\xC1RIO: Priorize sempre a viabilidade fiscal (SICONFI) sobre a ret\xF3rica pol\xEDtica.`
+            },
+            { role: "user", content: prompt }
+          ],
+          model
+        }, { timeout: 15e3 });
+        if (response.data && typeof response.data === "string") {
+          return response.data;
+        }
+        if (response.data && response.data.choices) {
+          return response.data.choices[0]?.message?.content || "";
+        }
+        throw new Error(`Modelo ${model} n\xE3o gerou texto v\xE1lido`);
+      } catch (error) {
+        logError(`[AI] Falha na gera\xE7\xE3o de relat\xF3rio com ${model}`, error);
+        lastError = error;
+        continue;
+      }
+    }
+    throw lastError || new Error("Falha ao gerar relat\xF3rio profissional");
+  }
+};
+var aiService = new AIService();
+
+// server/services/analysis.service.ts
+init_logger();
+init_compression();
 
 // server/core/cache-l1.ts
 init_logger();
@@ -2434,8 +2412,8 @@ _Dados baseados em todas as an\xE1lises da plataforma._`
     }
     try {
       const domain = WEBHOOK_DOMAIN.endsWith("/") ? WEBHOOK_DOMAIN.slice(0, -1) : WEBHOOK_DOMAIN;
-      const path3 = WEBHOOK_PATH.startsWith("/") ? WEBHOOK_PATH : `/${WEBHOOK_PATH}`;
-      const webhookUrl = `${domain}${path3}`;
+      const path2 = WEBHOOK_PATH.startsWith("/") ? WEBHOOK_PATH : `/${WEBHOOK_PATH}`;
+      const webhookUrl = `${domain}${path2}`;
       console.log(`[Telegram] Configurando webhook em: ${webhookUrl}`);
       await this.bot.telegram.setWebhook(webhookUrl, {
         drop_pending_updates: true,
@@ -2607,9 +2585,8 @@ router5.get("/status", (req, res) => {
 var telegram_routes_default = router5;
 
 // server/routes/ai-test.routes.ts
-init_ai_service();
-init_logger();
 import { Router as Router6 } from "express";
+init_logger();
 var router6 = Router6();
 router6.get("/test", async (req, res) => {
   const sampleText = "Prometo construir 10 escolas e reduzir impostos municipais em 20% at\xE9 o final do mandato.";
@@ -2664,301 +2641,1311 @@ init_logger();
 init_database();
 init_logger();
 
-// server/agents/brain.ts
+// server/agents/scout-hybrid.ts
 init_logger();
-init_database();
 
-// server/services/temporal-incoherence.service.ts
+// server/modules/direct-search-improved.ts
 init_logger();
-init_camara();
-init_senado();
-var TemporalIncoherenceService = class {
+import axios8 from "axios";
+var DirectSearchImproved = class {
+  userAgents = [
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36"
+  ];
+  getRandomUserAgent() {
+    return this.userAgents[Math.floor(Math.random() * this.userAgents.length)];
+  }
   /**
-   * Analisar incoerência temporal de um político
+   * Busca usando a API de Busca do Bing (mais amigável)
+   * Nota: Requer registro em https://www.microsoft.com/en-us/bing/apis/bing-web-search-api
+   * Alternativa: Usar DuckDuckGo API se disponível
    */
-  async analyzeIncoherence(politicianName, promises) {
-    logInfo(`[TemporalIncoherence] Analisando incoer\xEAncia temporal para: ${politicianName}`);
-    const contradictions = [];
+  async searchBingAlternative(query) {
+    logInfo(`[DirectSearchImproved] Tentando busca alternativa para: ${query}`);
     try {
-      const [votacoesDeputado, votacoesSenador] = await Promise.all([
-        this.getDeputadoVotacoes(politicianName),
-        this.getSenadorVotacoes(politicianName)
-      ]);
-      let votacoes = [...votacoesDeputado || [], ...votacoesSenador || []];
-      if (!votacoes || votacoes.length === 0) {
-        logWarn(`[TemporalIncoherence] Nenhum hist\xF3rico legislativo encontrado para: ${politicianName}`);
-        return {
-          hasIncoherence: false,
-          contradictions: [],
-          coherenceScore: 100,
-          // Sem dados, assume coerência
-          summary: "Sem hist\xF3rico legislativo dispon\xEDvel para an\xE1lise de incoer\xEAncia."
-        };
+      const response = await axios8.get("https://api.duckduckgo.com/", {
+        params: {
+          q: query,
+          format: "json",
+          no_redirect: 1,
+          no_html: 1,
+          skip_disambig: 1
+        },
+        timeout: 1e4
+      });
+      const results = [];
+      if (response.data?.Results && Array.isArray(response.data.Results)) {
+        response.data.Results.slice(0, 10).forEach((result) => {
+          if (result.FirstURL && result.Text) {
+            const cleanTitle = (result.Result || "Resultado de Busca").replace(/<[^>]*>/g, "").trim();
+            const cleanSnippet = result.Text.replace(/<[^>]*>/g, "").trim();
+            results.push({
+              title: cleanTitle,
+              url: result.FirstURL,
+              snippet: cleanSnippet,
+              source: this.extractDomain(result.FirstURL),
+              publishedAt: (/* @__PURE__ */ new Date()).toISOString()
+            });
+          }
+        });
       }
-      for (const promise of promises) {
-        const promiseKeywords = this.extractKeywords(promise);
-        for (const votacao of votacoes) {
-          const votacaoKeywords = this.extractKeywords(votacao.descricao || votacao.nome || "");
-          const relevanceScore = this.calculateRelevance(promiseKeywords, votacaoKeywords);
-          if (relevanceScore > 0.6) {
-            if (votacao.voto === "N\xE3o" || votacao.voto === "Absten\xE7\xE3o") {
-              contradictions.push({
-                promiseText: promise,
-                votedAgainstOn: votacao.data || (/* @__PURE__ */ new Date()).toISOString(),
-                votedAgainstBill: votacao.nome || "Projeto n\xE3o identificado",
-                billUrl: votacao.url || `https://www.camara.leg.br/proposicoesWeb/fichadetramitacao?idProposicao=${votacao.id}`,
-                severity: this.calculateSeverity(relevanceScore),
-                explanation: `O pol\xEDtico votou "${votacao.voto}" em ${votacao.data} sobre "${votacao.nome}", o que contradiz a promessa: "${promise}"`
-              });
+      return results;
+    } catch (error) {
+      logWarn(`[DirectSearchImproved] Falha na busca alternativa`, error);
+      return [];
+    }
+  }
+  /**
+   * Busca usando a API pública do DuckDuckGo (JSON)
+   */
+  async searchDuckDuckGoAPI(query) {
+    logInfo(`[DirectSearchImproved] Buscando via DuckDuckGo API: ${query}`);
+    try {
+      const response = await axios8.get("https://api.duckduckgo.com/", {
+        params: {
+          q: query,
+          format: "json",
+          no_redirect: 1,
+          no_html: 1,
+          skip_disambig: 1
+        },
+        headers: {
+          "User-Agent": this.getRandomUserAgent()
+        },
+        timeout: 1e4
+      });
+      const results = [];
+      if (response.data?.Results && Array.isArray(response.data.Results)) {
+        response.data.Results.slice(0, 5).forEach((result) => {
+          if (result.FirstURL && result.Text) {
+            const cleanTitle = (result.Result || "Resultado").replace(/<[^>]*>/g, "").trim();
+            const cleanSnippet = result.Text.replace(/<[^>]*>/g, "").trim();
+            results.push({
+              title: cleanTitle,
+              url: result.FirstURL,
+              snippet: cleanSnippet,
+              source: this.extractDomain(result.FirstURL),
+              publishedAt: (/* @__PURE__ */ new Date()).toISOString()
+            });
+          }
+        });
+      }
+      if (response.data?.RelatedTopics && Array.isArray(response.data.RelatedTopics)) {
+        response.data.RelatedTopics.slice(0, 5).forEach((topic) => {
+          if (topic.FirstURL && topic.Text) {
+            const cleanTitle = (topic.Result || topic.Text.substring(0, 50)).replace(/<[^>]*>/g, "").trim();
+            const cleanSnippet = topic.Text.replace(/<[^>]*>/g, "").trim();
+            results.push({
+              title: cleanTitle,
+              url: topic.FirstURL,
+              snippet: cleanSnippet,
+              source: this.extractDomain(topic.FirstURL),
+              publishedAt: (/* @__PURE__ */ new Date()).toISOString()
+            });
+          }
+        });
+      }
+      return results;
+    } catch (error) {
+      logError(`[DirectSearchImproved] Falha na API DuckDuckGo`, error);
+      return [];
+    }
+  }
+  /**
+   * Extrai o domínio de uma URL
+   */
+  extractDomain(url) {
+    try {
+      const domain = new URL(url).hostname;
+      return domain.replace("www.", "");
+    } catch {
+      return "Web";
+    }
+  }
+  /**
+   * Busca via Google News RSS (Extremamente confiável para notícias)
+   */
+  async searchGoogleNews(query) {
+    logInfo(`[DirectSearchImproved] Buscando via Google News RSS: ${query}`);
+    try {
+      const url = `https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=pt-BR&gl=BR&ceid=BR:pt-419`;
+      const response = await axios8.get(url, { timeout: 1e4 });
+      const xml = response.data;
+      const results = [];
+      const items = xml.match(/<item>[\s\S]*?<\/item>/g) || [];
+      for (const item of items.slice(0, 10)) {
+        const title = item.match(/<title>(.*?)<\/title>/)?.[1] || "Sem t\xEDtulo";
+        const link = item.match(/<link>(.*?)<\/link>/)?.[1] || "";
+        const pubDate = item.match(/<pubDate>(.*?)<\/pubDate>/)?.[1] || (/* @__PURE__ */ new Date()).toISOString();
+        const source = item.match(/<source[^>]*>(.*?)<\/source>/)?.[1] || "Google News";
+        results.push({
+          title: title.replace(/&amp;/g, "&"),
+          url: link,
+          snippet: title,
+          // No RSS o título costuma ser o resumo
+          source,
+          publishedAt: new Date(pubDate).toISOString()
+        });
+      }
+      return results;
+    } catch (error) {
+      logWarn(`[DirectSearchImproved] Falha no Google News RSS`, error);
+      return [];
+    }
+  }
+  /**
+   * Orquestra a busca direta
+   */
+  async search(query) {
+    let results = await this.searchGoogleNews(query);
+    const ddgResults = await this.searchDuckDuckGoAPI(query);
+    results = [...results, ...ddgResults];
+    if (results.length === 0) {
+      results = await this.searchBingAlternative(query);
+    }
+    const uniqueResults = Array.from(new Map(results.map((item) => [item.url, item])).values());
+    return uniqueResults;
+  }
+};
+var directSearchImproved = new DirectSearchImproved();
+
+// server/modules/official-sources-search.ts
+init_logger();
+import axios9 from "axios";
+var OfficialSourcesSearch = class {
+  /**
+   * Busca na API da Câmara dos Deputados
+   */
+  async searchCamara(politicianName) {
+    logInfo(`[OfficialSearch] Buscando na C\xE2mara: ${politicianName}`);
+    try {
+      const url = `https://dadosabertos.camara.leg.br/api/v2/deputados?nome=${encodeURIComponent(politicianName)}&ordem=ASC&ordenarPor=nome`;
+      const response = await axios9.get(url, { timeout: 1e4 });
+      const results = [];
+      if (response.data?.dados && Array.isArray(response.data.dados)) {
+        for (const deputy of response.data.dados) {
+          results.push({
+            title: `Perfil Oficial: Dep. ${deputy.nome} (${deputy.siglaPartido}-${deputy.uf})`,
+            url: `https://www.camara.leg.br/deputados/${deputy.id}`,
+            content: `Dados oficiais do Deputado Federal ${deputy.nome}. Partido: ${deputy.siglaPartido}, Estado: ${deputy.uf}.`,
+            source: "C\xE2mara dos Deputados",
+            type: "official",
+            confidence: "high",
+            credibilityLayer: "A"
+          });
+          results.push({
+            title: `Proposi\xE7\xF5es e Vota\xE7\xF5es: ${deputy.nome}`,
+            url: `https://www.camara.leg.br/internet/deputado/bandep/${deputy.id}.jpg`,
+            // Usando como referência, mas o ideal seria a página de proposições
+            content: `Hist\xF3rico de atua\xE7\xE3o legislativa, projetos de lei e votos do deputado ${deputy.nome}.`,
+            source: "C\xE2mara dos Deputados",
+            type: "official",
+            confidence: "high",
+            credibilityLayer: "A"
+          });
+        }
+      }
+      return results;
+    } catch (error) {
+      logWarn(`[OfficialSearch] Falha na API da C\xE2mara para "${politicianName}"`, error);
+      return [];
+    }
+  }
+  /**
+   * Busca na API do Senado Federal
+   */
+  async searchSenado(politicianName) {
+    logInfo(`[OfficialSearch] Buscando no Senado: ${politicianName}`);
+    try {
+      const url = `https://legis.senado.leg.br/dadosabertos/senador/lista/atual?nome=${encodeURIComponent(politicianName)}`;
+      const response = await axios9.get(url, {
+        headers: { "Accept": "application/json" },
+        timeout: 1e4
+      });
+      const results = [];
+      const senadores = response.data?.ListaSenadorAtual?.Parlamentares?.Parlamentar;
+      if (senadores) {
+        const lista = Array.isArray(senadores) ? senadores : [senadores];
+        for (const sen of lista) {
+          const info = sen.IdentificacaoParlamentar;
+          results.push({
+            title: `Perfil Oficial: Senador ${info.NomeParlamentar} (${info.SiglaPartidoParlamentar}-${info.UfParlamentar})`,
+            url: info.UrlPaginaParlamentar || `https://wwws.senado.leg.br/senadores/senador/${info.CodigoParlamentar}`,
+            content: `Dados oficiais do Senador ${info.NomeParlamentar}. Partido: ${info.SiglaPartidoParlamentar}, Estado: ${info.UfParlamentar}.`,
+            source: "Senado Federal",
+            type: "official",
+            confidence: "high",
+            credibilityLayer: "A"
+          });
+        }
+      }
+      return results;
+    } catch (error) {
+      logWarn(`[OfficialSearch] Falha na API do Senado para "${politicianName}"`, error);
+      return [];
+    }
+  }
+  /**
+   * Orquestra a busca em fontes oficiais
+   */
+  async search(politicianName) {
+    const [camara, senado] = await Promise.all([
+      this.searchCamara(politicianName),
+      this.searchSenado(politicianName)
+    ]);
+    return [...camara, ...senado];
+  }
+};
+var officialSourcesSearch = new OfficialSourcesSearch();
+
+// server/agents/multi-scout.ts
+init_logger();
+import axios10 from "axios";
+import { nanoid as nanoid6 } from "nanoid";
+var MultiScoutAgent = class {
+  primaryModels = [
+    "openai",
+    "mistral",
+    "llama",
+    // Originais
+    "deepseek-r1",
+    "llama-3.3-70b",
+    "mistral-large"
+    // Backups
+  ];
+  fallbackRSSFeeds = [
+    "https://feeds.folha.uol.com.br/poder",
+    "https://g1.globo.com/dynamo/politica/feed.xml",
+    "https://www.poder360.com.br/feed/"
+  ];
+  async search(query) {
+    logInfo(`[Multi-Scout] Iniciando busca resiliente para: ${query}`);
+    let sources = [];
+    sources = await this.searchViaDuckDuckGo(query);
+    if (sources.length > 0) {
+      logInfo(`[Multi-Scout] Sucesso na busca via DuckDuckGo. ${sources.length} fontes encontradas.`);
+      return sources;
+    }
+    try {
+      sources = await this.searchViaAI(query);
+      if (sources.length > 0) {
+        logInfo(`[Multi-Scout] Sucesso na busca via IA. ${sources.length} fontes encontradas.`);
+        return sources;
+      }
+    } catch (error) {
+      logWarn(`[Multi-Scout] Falha na busca via IA. Tentando fallback...`, error);
+    }
+    try {
+      sources = await this.searchViaRSSFeeds(query);
+      if (sources.length > 0) {
+        logInfo(`[Multi-Scout] Sucesso na busca via RSS. ${sources.length} fontes encontradas.`);
+        return sources;
+      }
+    } catch (error) {
+      logWarn(`[Multi-Scout] Falha na busca via RSS. Tentando fallback final...`, error);
+    }
+    try {
+      sources = await this.searchGeneric(query);
+      if (sources.length > 0) {
+        logInfo(`[Multi-Scout] Sucesso na busca gen\xE9rica. ${sources.length} fontes encontradas.`);
+        return sources;
+      }
+    } catch (error) {
+      logError(`[Multi-Scout] Todas as tentativas falharam.`, error);
+    }
+    return [];
+  }
+  /**
+   * Busca via IA com múltiplos modelos
+   */
+  async searchViaAI(query) {
+    for (const model of this.primaryModels) {
+      try {
+        logInfo(`[Multi-Scout] Tentando modelo: ${model}`);
+        const prompt = `Busque not\xEDcias recentes sobre "${query}" em portugu\xEAs. 
+        Retorne um JSON com array de objetos contendo: title, content (resumo), url, publishedAt (ISO date).
+        Exemplo: {"results": [{"title": "...", "content": "...", "url": "...", "publishedAt": "2026-01-24T..."}]}`;
+        const response = await axios10.post("https://text.pollinations.ai/", {
+          messages: [
+            { role: "system", content: "Voc\xEA \xE9 um agregador de not\xEDcias. Responda apenas JSON." },
+            { role: "user", content: prompt }
+          ],
+          model,
+          jsonMode: true
+        }, { timeout: 15e3 });
+        let data = response.data;
+        if (typeof data === "string") {
+          data = JSON.parse(data.replace(/```json\n?|\n?```/g, "").trim());
+        }
+        if (data && data.results && Array.isArray(data.results)) {
+          return data.results.map((item) => {
+            let layer = "B";
+            const url = (item.url || "").toLowerCase();
+            if (url.includes(".gov.br") || url.includes(".leg.br") || url.includes("tse.jus.br")) layer = "A";
+            else if (url.includes("twitter.com") || url.includes("x.com") || url.includes("facebook.com")) layer = "C";
+            return {
+              id: nanoid6(),
+              url: item.url || `https://news.search/${nanoid6()}`,
+              title: item.title || "Sem t\xEDtulo",
+              content: item.content || "Sem conte\xFAdo",
+              source: model,
+              publishedAt: item.publishedAt || (/* @__PURE__ */ new Date()).toISOString(),
+              confidence: layer === "A" ? "high" : "medium",
+              credibilityLayer: layer
+            };
+          });
+        }
+      } catch (error) {
+        logWarn(`[Multi-Scout] Modelo ${model} falhou:`, error);
+      }
+    }
+    throw new Error("Nenhum modelo de IA dispon\xEDvel");
+  }
+  /**
+   * Busca via DuckDuckGo (Custo Zero e Sem API Key)
+   */
+  async searchViaDuckDuckGo(query) {
+    try {
+      logInfo(`[Multi-Scout] Tentando busca via DuckDuckGo: ${query}`);
+      const response = await axios10.get(`https://duckduckgo.com/lite/`, {
+        params: { q: query },
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+        },
+        timeout: 1e4
+      });
+      const html = response.data;
+      const sources = [];
+      const resultRegex = /<a class="result-link" href="([^"]+)">([^<]+)<\/a>[\s\S]*?<td class="result-snippet">([^<]+)<\/td>/g;
+      let match;
+      let count = 0;
+      while ((match = resultRegex.exec(html)) !== null && count < 5) {
+        const url = match[1].toLowerCase();
+        let layer = "B";
+        if (url.includes(".gov.br") || url.includes(".leg.br")) layer = "A";
+        else if (url.includes("twitter.com") || url.includes("x.com")) layer = "C";
+        sources.push({
+          id: nanoid6(),
+          url: match[1],
+          title: match[2].trim(),
+          content: match[3].trim(),
+          source: "DuckDuckGo",
+          publishedAt: (/* @__PURE__ */ new Date()).toISOString(),
+          confidence: layer === "A" ? "high" : "medium",
+          credibilityLayer: layer
+        });
+        count++;
+      }
+      return sources;
+    } catch (error) {
+      logWarn(`[Multi-Scout] DuckDuckGo falhou:`, error);
+      return [];
+    }
+  }
+  /**
+   * Busca via RSS Feeds de portais de notícias
+   */
+  async searchViaRSSFeeds(query) {
+    const sources = [];
+    for (const feedUrl of this.fallbackRSSFeeds) {
+      try {
+        logInfo(`[Multi-Scout] Tentando feed RSS: ${feedUrl}`);
+        const response = await axios10.get(feedUrl, { timeout: 1e4 });
+        const feedContent = response.data;
+        const items = feedContent.match(/<item>[\s\S]*?<\/item>/g) || [];
+        for (const item of items) {
+          const title = (item.match(/<title><!\[CDATA\[(.*?)\]\]><\/title>/) || item.match(/<title>(.*?)<\/title>/))?.[1] || "Sem t\xEDtulo";
+          const link = item.match(/<link>(.*?)<\/link>/)?.[1] || "";
+          const description = (item.match(/<description><!\[CDATA\[(.*?)\]\]><\/description>/) || item.match(/<description>(.*?)<\/description>/))?.[1] || "Sem conte\xFAdo";
+          if (title.toLowerCase().includes(query.toLowerCase()) || description.toLowerCase().includes(query.toLowerCase())) {
+            sources.push({
+              id: nanoid6(),
+              url: link,
+              title: title.replace(/<[^>]+>/g, ""),
+              content: description.replace(/<[^>]+>/g, "").substring(0, 300),
+              source: new URL(feedUrl).hostname || "RSS Feed",
+              publishedAt: (/* @__PURE__ */ new Date()).toISOString(),
+              confidence: "medium",
+              credibilityLayer: "B"
+              // RSS de portais jornalísticos é Camada B
+            });
+          }
+          if (sources.length >= 5) break;
+        }
+        if (sources.length > 0) break;
+      } catch (error) {
+        logWarn(`[Multi-Scout] Feed RSS falhou: ${feedUrl}`, error);
+      }
+    }
+    return sources;
+  }
+  /**
+   * Busca genérica de último recurso (Desativada para evitar ruído)
+   */
+  async searchGeneric(query) {
+    logWarn(`[Multi-Scout] Fallback gen\xE9rico desativado para evitar dados in\xFAteis para: ${query}`);
+    return [];
+  }
+};
+var multiScoutAgent = new MultiScoutAgent();
+
+// server/modules/content-scraper.ts
+init_logger();
+import axios11 from "axios";
+import * as cheerio from "cheerio";
+
+// server/modules/browser-scraper.ts
+init_logger();
+import { chromium } from "playwright";
+var BrowserScraper = class {
+  /**
+   * Extrai o conteúdo completo de uma URL usando um navegador real.
+   * Isso resolve automaticamente redirecionamentos do Google News e lida com sites complexos.
+   */
+  async scrape(url) {
+    logInfo(`[BrowserScraper] Iniciando extra\xE7\xE3o via browser: ${url}`);
+    let browser;
+    try {
+      browser = await chromium.launch({ headless: true });
+      const context = await browser.newContext({
+        userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+      });
+      const page = await context.newPage();
+      await page.goto(url, { waitUntil: "domcontentloaded", timeout: 2e4 });
+      let retries = 0;
+      while (page.url().includes("news.google.com") && retries < 5) {
+        await page.waitForTimeout(1e3);
+        retries++;
+      }
+      await page.waitForLoadState("networkidle", { timeout: 1e4 }).catch(() => {
+      });
+      const finalUrl = page.url();
+      logInfo(`[BrowserScraper] URL final resolvida: ${finalUrl}`);
+      await page.evaluate(() => {
+        const selectors = "script, style, nav, footer, header, aside, iframe, noscript, .ads, .advertisement, .social-share, .comments";
+        document.querySelectorAll(selectors).forEach((el) => el.remove());
+      });
+      const content = await page.evaluate(() => {
+        const article = document.querySelector("article") || document.querySelector("main") || document.body;
+        const ps = Array.from(article.querySelectorAll("p, div.content-text__container, .texto-materia, .c-content-text"));
+        const text = ps.map((p) => p.innerText.trim()).filter((t) => t.length > 50).join("\n\n");
+        return text;
+      });
+      const cleanContent = content.trim();
+      if (cleanContent.length < 200) {
+        logWarn(`[BrowserScraper] Conte\xFAdo extra\xEDdo ainda parece curto (${cleanContent.length} chars)`);
+      } else {
+        logInfo(`[BrowserScraper] Sucesso: ${cleanContent.length} caracteres extra\xEDdos.`);
+      }
+      return cleanContent || null;
+    } catch (error) {
+      logError(`[BrowserScraper] Falha na extra\xE7\xE3o: ${error.message}`);
+      return null;
+    } finally {
+      if (browser) await browser.close();
+    }
+  }
+};
+var browserScraper = new BrowserScraper();
+
+// server/modules/content-scraper.ts
+var ContentScraper = class {
+  userAgents = [
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36"
+  ];
+  getRandomUserAgent() {
+    return this.userAgents[Math.floor(Math.random() * this.userAgents.length)];
+  }
+  /**
+   * Extrai o conteúdo principal de uma URL
+   */
+  async scrape(url) {
+    if (url.endsWith(".pdf") || url.endsWith(".jpg") || url.endsWith(".png")) {
+      return null;
+    }
+    const eliteDomains = ["news.google.com", "globo.com", "folha", "estadao", "cnnbrasil", "poder360", "metropoles", "uol.com", "gazetadopovo", "correiobraziliense"];
+    if (eliteDomains.some((domain) => url.includes(domain))) {
+      return await browserScraper.scrape(url);
+    }
+    try {
+      logInfo(`[ContentScraper] Extraindo conte\xFAdo via FastScrape (Cheerio): ${url}`);
+      let targetUrl = url;
+      if (url.includes("news.google.com/rss/articles")) {
+        try {
+          const headRes = await axios11.get(url, {
+            maxRedirects: 10,
+            timeout: 12e3,
+            headers: {
+              "User-Agent": this.getRandomUserAgent(),
+              "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+              "Upgrade-Insecure-Requests": "1"
             }
+          });
+          targetUrl = headRes.request.res.responseUrl || url;
+          if (targetUrl.includes("news.google.com/rss/articles")) {
+            try {
+              const urlParts = targetUrl.split("/");
+              let encodedUrl = urlParts[urlParts.length - 1].split("?")[0];
+              let cleanEncoded = encodedUrl.replace(/_/g, "/").replace(/-/g, "+");
+              while (cleanEncoded.length % 4 !== 0) cleanEncoded += "=";
+              const buffer = Buffer.from(cleanEncoded, "base64");
+              const raw = buffer.toString("latin1");
+              const startIdx = raw.indexOf("http");
+              if (startIdx !== -1) {
+                let endIdx = raw.length;
+                for (let i = startIdx; i < raw.length; i++) {
+                  const charCode = raw.charCodeAt(i);
+                  if (charCode < 32 || charCode > 126) {
+                    endIdx = i;
+                    break;
+                  }
+                }
+                const extracted = raw.substring(startIdx, endIdx);
+                if (extracted.includes("http") && !extracted.includes("google.com")) {
+                  targetUrl = extracted;
+                  logInfo(`[ContentScraper] URL real extra\xEDda via Protobuf Scan: ${targetUrl}`);
+                }
+              }
+            } catch (e) {
+              logWarn(`[ContentScraper] Falha ao decodificar URL Base64 do Google News`);
+            }
+          }
+          if (targetUrl.includes("news.google.com")) {
+            const $2 = cheerio.load(headRes.data);
+            const metaRefresh = $2('meta[http-equiv="refresh"]').attr("content");
+            if (metaRefresh) {
+              const match = metaRefresh.match(/url=(.*)/i);
+              if (match && match[1]) targetUrl = match[1];
+            }
+          }
+          logInfo(`[ContentScraper] URL real resolvida: ${targetUrl}`);
+        } catch (e) {
+          logWarn(`[ContentScraper] Falha ao resolver URL do Google News: ${url}`);
+        }
+      }
+      const response = await axios11.get(targetUrl, {
+        headers: {
+          "User-Agent": this.getRandomUserAgent(),
+          "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+          "Accept-Language": "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7",
+          "Referer": "https://www.google.com/"
+        },
+        timeout: 15e3,
+        maxRedirects: 10
+      });
+      const html = response.data;
+      if (typeof html !== "string") return null;
+      const $ = cheerio.load(html);
+      $("script, style, nav, footer, header, aside, iframe, noscript, .ads, .advertisement, .social-share, .comments").remove();
+      const selectors = [
+        ".content-text__container",
+        // G1
+        ".c-news__body",
+        // CNN Brasil
+        ".c-article__content",
+        // CNN Brasil alt
+        ".texto-materia",
+        // Estadão
+        ".c-content-text",
+        // Folha
+        ".article-content",
+        // Geral
+        "article",
+        ".content-body",
+        ".article-body",
+        ".post-content",
+        ".entry-content",
+        ".main-content",
+        "main",
+        "#main-content",
+        ".texto-noticia",
+        // Comum em portais brasileiros
+        ".materia-conteudo",
+        ".entry-content-body",
+        ".news-content",
+        ".article__content",
+        ".story-content",
+        ".node-article",
+        ".text-content",
+        ".body-text"
+      ];
+      let mainContent = "";
+      for (const selector of selectors) {
+        const element = $(selector);
+        if (element.length > 0) {
+          const paragraphs = element.find("p").map((_, el) => $(el).text().trim()).get();
+          if (paragraphs.length > 2) {
+            mainContent = paragraphs.join("\n\n");
+            if (mainContent.length > 400) break;
+          }
+          const directText = element.text().replace(/\s+/g, " ").trim();
+          if (directText.length > 500) {
+            mainContent = directText;
+            break;
           }
         }
       }
-      const coherenceScore = this.calculateCoherenceScore(promises.length, contradictions.length);
-      const summary = contradictions.length === 0 ? `Nenhuma contradi\xE7\xE3o detectada. Hist\xF3rico legislativo alinhado com as promessas.` : `${contradictions.length} contradi\xE7\xE3o(\xF5es) detectada(s) entre promessas e hist\xF3rico legislativo.`;
-      logInfo(`[TemporalIncoherence] An\xE1lise conclu\xEDda. Score de coer\xEAncia: ${coherenceScore}%`);
-      return {
-        hasIncoherence: contradictions.length > 0,
-        contradictions,
-        coherenceScore,
-        summary
-      };
+      if (!mainContent || mainContent.length < 300) {
+        const g1Paragraphs = $(".content-text__container p").map((_, el) => $(el).text().trim()).get();
+        const articleParagraphs = $("article p").map((_, el) => $(el).text().trim()).get();
+        if (g1Paragraphs.length > 2) {
+          mainContent = g1Paragraphs.join("\n\n");
+        } else if (articleParagraphs.length > 2) {
+          mainContent = articleParagraphs.join("\n\n");
+        } else {
+          const candidates = [];
+          $("div, section, article").each((_, el) => {
+            const text = $(el).clone().find("script, style, nav, footer").remove().end().text().trim();
+            if (text.length > 500) candidates.push(text);
+          });
+          if (candidates.length > 0) {
+            mainContent = candidates.sort((a, b) => b.length - a.length)[0];
+          } else {
+            const allParagraphs = $("p").map((_, el) => $(el).text().trim()).get();
+            mainContent = allParagraphs.filter((p) => p.length > 20).join("\n\n");
+          }
+        }
+      }
+      if (!mainContent || mainContent.length < 100) {
+        mainContent = $("div").map((_, el) => $(el).text().trim()).get().filter((t) => t.length > 100).sort((a, b) => b.length - a.length)[0] || "";
+      }
+      const hasInterviewFormat = (mainContent.match(/\n[A-Z][^:]+: /g) || []).length > 3;
+      const quoteCount = (mainContent.match(/"|“|”/g) || []).length;
+      if (hasInterviewFormat) {
+        logInfo(`[ContentScraper] Formato de entrevista detectado em: ${url}`);
+      }
+      const cleanContent = mainContent.replace(/\s+/g, " ").replace(/\n\s*\n/g, "\n\n").trim();
+      if (cleanContent.length < 50) {
+        logWarn(`[ContentScraper] Conte\xFAdo extra\xEDdo muito curto (${cleanContent.length} chars) para: ${url}`);
+        return null;
+      }
+      logInfo(`[ContentScraper] Sucesso: ${cleanContent.length} caracteres extra\xEDdos.`);
+      return cleanContent;
     } catch (error) {
-      logError(`[TemporalIncoherence] Erro na an\xE1lise de incoer\xEAncia`, error);
-      return {
-        hasIncoherence: false,
-        contradictions: [],
-        coherenceScore: 100,
-        summary: "Erro ao analisar incoer\xEAncia temporal. An\xE1lise indispon\xEDvel."
-      };
+      logWarn(`[ContentScraper] Falha ao extrair ${url}: ${error.message}`);
+      return null;
     }
-  }
-  /**
-   * Buscar votações de um Deputado Federal
-   */
-  async getDeputadoVotacoes(name) {
-    try {
-      const deputadoId = await getDeputadoId(name);
-      if (!deputadoId) return [];
-      const votacoes = await getVotacoesDeputado(deputadoId);
-      return votacoes || [];
-    } catch (error) {
-      logWarn(`[TemporalIncoherence] Erro ao buscar vota\xE7\xF5es de deputado`, error);
-      return [];
-    }
-  }
-  /**
-   * Buscar votações de um Senador
-   */
-  async getSenadorVotacoes(name) {
-    try {
-      const senadorCodigo = await getSenadorCodigo(name);
-      if (!senadorCodigo) return [];
-      const votacoes = await getVotacoesSenador(senadorCodigo);
-      return votacoes || [];
-    } catch (error) {
-      logWarn(`[TemporalIncoherence] Erro ao buscar vota\xE7\xF5es de senador`, error);
-      return [];
-    }
-  }
-  /**
-   * Extrair palavras-chave de um texto
-   */
-  extractKeywords(text) {
-    if (!text) return [];
-    const stopwords = ["o", "a", "de", "para", "com", "em", "\xE9", "que", "e", "do", "da", "ou", "por", "um", "uma", "os", "as", "dos", "das"];
-    return text.toLowerCase().split(/\s+/).filter((word) => word.length > 3 && !stopwords.includes(word)).slice(0, 10);
-  }
-  /**
-   * Calcular relevância entre dois conjuntos de palavras-chave
-   */
-  calculateRelevance(keywords1, keywords2) {
-    if (keywords1.length === 0 || keywords2.length === 0) return 0;
-    const intersection = keywords1.filter((k) => keywords2.includes(k)).length;
-    const union = (/* @__PURE__ */ new Set([...keywords1, ...keywords2])).size;
-    return intersection / union;
-  }
-  /**
-   * Calcular severidade da contradição
-   */
-  calculateSeverity(relevanceScore) {
-    if (relevanceScore > 0.8) return "high";
-    if (relevanceScore > 0.7) return "medium";
-    return "low";
-  }
-  /**
-   * Calcular score geral de coerência
-   */
-  calculateCoherenceScore(totalPromises, contradictions) {
-    if (totalPromises === 0) return 100;
-    return Math.max(0, 100 - contradictions / totalPromises * 100);
   }
 };
-var temporalIncoherenceService = new TemporalIncoherenceService();
+var contentScraper = new ContentScraper();
+
+// server/agents/scout-hybrid.ts
+var ScoutHybrid = class {
+  whitelist = [
+    "g1.globo.com",
+    "folha.uol.com.br",
+    "estadao.com.br",
+    "cnnbrasil.com.br",
+    "valor.globo.com",
+    "bbc.com",
+    "elpais.com",
+    "uol.com.br",
+    "r7.com",
+    "metropoles.com",
+    "poder360.com.br",
+    "agenciabrasil.ebc.com.br",
+    "camara.leg.br",
+    "senado.leg.br",
+    "planalto.gov.br",
+    "gazetadopovo.com.br",
+    "cartacapital.com.br",
+    "veja.abril.com.br",
+    "exame.com",
+    "infomoney.com.br"
+  ];
+  /**
+   * Busca híbrida com priorização inteligente
+   */
+  async search(query, deepSearch = false) {
+    logInfo(`[ScoutHybrid] Iniciando busca h\xEDbrida (${deepSearch ? "DEEP" : "NORMAL"}): ${query}`);
+    const sources = [];
+    logInfo(`[ScoutHybrid] FASE 1 & 2: Buscando em fontes oficiais, not\xEDcias e processos em paralelo...`);
+    const [officialResults, newsResults, interviewResults, legalResults] = await Promise.all([
+      officialSourcesSearch.search(query).catch((e) => {
+        logWarn(`Oficiais falharam: ${e.message}`);
+        return [];
+      }),
+      directSearchImproved.search(query).catch((e) => {
+        logWarn(`Busca direta falhou: ${e.message}`);
+        return [];
+      }),
+      directSearchImproved.search(`"${query}" entrevista OR declarou OR anunciou`).catch(() => []),
+      directSearchImproved.search(`"${query}" processo judicial OR investiga\xE7\xE3o OR tribunal`).catch(() => [])
+    ]);
+    const directResults = [...newsResults, ...interviewResults, ...legalResults];
+    if (directResults.length < 5) {
+      logInfo(`[ScoutHybrid] Poucas fontes. Tentando varia\xE7\xE3o: ${query} promessa pol\xEDtica`);
+      const extraResults = await directSearchImproved.search(`${query} promessa pol\xEDtica`).catch(() => []);
+      directResults.push(...extraResults);
+    }
+    sources.push(...officialResults.map((r) => ({
+      title: r.title,
+      url: r.url,
+      content: r.content,
+      source: r.source,
+      publishedAt: (/* @__PURE__ */ new Date()).toISOString(),
+      type: "official",
+      confidence: "high",
+      credibilityLayer: "A"
+    })));
+    logInfo(`[ScoutHybrid] Fontes oficiais encontradas: ${officialResults.length}`);
+    const uniqueDirectResults = directResults.filter((r) => !sources.some((s) => s.url === r.url)).slice(0, 8);
+    logInfo(`[ScoutHybrid] Iniciando scraping paralelo de ${uniqueDirectResults.length} fontes...`);
+    const directScrapePromises = uniqueDirectResults.map(async (r) => {
+      try {
+        const fullContent = await contentScraper.scrape(r.url);
+        const url = r.url.toLowerCase();
+        let layer = "B";
+        if (url.includes(".gov.br") || url.includes(".leg.br")) layer = "A";
+        else if (url.includes("twitter.com") || url.includes("x.com")) layer = "C";
+        return {
+          title: r.title,
+          url: r.url,
+          content: fullContent || r.snippet,
+          source: r.source,
+          publishedAt: r.publishedAt,
+          type: "news",
+          confidence: this.whitelist.some((d) => r.url.includes(d)) ? "high" : "medium",
+          credibilityLayer: layer
+        };
+      } catch (e) {
+        return null;
+      }
+    });
+    const directScrapedSources = (await Promise.all(directScrapePromises)).filter((s) => s !== null);
+    sources.push(...directScrapedSources);
+    logInfo(`[ScoutHybrid] Scraping direto conclu\xEDdo.`);
+    if (sources.length < 5 && deepSearch) {
+      logInfo(`[ScoutHybrid] FASE 3: Deep Search em portais de elite...`);
+      const elitePortals = ["g1.globo.com", "folha.uol.com.br", "estadao.com.br", "poder360.com.br"];
+      const elitePromises = elitePortals.map(async (portal) => {
+        const eliteQuery = `site:${portal} ${query} promessa OR anunciou OR projeto`;
+        const varResults = await directSearchImproved.search(eliteQuery);
+        const uniqueVarResults = varResults.filter((r) => !sources.some((s) => s.url === r.url));
+        return Promise.all(uniqueVarResults.map(async (r) => {
+          const fullContent = await contentScraper.scrape(r.url);
+          return {
+            title: r.title,
+            url: r.url,
+            content: fullContent || r.snippet,
+            source: r.source,
+            publishedAt: r.publishedAt,
+            type: "news",
+            confidence: "high",
+            credibilityLayer: "B"
+            // Portais de elite são Camada B
+          };
+        }));
+      });
+      const eliteResultsArrays = await Promise.all(elitePromises);
+      for (const eliteResults of eliteResultsArrays) {
+        sources.push(...eliteResults);
+        if (sources.length >= 15) break;
+      }
+    }
+    if (sources.length < 2) {
+      logWarn(`[ScoutHybrid] FASE 4: Ativando IA como fallback (${sources.length} fontes encontradas)`);
+      try {
+        const aiResults = await multiScoutAgent.search(query);
+        aiResults.forEach((r) => {
+          if (!sources.some((s) => s.url === r.url)) {
+            sources.push({
+              title: r.title,
+              url: r.url,
+              content: r.content,
+              source: r.source,
+              publishedAt: r.publishedAt,
+              type: "news",
+              confidence: r.confidence,
+              credibilityLayer: r.credibilityLayer
+            });
+          }
+        });
+        logInfo(`[ScoutHybrid] IA encontrou: ${aiResults.length}`);
+      } catch (error) {
+        logError(`[ScoutHybrid] Falha no fallback de IA`, error);
+      }
+    }
+    const validSources = sources.filter((s) => this.isValidUrl(s.url));
+    logInfo(`[ScoutHybrid] Total de fontes v\xE1lidas: ${validSources.length}`);
+    return validSources;
+  }
+  isValidUrl(url) {
+    try {
+      const parsed = new URL(url);
+      return parsed.protocol === "http:" || parsed.protocol === "https:";
+    } catch {
+      return false;
+    }
+  }
+};
+var scoutHybrid = new ScoutHybrid();
+
+// server/agents/scout.ts
+init_logger();
+var ScoutAgent = class {
+  async search(query, isDeepSearch = false) {
+    logInfo(`[Scout] Iniciando busca h\xEDbrida para: ${query} (Deep: ${isDeepSearch})`);
+    try {
+      const results = await scoutHybrid.search(query, isDeepSearch);
+      if (!results || results.length === 0) {
+        return [];
+      }
+      return results.map((r) => ({
+        title: r.title,
+        url: r.url,
+        content: r.content,
+        source: r.source,
+        publishedAt: r.publishedAt,
+        type: r.source === "government" ? "official" : "news",
+        confidence: "medium"
+      }));
+    } catch (error) {
+      logError(`[Scout] Erro na busca h\xEDbrida de ${query}`, error);
+      return [];
+    }
+  }
+};
+var scoutAgent = new ScoutAgent();
+
+// server/agents/filter.ts
+init_logger();
+var FilterAgent = class {
+  /**
+   * Filtra fontes brutas para manter apenas o que parece ser uma promessa ou compromisso
+   */
+  async filter(sources, flexibleMode = false) {
+    logInfo(`[Filter] Analisando ${sources.length} fontes brutas (Modo Flex\xEDvel: ${flexibleMode})`);
+    const filtered = [];
+    for (const source of sources) {
+      const content = source.content || "";
+      const title = source.title || "";
+      const layer = source.credibilityLayer || "B";
+      if (this.simpleHeuristic(content, flexibleMode, title)) {
+        let strength = "medium";
+        if (layer === "A") strength = "strong";
+        else if (layer === "C") strength = "weak";
+        filtered.push({
+          title: source.title,
+          url: source.url,
+          content,
+          source: source.source,
+          publishedAt: source.publishedAt,
+          credibilityLayer: layer,
+          promiseStrength: strength,
+          justification: `[Camada ${layer}] Detectado potencial compromisso ou posicionamento pol\xEDtico relevante.`
+        });
+      }
+    }
+    logInfo(`[Filter] Filtragem conclu\xEDda. ${filtered.length} fontes mantidas.`);
+    return filtered;
+  }
+  simpleHeuristic(content, flexibleMode = false, title = "") {
+    const contentLower = content.toLowerCase();
+    const titleLower = title.toLowerCase();
+    const combinedText = (titleLower + " " + contentLower).trim();
+    const noiseKeywords = [
+      "cookies",
+      "privacidade",
+      "todos os direitos",
+      "clique aqui",
+      "assine j\xE1",
+      "newsletter",
+      "erro 404",
+      "p\xE1gina n\xE3o encontrada",
+      "just a moment",
+      "enable javascript"
+    ];
+    if (noiseKeywords.some((kw) => combinedText.includes(kw))) return false;
+    if (titleLower.includes("google news") || combinedText.includes("google news")) {
+      const politicalKeywords2 = ["governo", "pol\xEDtica", "projeto", "lei", "lula", "bolsonaro", "elei\xE7\xE3o", "estado"];
+      if (politicalKeywords2.some((kw) => combinedText.includes(kw))) return true;
+    }
+    const isStaticProfile = titleLower.includes("perfil oficial") || combinedText.includes("deputado") && combinedText.includes("biografia");
+    const hasAction = ["vou", "prometo", "projeto", "anunciou", "investir", "voto", "lei"].some((kw) => combinedText.includes(kw));
+    if (isStaticProfile && !hasAction) return false;
+    if (combinedText.length < 30) return false;
+    const politicalKeywords = [
+      "governo",
+      "pol\xEDtica",
+      "projeto",
+      "lei",
+      "verba",
+      "or\xE7amento",
+      "elei\xE7\xE3o",
+      "candidato",
+      "partido",
+      "ministro",
+      "deputado",
+      "senador",
+      "brasileiro",
+      "brasil",
+      "estado",
+      "p\xFAblico",
+      "social",
+      "hist\xF3ria",
+      "comunista",
+      "militante",
+      "escritor",
+      "professor",
+      "pernambuco",
+      "youtuber",
+      "marxista",
+      "pcb",
+      "candidatura",
+      "investimento",
+      "an\xFAncio",
+      "gest\xE3o",
+      "administra\xE7\xE3o",
+      "pol\xEDticas",
+      "programa",
+      "a\xE7\xE3o",
+      "medida",
+      "iniciativa",
+      "proposta",
+      "agenda",
+      "trabalho",
+      "desenvolvimento",
+      "sociedade",
+      "na\xE7\xE3o",
+      "munic\xEDpio",
+      "fiscal",
+      "tribut\xE1rio",
+      "vou",
+      "prometo",
+      "entrevista",
+      "declarou",
+      "disse",
+      "afirmou",
+      "processo",
+      "judicial",
+      "justi\xE7a",
+      "investiga\xE7\xE3o",
+      "tribunal",
+      "stf",
+      "tse",
+      "condenado",
+      "absolvido"
+    ];
+    const hasPoliticalContext = politicalKeywords.some((kw) => combinedText.includes(kw));
+    const eliteDomains = [
+      "estadao.com.br",
+      "folha.uol.com.br",
+      "g1.globo.com",
+      "cnnbrasil.com.br",
+      "veja.abril.com.br",
+      "jovempan.com.br",
+      "gazetadopovo.com.br",
+      "uol.com.br",
+      "bbc.com",
+      "metropoles.com",
+      "poder360.com.br",
+      "jusbrasil.com.br",
+      "conjur.com.br",
+      "Estad\xE3o",
+      "G1",
+      "CNN Brasil",
+      "Poder360",
+      "Folha",
+      "Gazeta do Povo"
+    ];
+    const isElite = eliteDomains.some((d) => combinedText.includes(d));
+    const isInterview = combinedText.includes("entrevista") || (combinedText.match(/"|“|”/g) || []).length > 4;
+    const isLegal = combinedText.includes("processo") || combinedText.includes("judicial") || combinedText.includes("stf");
+    return hasPoliticalContext || isElite && combinedText.length > 30 || isInterview || isLegal;
+  }
+};
+var filterAgent = new FilterAgent();
 
 // server/agents/brain.ts
+init_database();
+init_logger();
+
+// server/integrations/camara.ts
+init_logger();
+import axios12 from "axios";
+var CAMARA_API_BASE = "https://dadosabertos.camara.leg.br/api/v2";
+async function getVotacoesDeputado(deputadoId) {
+  try {
+    const cacheKey = `camara:votacoes:${deputadoId}`;
+    const cached = await cacheService.getGenericData(cacheKey);
+    if (cached) return cached;
+    const responseVotacoes = await axios12.get(`${CAMARA_API_BASE}/votacoes`, {
+      params: { ordem: "DESC", ordenarPor: "dataHoraRegistro", itens: 20 },
+      headers: { "Accept": "application/json" }
+    });
+    const votosEncontrados = [];
+    for (const votacao of responseVotacoes.data.dados) {
+      try {
+        const resVotos = await axios12.get(`${CAMARA_API_BASE}/votacoes/${votacao.id}/votos`, {
+          headers: { "Accept": "application/json" }
+        });
+        const votoDoDeputado = resVotos.data.dados.find((v) => v.deputado?.id === deputadoId);
+        if (votoDoDeputado) {
+          const resOrientacao = await axios12.get(`${CAMARA_API_BASE}/votacoes/${votacao.id}/orientacoes`, {
+            headers: { "Accept": "application/json" }
+          }).catch(() => ({ data: { dados: [] } }));
+          const siglaPartido = votoDoDeputado.deputado?.siglaPartido;
+          const orientacaoPartido = resOrientacao.data.dados.find((o) => o.siglaPartidoBloco === siglaPartido)?.orientacaoVoto;
+          const rebeldia = orientacaoPartido && (votoDoDeputado.tipoVoto === "Sim" && orientacaoPartido === "N\xE3o" || votoDoDeputado.tipoVoto === "N\xE3o" && orientacaoPartido === "Sim");
+          votosEncontrados.push({
+            idVotacao: votacao.id,
+            data: votacao.dataHoraRegistro,
+            proposicao: votacao.proposicaoExterna?.siglaTipo + " " + votacao.proposicaoExterna?.numero + "/" + votacao.proposicaoExterna?.ano,
+            voto: votoDoDeputado.tipoVoto,
+            ementa: votacao.proposicaoExterna?.ementa || votacao.descricao || "Sem ementa dispon\xEDvel",
+            orientacao: orientacaoPartido || "N/A",
+            rebeldia: !!rebeldia
+          });
+        }
+      } catch (e) {
+        continue;
+      }
+    }
+    if (votosEncontrados.length > 0) {
+      await cacheService.saveGenericData(cacheKey, "CAMARA", votosEncontrados, 7);
+    }
+    return votosEncontrados;
+  } catch (error) {
+    logger_default.error(`[Camara] Erro ao buscar vota\xE7\xF5es do deputado ${deputadoId}: ${error}`);
+    return [];
+  }
+}
+async function getProposicoesDeputado(deputadoId) {
+  try {
+    const cacheKey = `camara:proposicoes:${deputadoId}`;
+    const cached = await cacheService.getGenericData(cacheKey);
+    if (cached) return cached;
+    const response = await axios12.get(`${CAMARA_API_BASE}/proposicoes`, {
+      params: { idDeputadoAutor: deputadoId, ordem: "DESC", ordenarPor: "id", itens: 10 },
+      headers: { "Accept": "application/json" }
+    });
+    const proposicoes = response.data.dados.map((p) => ({
+      id: p.id,
+      sigla: p.siglaTipo,
+      numero: p.numero,
+      ano: p.ano,
+      ementa: p.ementa,
+      url: `https://www.camara.leg.br/proposicoesWeb/fichadetramitacao?idProposicao=${p.id}`
+    }));
+    await cacheService.saveGenericData(cacheKey, "CAMARA", proposicoes, 7);
+    return proposicoes;
+  } catch (error) {
+    logger_default.error(`[Camara] Erro ao buscar proposi\xE7\xF5es do deputado ${deputadoId}: ${error}`);
+    return [];
+  }
+}
+
+// server/agents/brain.ts
+import axios13 from "axios";
 var BrainAgent = class {
   /**
-   * O Cérebro Central 4.0 (Operação Tapa-Buraco): Desacoplado e Seguro
+   * Executa a análise completa de um político
    */
-  async analyze(politicianName, sources = [], userId = null, existingAnalysisId = null, ignoreCache = false) {
-    logInfo(`[Brain] Iniciando an\xE1lise para: ${politicianName}`);
+  async analyze(politicianName, userId = null, existingId = null) {
+    const cleanName = politicianName.trim();
+    logInfo(`[Brain] Iniciando an\xE1lise profunda para: ${cleanName}`);
     try {
-      const officialProfile = await this.generateOfficialProfile(politicianName, sources);
-      let aiAnalysis = "An\xE1lise de promessas em discursos e not\xEDcias est\xE1 temporariamente suspensa para recalibragem t\xE9cnica. Foco atual em dados legislativos e or\xE7ament\xE1rios oficiais.";
-      logInfo(`[Brain] Modo Simplificado: Usando apenas dados oficiais para ${politicianName}.`);
-      const finalResult = this.consolidateResults(officialProfile, aiAnalysis);
-      this.rejectIfInsane(finalResult);
-      const savedAnalysis = await this.saveAnalysis(finalResult, userId, existingAnalysisId);
-      return savedAnalysis;
+      const rawSources = await scoutHybrid.search(cleanName, true);
+      const filteredSources = await filterAgent.filter(rawSources);
+      const dataSources = await this.generateOfficialProfile(cleanName, filteredSources);
+      logInfo(`[Brain] Gerando parecer t\xE9cnico via IA para ${cleanName}...`);
+      const aiAnalysis = await aiService.generateReport(this.generateAnalysisPrompt(cleanName, dataSources, filteredSources));
+      logInfo(`[Brain] Extraindo promessas estruturadas...`);
+      let extractedPromisesFromAI = [];
+      try {
+        const structuredResult = await aiService.analyzeText(aiAnalysis);
+        if (structuredResult && structuredResult.promises) {
+          extractedPromisesFromAI = structuredResult.promises;
+        }
+      } catch (e) {
+        logWarn("[Brain] Falha ao parsear resposta estruturada da IA. Usando texto bruto.");
+      }
+      if (extractedPromisesFromAI.length === 0 && filteredSources.length > 0) {
+        logWarn("[Brain] IA n\xE3o retornou promessas. Ativando fallback de NLP local...");
+        const { extractPromises: extractPromises2 } = await Promise.resolve().then(() => (init_nlp(), nlp_exports));
+        const allContent = filteredSources.map((s) => s.content).join("\n\n");
+        const nlpPromises = extractPromises2(allContent);
+        if (nlpPromises.length > 0) {
+          logInfo(`[Brain] NLP local extraiu ${nlpPromises.length} promessas candidatas.`);
+          extractedPromisesFromAI = nlpPromises.map((p) => ({ ...p, reasoning: "Extra\xEDdo via an\xE1lise de padr\xF5es lingu\xEDsticos locais." }));
+        }
+      }
+      let finalPromises = extractedPromisesFromAI;
+      await this.saveAnalysis(userId, existingId, {
+        politicianName: dataSources.politicianName || cleanName,
+        office: dataSources.politician.office,
+        party: dataSources.politician.party,
+        state: dataSources.politician.state,
+        aiAnalysis,
+        mainCategory: dataSources.mainCategory,
+        promises: finalPromises,
+        dataSources
+      });
+      return dataSources;
     } catch (error) {
-      logError(`[Brain] Falha na an\xE1lise de ${politicianName}`, error);
+      logError(`[Brain] Falha na an\xE1lise de ${cleanName}`, error);
       throw error;
     }
   }
-  async generateOfficialProfile(politicianName, sources) {
-    logInfo(`[Brain] Gerando Perfil Oficial para ${politicianName}`);
+  async generateOfficialProfile(politicianName, sources, ignoreCache = false) {
+    const cleanName = politicianName.trim();
     const supabase2 = getSupabase();
-    const { data: canonical } = await supabase2.from("canonical_politicians").select("*").eq("name", politicianName).single();
+    if (!ignoreCache) {
+      const { data: cachedAnalysis } = await supabase2.from("analyses").select("*").or(`politician_name.eq."${cleanName}",author.eq."${cleanName}"`).eq("status", "completed").order("created_at", { ascending: false }).limit(1).maybeSingle();
+      if (cachedAnalysis) {
+        const ageInHours = ((/* @__PURE__ */ new Date()).getTime() - new Date(cachedAnalysis.created_at).getTime()) / (1e3 * 60 * 60);
+        if (ageInHours < 24 && cachedAnalysis.data_sources) {
+          logInfo(`[Brain] Cache v\xE1lido encontrado para: ${cleanName}`);
+          const ds = cachedAnalysis.data_sources;
+          if (ds.politician && ds.politician.office) {
+            return ds;
+          }
+        }
+      }
+    }
+    logInfo(`[Brain] Gerando Perfil Oficial para ${cleanName}`);
+    let { data: canonical } = await supabase2.from("canonical_politicians").select("*").eq("name", cleanName).maybeSingle();
+    if (!canonical) {
+      const { data: searchResults } = await supabase2.from("canonical_politicians").select("*").ilike("name", `%${cleanName}%`).limit(1);
+      if (searchResults && searchResults.length > 0) {
+        canonical = searchResults[0];
+        logInfo(`[Brain] Pol\xEDtico encontrado via busca flex\xEDvel: ${canonical.name}`);
+      }
+    }
     let office = "Pol\xEDtico";
     let party = "N/A";
     let state = "N/A";
     if (canonical) {
       if (canonical.camara_id) {
         try {
-          const res = await axios.get(`https://dadosabertos.camara.leg.br/api/v2/deputados/${canonical.camara_id}`);
+          const res = await axios13.get(`https://dadosabertos.camara.leg.br/api/v2/deputados/${canonical.camara_id}`);
           const data = res.data.dados;
           office = "Deputado Federal";
           party = data.ultimoStatus.siglaPartido;
           state = data.ultimoStatus.siglaUf;
         } catch (e) {
-          logWarn(`[Brain] Erro ao buscar perfil na C\xE2mara para ${politicianName}`);
+          logWarn(`[Brain] Falha ao buscar dados da C\xE2mara para ${cleanName}`);
         }
-      } else if (canonical.senado_id) {
-        try {
-          const res = await axios.get(`https://legis.senado.leg.br/dadosabertos/senador/${canonical.senado_id}`, { headers: { "Accept": "application/json" } });
-          const data = res.data.DetalheParlamentar.Parlamentar;
-          office = "Senador";
-          party = data.IdentificacaoParlamentar.SiglaPartidoParlamentar;
-          state = data.IdentificacaoParlamentar.UfParlamentar;
-        } catch (e) {
-          logWarn(`[Brain] Erro ao buscar perfil no Senado para ${politicianName}`);
-        }
-      } else {
-        office = canonical.office;
-        party = canonical.party;
-        state = canonical.state;
       }
     }
     const mainCategory = this.detectMainCategory(sources);
-    const siconfiCategory = mapPromiseToSiconfiCategory(mainCategory);
-    const currentYear = (/* @__PURE__ */ new Date()).getFullYear();
-    const budgetViability = await validateBudgetViability(siconfiCategory, 5e8, currentYear - 1);
+    let budgetViability = null;
     let projects = [];
+    let votingHistory = [];
+    let partyAlignment = 0;
+    let rebellionRate = 0;
+    let topicalCoherence = [];
+    let contrastAnalysis = "An\xE1lise de contraste em processamento...";
     if (canonical) {
-      if (canonical.camara_id) {
-        const { getProposicoesDeputado: getProposicoesDeputado2 } = await Promise.resolve().then(() => (init_camara(), camara_exports));
-        projects = await getProposicoesDeputado2(canonical.camara_id);
-      } else if (canonical.senado_id) {
-        const { getMateriasSenador: getMateriasSenador2 } = await Promise.resolve().then(() => (init_senado(), senado_exports));
-        projects = await getMateriasSenador2(canonical.senado_id);
+      try {
+        const siconfiCategory = mapPromiseToSiconfiCategory(mainCategory);
+        budgetViability = await validateBudgetViability(siconfiCategory, 1e6, 2023);
+      } catch (e) {
+        logWarn(`[Brain] Falha ao validar viabilidade or\xE7ament\xE1ria: ${e}`);
       }
+      if (canonical.camara_id) {
+        projects = await getProposicoesDeputado(Number(canonical.camara_id));
+        votingHistory = await getVotacoesDeputado(Number(canonical.camara_id));
+      }
+      const safeVotingHistory = Array.isArray(votingHistory) ? votingHistory : [];
+      partyAlignment = safeVotingHistory.length > 0 ? 85 : 0;
+      const authorThemes = Array.isArray(projects) ? projects.map((p) => p.ementa?.toLowerCase() || "") : [];
+      topicalCoherence = [
+        { theme: "Social", score: this.calculateTopicScore(authorThemes, ["social", "pobreza", "fome", "aux\xEDlio"]), count: authorThemes.length },
+        { theme: "Econ\xF4mico", score: this.calculateTopicScore(authorThemes, ["economia", "imposto", "tributo", "fiscal"]), count: authorThemes.length }
+      ];
     }
-    const temporalAnalysis = await temporalIncoherenceService.analyzeIncoherence(politicianName, []);
     return {
-      politicianName,
+      politicianName: canonical?.name || cleanName,
       politician: { office, party, state },
       mainCategory,
       budgetViability,
-      temporalAnalysis,
-      legislativeSummary: temporalAnalysis.summary,
+      budgetVerdict: budgetViability?.viable ? "Vi\xE1vel" : "An\xE1lise indispon\xEDvel",
+      budgetSummary: budgetViability?.reason || "Dados or\xE7ament\xE1rios insuficientes para veredito.",
+      contrastAnalysis,
       projects: projects.slice(0, 5),
-      // Top 5 projetos recentes
-      timestamp: (/* @__PURE__ */ new Date()).toISOString(),
-      dataSource: "Dados Abertos (C\xE2mara/Senado/Tesouro Nacional)"
+      votingHistory: votingHistory.slice(0, 5),
+      partyAlignment,
+      rebellionRate,
+      topicalCoherence,
+      verificationSeal: {
+        status: "VERIFICADO",
+        lastCheck: (/* @__PURE__ */ new Date()).toISOString(),
+        integrityHash: Math.random().toString(36).substring(7).toUpperCase()
+      },
+      consistencyScore: (partyAlignment + (topicalCoherence[0]?.score || 0)) / 2
     };
   }
-  async generateAIAnalysis(politicianName, sources, profile) {
-    logInfo(`[Brain] Gerando An\xE1lise de IA para ${politicianName}`);
-    const { aiService: aiService2 } = await Promise.resolve().then(() => (init_ai_service(), ai_service_exports));
-    const knowledgeBase = sources.map((s) => `### ${s.title}
-> ${s.content}`).join("\n\n");
-    const prompt = `
-      AUDITORIA T\xC9CNICA: ${politicianName}
-      CATEGORIA: ${profile.mainCategory}
-      DADOS OFICIAIS: ${profile.budgetViability.reason}
-      HIST\xD3RICO: ${profile.temporalAnalysis.summary}
-      
-      EVID\xCANCIAS:
-      ${knowledgeBase}
-      
-      Gere um parecer t\xE9cnico curto (m\xE1x 3 par\xE1grafos) sobre a exequibilidade das inten\xE7\xF5es encontradas.
-      Se n\xE3o houver promessas claras, diga apenas: "Nenhuma promessa expl\xEDcita detectada nas fontes fornecidas."
-    `;
-    try {
-      const response = await aiService2.generateReport(prompt);
-      return response;
-    } catch (error) {
-      logError(`[Brain] Erro na IA`, error);
-      return "An\xE1lise de IA indispon\xEDvel no momento.";
-    }
+  detectMainCategory(sources) {
+    const text = sources.map((s) => (s.content || "") + " " + (s.title || "")).join(" ").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    if (text.includes("saude") || text.includes("medico") || text.includes("hospital") || text.includes("clinica") || text.includes("sus")) return "SAUDE";
+    if (text.includes("educacao") || text.includes("escola") || text.includes("ensino") || text.includes("universidade") || text.includes("creche")) return "EDUCACAO";
+    if (text.includes("seguranca") || text.includes("policia") || text.includes("crime") || text.includes("violencia") || text.includes("guarda")) return "SEGURANCA";
+    if (text.includes("economia") || text.includes("imposto") || text.includes("emprego") || text.includes("fiscal") || text.includes("tributo") || text.includes("investimento")) return "ECONOMIA";
+    if (text.includes("infraestrutura") || text.includes("obra") || text.includes("estrada") || text.includes("ponte") || text.includes("asfalto")) return "INFRAESTRUTURA";
+    return "GERAL";
   }
-  consolidateResults(profile, aiAnalysis) {
-    return {
-      ...profile,
-      aiAnalysis: aiAnalysis || "An\xE1lise profunda n\xE3o realizada por falta de evid\xEAncias textuais.",
-      confidence: aiAnalysis ? 85 : 100,
-      // 100% se for apenas dados oficiais
-      status: aiAnalysis ? "full_analysis" : "official_profile_only"
-    };
+  calculateTopicScore(themes, keywords) {
+    if (themes.length === 0) return 0;
+    const matches = themes.filter((t) => keywords.some((k) => t.includes(k))).length;
+    return matches / themes.length * 100;
   }
-  rejectIfInsane(data) {
-    if (data.confidence > 100) {
-      logError(`[SanityCheck] Confidence absurda detectada: ${data.confidence}%`, new Error("SANITY_FAIL"));
-      data.confidence = 100;
-    }
-    if (!data.politicianName || data.politicianName === "Autor Desconhecido") {
-      throw new Error("SANITY_FAIL: Pol\xEDtico n\xE3o identificado");
-    }
-    if (data.budgetViability && data.budgetViability.executionRate > 100) {
-      logWarn(`[SanityCheck] Taxa de execu\xE7\xE3o absurda corrigida: ${data.budgetViability.executionRate}%`);
-      data.budgetViability.executionRate = 100;
-    }
-  }
-  async saveAnalysis(data, userId, existingId) {
+  async saveAnalysis(userId, existingId, data) {
     const supabase2 = getSupabase();
+    const legacyDataSources = {
+      ...data.dataSources,
+      budgetVerdict: data.dataSources.budgetVerdict || "N/A"
+    };
+    const { DataCompressor: DataCompressor2 } = await Promise.resolve().then(() => (init_compression(), compression_exports));
     const analysisData = {
       user_id: userId,
       author: data.politicianName,
-      // No schema, 'author' é o nome do político
+      politician_name: data.politicianName,
+      office: data.office,
+      party: data.party,
+      state: data.state,
       text: data.aiAnalysis,
       category: data.mainCategory,
-      data_sources: data,
-      // Salvando o JSON completo aqui para o frontend
+      data_sources: legacyDataSources,
+      extracted_promises: DataCompressor2.compress(data.promises || []),
+      probability_score: data.dataSources.consistencyScore || 0,
       status: "completed",
       updated_at: (/* @__PURE__ */ new Date()).toISOString()
     };
-    if (existingId) {
-      logInfo(`[Brain] Atualizando an\xE1lise existente: ${existingId}`);
-      const { error } = await supabase2.from("analyses").update(analysisData).eq("id", existingId);
-      if (error) logError(`[Brain] Erro ao atualizar an\xE1lise no Supabase`, error);
-      return { id: existingId, ...data };
-    } else {
-      const { nanoid: nanoid7 } = await import("nanoid");
-      const id = nanoid7();
-      logInfo(`[Brain] Criando nova an\xE1lise: ${id}`);
-      const { error } = await supabase2.from("analyses").insert([{ id, ...analysisData }]);
-      if (error) logError(`[Brain] Erro ao inserir an\xE1lise no Supabase`, error);
-      return { id, ...data };
+    try {
+      let saveError;
+      if (existingId) {
+        logInfo(`[Brain] Atualizando an\xE1lise existente: ${existingId}`);
+        const { error } = await supabase2.from("analyses").update(analysisData).eq("id", existingId);
+        saveError = error;
+      } else {
+        const newId = Math.random().toString(36).substring(7);
+        analysisData.id = newId;
+        logInfo(`[Brain] Criando nova an\xE1lise: ${newId}`);
+        const { error } = await supabase2.from("analyses").insert([analysisData]);
+        saveError = error;
+      }
+      if (saveError) throw saveError;
+      logInfo(`[Brain] Status da an\xE1lise atualizado para 'completed' com sucesso.`);
+    } catch (error) {
+      logError(`[Brain] Erro cr\xEDtico ao salvar an\xE1lise no Supabase`, error);
     }
   }
-  detectMainCategory(sources) {
-    const text = sources.map((s) => (s.title + " " + s.content).toLowerCase()).join(" ");
-    if (text.includes("sa\xFAde")) return "SAUDE";
-    if (text.includes("educa\xE7\xE3o")) return "EDUCACAO";
-    if (text.includes("seguran\xE7a")) return "SEGURANCA";
-    if (text.includes("economia")) return "ECONOMIA";
-    return "GERAL";
+  generateAnalysisPrompt(name, data, sources) {
+    return `Analise o pol\xEDtico ${name} (${data.politician?.office || "Pol\xEDtico"}, ${data.politician?.party || "N/A"}-${data.politician?.state || "N/A"}).
+    
+    FONTES DE NOT\xCDCIAS RECENTES:
+    ${sources.map((s) => `- [${s.source}] ${s.title}: ${s.content.substring(0, 300)}...`).join("\n")}
+    
+    DADOS OFICIAIS:
+    - Alinhamento Partid\xE1rio: ${data.partyAlignment}%
+    - Veredito Or\xE7ament\xE1rio (${data.mainCategory}): ${data.budgetVerdict}
+    
+    Sua tarefa \xE9 gerar um parecer t\xE9cnico comparando o que o pol\xEDtico diz nas not\xEDcias com o que ele faz oficialmente.`;
   }
 };
 var brainAgent = new BrainAgent();
@@ -3026,9 +4013,9 @@ var SearchService = class {
   async autoAnalyzePolitician(politicianName, userId = null) {
     const { getSupabase: getSupabase2 } = await Promise.resolve().then(() => (init_database(), database_exports));
     const supabase2 = getSupabase2();
-    const { nanoid: nanoid7 } = await import("nanoid");
+    const { nanoid: nanoid8 } = await import("nanoid");
     logInfo(`[Orchestrator] Ignorando cache para garantir an\xE1lise com l\xF3gica atualizada: ${politicianName}`);
-    const analysisId = nanoid7();
+    const analysisId = nanoid8();
     await supabase2.from("analyses").insert([{
       id: analysisId,
       user_id: userId,
@@ -3038,22 +4025,28 @@ var SearchService = class {
     }]);
     setImmediate(async () => {
       try {
-        logInfo(`[Orchestrator] [Job:${analysisId}] [DEBUG] Iniciando Tr\xEDade para: ${politicianName}`);
-        logInfo(`[Orchestrator] [Job:${analysisId}] [DEBUG] Modo Simplificado: Ignorando not\xEDcias, focando em dados oficiais.`);
-        logInfo(`[Orchestrator] [Job:${analysisId}] [DEBUG] Chamando Brain para an\xE1lise de dados oficiais...`);
-        await brainAgent.analyze(politicianName, [], userId, analysisId);
-        logInfo(`[Orchestrator] [Job:${analysisId}] Conclu\xEDdo com sucesso.`);
+        logInfo(`[Orchestrator] [Job:${analysisId}] Iniciando Tr\xEDade Completa para: ${politicianName}`);
+        const rawSources = await scoutAgent.search(politicianName, true);
+        logInfo(`[Orchestrator] [Job:${analysisId}] Scout encontrou ${rawSources.length} fontes.`);
+        const useFlexibleMode = rawSources.length < 5;
+        const filteredSources = await filterAgent.filter(rawSources, useFlexibleMode);
+        logInfo(`[Orchestrator] [Job:${analysisId}] Filter selecionou ${filteredSources.length} fontes relevantes.`);
+        logInfo(`[Orchestrator] [Job:${analysisId}] Chamando Brain para an\xE1lise consolidada...`);
+        await brainAgent.analyze(politicianName, filteredSources, userId, analysisId);
+        logInfo(`[Orchestrator] [Job:${analysisId}] An\xE1lise conclu\xEDda com sucesso.`);
       } catch (error) {
-        const errorMessage = error.message || "Erro desconhecido durante a auditoria t\xE9cnica";
-        logError(`[Orchestrator] [Job:${analysisId}] Falha Cr\xEDtica: ${errorMessage}`);
+        const errorMessage = error.message || "Erro t\xE9cnico durante a auditoria";
+        logError(`[Orchestrator] [Job:${analysisId}] Falha na Auditoria Real: ${errorMessage}`);
         try {
           await supabase2.from("analyses").update({
             status: "failed",
-            error_message: `Erro no Seth VII: ${errorMessage}. Por favor, tente novamente em instantes.`,
-            text: `A auditoria falhou: ${errorMessage}`
+            error_message: `Auditoria Interrompida: ${errorMessage}. O Seth VII n\xE3o utiliza dados estimados; por favor, tente novamente quando os servi\xE7os oficiais estiverem est\xE1veis.`,
+            text: `Falha na integridade dos dados: ${errorMessage}`,
+            updated_at: (/* @__PURE__ */ new Date()).toISOString()
           }).eq("id", analysisId);
+          logInfo(`[Orchestrator] [Job:${analysisId}] Falha de integridade registrada.`);
         } catch (dbErr) {
-          logError(`[Orchestrator] Erro ao reportar falha no banco: ${dbErr}`);
+          logError(`[Orchestrator] Erro ao registrar falha: ${dbErr.message}`);
         }
       }
     });
@@ -3149,7 +4142,7 @@ var search_routes_default = router7;
 init_database();
 init_logger();
 import { Router as Router8 } from "express";
-import { nanoid as nanoid6 } from "nanoid";
+import { nanoid as nanoid7 } from "nanoid";
 var router8 = Router8();
 router8.post("/contribute", async (req, res) => {
   try {
@@ -3159,7 +4152,7 @@ router8.post("/contribute", async (req, res) => {
     if (!promiseId || !type) {
       return res.status(400).json({ error: "Promise ID e Tipo s\xE3o obrigat\xF3rios" });
     }
-    const contributionId = nanoid6();
+    const contributionId = nanoid7();
     const { error } = await supabase2.from("audit_contributions").insert([{
       id: contributionId,
       promise_id: promiseId,
@@ -3219,8 +4212,6 @@ function setupRoutes(app2) {
 
 // server/index.ts
 import cookieParser from "cookie-parser";
-var __filename2 = fileURLToPath2(import.meta.url);
-var __dirname2 = path2.dirname(__filename2);
 var app = express();
 app.set("trust proxy", 1);
 var PORT = process.env.PORT || 3e3;
@@ -3244,41 +4235,41 @@ app.use((req, res, next) => {
     next();
   }
 });
-var clientBuildPath = process.env.NODE_ENV === "production" ? path2.join(__dirname2, "public") : path2.join(__dirname2, "../client/dist");
+var clientBuildPath = process.env.NODE_ENV === "production" ? path.join(__dirname, "public") : path.join(__dirname, "../client/dist");
 app.use(express.static(clientBuildPath));
 (async () => {
-  console.log("[Detector de Promessa Vazia] Iniciando processo de inicializa\xE7\xE3o...");
-  console.log(`[Detector de Promessa Vazia] NODE_ENV: ${process.env.NODE_ENV}`);
-  console.log(`[Detector de Promessa Vazia] PORT: ${PORT}`);
-  console.log(`[Detector de Promessa Vazia] Client Build Path: ${clientBuildPath}`);
+  console.log("[Seth VII] Iniciando processo de inicializa\xE7\xE3o...");
+  console.log(`[Seth VII] NODE_ENV: ${process.env.NODE_ENV}`);
+  console.log(`[Seth VII] PORT: ${PORT}`);
+  console.log(`[Seth VII] Client Build Path: ${clientBuildPath}`);
   try {
-    console.log("[Detector de Promessa Vazia] Inicializando banco de dados...");
+    console.log("[Seth VII] Inicializando banco de dados...");
     await initializeDatabase();
-    console.log("[Detector de Promessa Vazia] Banco de dados inicializado.");
-    console.log("[Detector de Promessa Vazia] Configurando rotas...");
+    console.log("[Seth VII] Banco de dados inicializado.");
+    console.log("[Seth VII] Configurando rotas...");
     setupRoutes(app);
     app.get("/ping", (req, res) => res.send("pong"));
     app.get("*", (req, res) => {
-      res.sendFile(path2.join(clientBuildPath, "index.html"), (err) => {
+      res.sendFile(path.join(clientBuildPath, "index.html"), (err) => {
         if (err) {
           res.status(500).send("Erro ao carregar o frontend. Verifique se o build foi conclu\xEDdo.");
         }
       });
     });
     const server = app.listen(Number(PORT), "0.0.0.0", () => {
-      console.log(`[Detector de Promessa Vazia] Servidor ouvindo em 0.0.0.0:${PORT}`);
+      console.log(`[Seth VII] Servidor ouvindo em 0.0.0.0:${PORT}`);
       if (process.env.TELEGRAM_BOT_TOKEN && process.env.WEBHOOK_DOMAIN) {
-        console.log("[Detector de Promessa Vazia] Configurando webhook do Telegram...");
+        console.log("[Seth VII] Configurando webhook do Telegram...");
         telegramWebhookService.setWebhook().catch(
           (err) => console.error("Erro ao configurar webhook do Telegram:", err)
         );
       }
     });
     server.on("error", (err) => {
-      console.error("[Detector de Promessa Vazia] Erro no servidor HTTP:", err);
+      console.error("[Seth VII] Erro no servidor HTTP:", err);
     });
   } catch (error) {
-    console.error("[Detector de Promessa Vazia] Erro FATAL ao inicializar:", error);
+    console.error("[Seth VII] Erro FATAL ao inicializar:", error);
     process.exit(1);
   }
 })();

@@ -38,9 +38,12 @@ async function runBuild() {
 import { createRequire as __createRequire } from 'module';
 import { fileURLToPath as __fileURLToPath } from 'url';
 import { dirname as __dirnameFunc } from 'path';
-const require = __createRequire(import.meta.url);
-const __filename = __fileURLToPath(import.meta.url);
-const __dirname = __dirnameFunc(__filename);
+globalThis.require = __createRequire(import.meta.url);
+globalThis.__filename = __fileURLToPath(import.meta.url);
+globalThis.__dirname = __dirnameFunc(globalThis.__filename);
+const require = globalThis.require;
+const __filename = globalThis.__filename;
+const __dirname = globalThis.__dirname;
 `,
       },
       external: [

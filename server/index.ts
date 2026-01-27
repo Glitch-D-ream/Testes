@@ -6,8 +6,7 @@ import { setupRoutes } from './core/routes.ts';
 import cookieParser from 'cookie-parser';
 import { telegramWebhookService } from './services/telegram-webhook.service.ts';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+// __filename e __dirname são injetados pelo esbuild via banner no build-server.js
 
 const app = express();
 
