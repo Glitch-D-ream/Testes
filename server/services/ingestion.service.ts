@@ -7,6 +7,7 @@ import { logInfo, logError, logWarn } from '../core/logger.ts';
 import { browserScraper } from '../modules/browser-scraper.ts';
 import { chunkingService } from './chunking.service.ts';
 import { normalizationService, NormalizedData } from './normalization.service.ts';
+import { ocrService } from './ocr.service.ts';
 
 export type IngestionFormat = 'pdf' | 'docx' | 'xlsx' | 'html' | 'text' | 'unknown';
 
@@ -20,6 +21,7 @@ export interface IngestionResult {
     sourceUrl: string;
     pages?: number;
     normalized?: NormalizedData;
+    ocrUsed?: boolean;
   };
 }
 
@@ -63,15 +65,14 @@ export class IngestionService {
 
       if (!result) return null;
 
-      // Normalização de dados extraídos (Fase 4 do plano)
+      // Normalização de dados extraídos
       result.metadata.normalized = normalizationService.process(result.content);
       
-      // Se a normalização encontrou uma data, atualizamos o metadado principal
       if (result.metadata.normalized.date) {
         result.metadata.date = result.metadata.normalized.date;
       }
 
-      // Se o conteúdo for muito longo (> 10k chars), aplicar chunking e filtrar por relevância
+      // Se o conteúdo for muito longo (> 10k chars), aplicar chunking
       if (result.content.length > 10000 && options.keywords) {
         logInfo(`[IngestionService] Conteúdo longo detectado (${result.content.length} chars). Aplicando extração semântica.`);
         const chunks = chunkingService.chunkText(result.content);
@@ -96,20 +97,33 @@ export class IngestionService {
       headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' }
     });
     
+    const buffer = Buffer.from(response.data);
+    
     try {
-      const parser = new PDFParse({ data: Buffer.from(response.data) });
+      const parser = new PDFParse({ data: buffer });
       const textResult = await parser.getText();
       const infoResult = await parser.getInfo();
       await parser.destroy();
 
+      let content = textResult.text || '';
+      let ocrUsed = false;
+
+      // Se o PDF não tiver texto (provavelmente digitalizado), tenta OCR
+      if (content.trim().length < 50) {
+        logWarn(`[IngestionService] PDF parece ser uma imagem digitalizada. Tentando OCR...`);
+        content = await ocrService.recognize(buffer);
+        ocrUsed = true;
+      }
+
       return {
-        content: textResult.text || '',
+        content: content,
         format: 'pdf',
         metadata: {
           title: infoResult.info?.Title,
           author: infoResult.info?.Author,
           sourceUrl: url,
-          pages: infoResult.total
+          pages: infoResult.total,
+          ocrUsed: ocrUsed
         }
       };
     } catch (err: any) {
