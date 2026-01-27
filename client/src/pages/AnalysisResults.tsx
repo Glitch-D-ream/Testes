@@ -116,9 +116,9 @@ export function AnalysisResults() {
                 PDF
               </button>
               <button
-                onClick={() => window.open(`${import.meta.env.VITE_API_URL || ''}/api/analyze/${id}/image`, '_blank')}
-                className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition"
-                title="Gerar Card para Redes Sociais"
+                onClick={() => alert('A geração de cards para redes sociais está em manutenção para melhorias no servidor. Por favor, use a exportação em PDF por enquanto.')}
+                className="flex items-center gap-2 px-4 py-2 bg-indigo-400 text-white rounded-md cursor-not-allowed opacity-75"
+                title="Funcionalidade em manutenção"
               >
                 <ImageIcon className="w-4 h-4" />
                 Card
