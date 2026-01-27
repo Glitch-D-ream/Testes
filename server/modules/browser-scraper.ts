@@ -1,6 +1,8 @@
 
 import { logInfo, logError, logWarn } from '../core/logger.ts';
 import { chromium } from 'playwright';
+import axios from 'axios';
+import * as cheerio from 'cheerio';
 
 export class BrowserScraper {
   private userAgents = [
@@ -142,10 +144,67 @@ export class BrowserScraper {
 
       return cleanContent || null;
     } catch (error: any) {
-      logError(`[BrowserScraper] Falha crítica na extração de ${url}: ${error.message}`);
-      return null;
+      logWarn(`[BrowserScraper] Playwright falhou, tentando fallback estático para ${url}: ${error.message}`);
+      return await this.scrapeStatic(url);
     } finally {
       if (browser) await browser.close();
+    }
+  }
+
+  /**
+   * Fallback estático usando Axios e Cheerio para sites que não exigem JS pesado
+   */
+  private async scrapeStatic(url: string): Promise<string | null> {
+    try {
+      // Tentar resolver redirecionamentos (especialmente Google News)
+      const response = await axios.get(url, {
+        headers: {
+          'User-Agent': this.getRandomUserAgent(),
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8'
+        },
+        timeout: 12000,
+        maxRedirects: 5
+      });
+
+      const $ = cheerio.load(response.data);
+      
+      // Se cair em página de redirecionamento do Google News (meta refresh)
+      const metaRefresh = $('meta[http-equiv="refresh"]').attr('content');
+      if (metaRefresh && metaRefresh.includes('url=')) {
+        const nextUrl = metaRefresh.split('url=')[1];
+        logInfo(`[BrowserScraper] Seguindo meta-refresh para: ${nextUrl}`);
+        return await this.scrapeStatic(nextUrl);
+      }
+      
+      // Remover ruído
+      $('script, style, nav, footer, header, aside, .ads, .comments').remove();
+
+      const selectors = [
+        'article', 'main', '.content', '.post-content', '.entry-content', 
+        '.materia-conteudo', '.texto-noticia'
+      ];
+
+      let content = '';
+      for (const s of selectors) {
+        const text = $(s).text().trim();
+        if (text.length > 500) {
+          content = text;
+          break;
+        }
+      }
+
+      if (!content) content = $('body').text().trim();
+
+      const cleanContent = content
+        .replace(/\s+/g, ' ')
+        .replace(/\n+/g, '\n\n')
+        .substring(0, 15000); // Limite de segurança
+
+      logInfo(`[BrowserScraper] Sucesso via Fallback Estático: ${cleanContent.length} chars.`);
+      return cleanContent.length > 200 ? cleanContent : null;
+    } catch (e: any) {
+      logError(`[BrowserScraper] Falha total na extração de ${url}: ${e.message}`);
+      return null;
     }
   }
 }

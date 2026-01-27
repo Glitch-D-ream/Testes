@@ -60,16 +60,21 @@ export class NormalizationService {
   }
 
   /**
-   * Extrai entidades básicas usando regex (fallback para NLP)
+   * Extrai entidades básicas usando regex (fallback para NLP) com filtragem de ruído
    */
   extractBasicEntities(text: string): string[] {
     const entities = new Set<string>();
+    const stopwords = new Set(['Início', 'Conteúdo', 'Página', 'Brasília', 'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'Domingo']);
     
-    // Nomes Próprios (Iniciais maiúsculas seguidas)
-    const nameRegex = /\b([A-Z][a-zÀ-ÿ]+(?:\s+[A-Z][a-zÀ-ÿ]+)+)\b/g;
+    // Nomes Próprios (Iniciais maiúsculas seguidas, suportando conectores de/da/do)
+    const nameRegex = /\b([A-Z][a-zÀ-ÿ]+(?:\s+(?:de|da|do|dos|das)\s+)?(?:[A-Z][a-zÀ-ÿ]+)+)\b/g;
     let match;
     while ((match = nameRegex.exec(text)) !== null) {
-      if (match[1].length > 5) entities.add(match[1]);
+      const name = match[1];
+      const firstWord = name.split(' ')[0];
+      if (name.length > 5 && !stopwords.has(firstWord)) {
+        entities.add(name);
+      }
     }
 
     // Siglas (3+ letras maiúsculas)
