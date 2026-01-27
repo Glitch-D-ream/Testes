@@ -68,7 +68,7 @@ export default function Statistics() {
           </button>
           <div className="flex items-center gap-2">
             <BarChart3 size={20} className="text-blue-600" />
-            <span className="font-bold text-lg">Painel de Transparência</span>
+            <span className="font-bold text-lg">Seth VII • Dashboard Estratégico</span>
           </div>
         </div>
       </header>
@@ -80,7 +80,7 @@ export default function Statistics() {
         animate="visible"
       >
         <motion.div className="mb-12" variants={itemVariants}>
-          <h1 className="text-3xl font-black mb-4">Métricas Globais</h1>
+          <h1 className="text-3xl font-black mb-4">Inteligência Política Seth VII</h1>
           <p className="text-slate-500 dark:text-slate-400">Dados consolidados de todas as auditorias realizadas pelo sistema.</p>
         </motion.div>
 

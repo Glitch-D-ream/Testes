@@ -5,6 +5,8 @@ import ReactMarkdown from 'react-markdown';
 import TopicCard from '../components/TopicCard';
 import { ViabilityThermometer } from '../components/ViabilityThermometer';
 import { IntelligencePanel } from '../components/IntelligencePanel';
+import { ForensicVulnerabilityPanel } from '../components/ForensicVulnerabilityPanel';
+import { BenchmarkingPanel } from '../components/BenchmarkingPanel';
 import { useAnalysis } from '../hooks/useAnalysis';
 
 export function AnalysisResults() {
@@ -156,6 +158,14 @@ export function AnalysisResults() {
             consensusMetrics={data.data_sources?.consensusMetrics}
             absenceReport={data.data_sources?.absenceReport}
           />
+
+          {data.data_sources?.vulnerabilityReport && (
+            <ForensicVulnerabilityPanel report={data.data_sources.vulnerabilityReport} />
+          )}
+
+          {data.data_sources?.benchmarkResult && (
+            <BenchmarkingPanel benchmark={data.data_sources.benchmarkResult} />
+          )}
 
           {/* Texto Original */}
           <div className="mt-8 pt-8 border-t border-gray-200">
