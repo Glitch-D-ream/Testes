@@ -34,6 +34,9 @@ export default function Home() {
                 <a href="/methodology" className="text-sm font-medium hover:text-blue-600 transition-colors flex items-center gap-1">
                   <FileText size={16} /> Metodologia
                 </a>
+                <a href="/dashboard" className="text-sm font-medium hover:text-blue-600 transition-colors flex items-center gap-1">
+                  <BarChart3 size={16} /> Dashboard
+                </a>
               </div>
               <Button
                 variant="ghost"

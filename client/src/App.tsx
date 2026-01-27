@@ -9,6 +9,7 @@ import History from './pages/History';
 import Methodology from './pages/Methodology';
 import PoliticianSearch from './pages/PoliticianSearch';
 import PoliticianProfile from './pages/PoliticianProfile';
+import Dashboard from './pages/Dashboard';
 import './index.css';
 
 function App() {
@@ -23,6 +24,7 @@ function App() {
           <Route path="/methodology" element={<Methodology />} />
           <Route path="/search" element={<PoliticianSearch />} />
           <Route path="/politician/:id" element={<PoliticianProfile />} />
+          <Route path="/dashboard" element={<Dashboard />} />
         </Routes>
         <Toaster />
         <ThemeToggle />
