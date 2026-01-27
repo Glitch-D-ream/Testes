@@ -6,6 +6,7 @@ import * as XLSX from 'xlsx';
 import { logInfo, logError, logWarn } from '../core/logger.ts';
 import { browserScraper } from '../modules/browser-scraper.ts';
 import { chunkingService } from './chunking.service.ts';
+import { normalizationService, NormalizedData } from './normalization.service.ts';
 
 export type IngestionFormat = 'pdf' | 'docx' | 'xlsx' | 'html' | 'text' | 'unknown';
 
@@ -18,6 +19,7 @@ export interface IngestionResult {
     date?: string;
     sourceUrl: string;
     pages?: number;
+    normalized?: NormalizedData;
   };
 }
 
@@ -26,7 +28,7 @@ export class IngestionService {
    * Detecta o formato do arquivo baseado na URL ou Content-Type
    */
   private detectFormat(url: string): IngestionFormat {
-    const ext = url.split('.').pop()?.toLowerCase();
+    const ext = url.split('.').pop()?.toLowerCase().split('?')[0];
     if (ext === 'pdf') return 'pdf';
     if (ext === 'docx') return 'docx';
     if (ext === 'xlsx') return 'xlsx';
@@ -35,7 +37,7 @@ export class IngestionService {
   }
 
   /**
-   * Processa uma URL independente do formato
+   * Processa uma URL independente do formato e normaliza os dados
    */
   async ingest(url: string, options: { keywords?: string[] } = {}): Promise<IngestionResult | null> {
     const format = this.detectFormat(url);
@@ -59,8 +61,18 @@ export class IngestionService {
           break;
       }
 
+      if (!result) return null;
+
+      // Normalização de dados extraídos (Fase 4 do plano)
+      result.metadata.normalized = normalizationService.process(result.content);
+      
+      // Se a normalização encontrou uma data, atualizamos o metadado principal
+      if (result.metadata.normalized.date) {
+        result.metadata.date = result.metadata.normalized.date;
+      }
+
       // Se o conteúdo for muito longo (> 10k chars), aplicar chunking e filtrar por relevância
-      if (result && result.content.length > 10000 && options.keywords) {
+      if (result.content.length > 10000 && options.keywords) {
         logInfo(`[IngestionService] Conteúdo longo detectado (${result.content.length} chars). Aplicando extração semântica.`);
         const chunks = chunkingService.chunkText(result.content);
         const relevantChunks = chunkingService.filterRelevantChunks(chunks, options.keywords);
@@ -81,7 +93,7 @@ export class IngestionService {
   private async processPDF(url: string): Promise<IngestionResult> {
     const response = await axios.get(url, { 
       responseType: 'arraybuffer',
-      headers: { 'User-Agent': 'Mozilla/5.0' }
+      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' }
     });
     
     try {
