@@ -3,8 +3,8 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import { initializeDatabase } from './core/database.ts';
-
 import { setupRoutes } from './core/routes.ts';
+import { compressionMiddleware } from './core/middleware.ts';;
 
 // __filename e __dirname para compatibilidade com ES Modules em dev/prod
 const __filename = fileURLToPath(import.meta.url);
@@ -21,6 +21,7 @@ app.set('trust proxy', 1);
 const PORT = process.env.PORT || 3000;
 
 // Middleware
+app.use(compressionMiddleware);
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 app.use(cookieParser());

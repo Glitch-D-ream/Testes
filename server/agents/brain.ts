@@ -40,23 +40,35 @@ export class BrainAgent {
       }
       // --- Fim Checkpoint 4 ---
 
-      // 4. Geração de Parecer Técnico via IA (Brain)
-      logInfo(`[Brain] Gerando parecer técnico via IA para ${cleanName} com ${filteredSources.length} fontes...`);
+      // 4. Geração de Parecer Técnico via IA (Brain - VerdictEngine v2)
+      logInfo(`[Brain] Ativando VerdictEngine para ${cleanName}...`);
       
       // Garantir que temos contexto, mesmo que mínimo
       const contextSources = filteredSources.length > 0 ? filteredSources : rawSources.slice(0, 5);
-      const aiAnalysis = await aiService.generateReport(this.generateAnalysisPrompt(cleanName, dataSources, contextSources));
-      
-      // 5. Extração de Promessas Estruturadas
-      logInfo(`[Brain] Extraindo promessas estruturadas...`);
+      const analysisPrompt = this.generateAnalysisPrompt(cleanName, dataSources, contextSources);
+
+      let aiAnalysis = "";
       let extractedPromisesFromAI: any[] = [];
+
       try {
+        // ETAPA 1: Raciocínio Profundo (DeepSeek R1 via OpenRouter)
+        logInfo(`[Brain] ETAPA 1: Gerando Parecer Técnico com DeepSeek R1...`);
+        aiAnalysis = await aiService.generateReport(analysisPrompt);
+
+        // ETAPA 2: Estruturação Rápida (Groq)
+        logInfo(`[Brain] ETAPA 2: Estruturando promessas com Groq...`);
         const structuredResult = await aiService.analyzeText(aiAnalysis);
         if (structuredResult && structuredResult.promises) {
           extractedPromisesFromAI = structuredResult.promises;
         }
-      } catch (e) {
-        logWarn('[Brain] Falha ao parsear resposta estruturada da IA. Usando texto bruto.');
+      } catch (error) {
+        logWarn(`[Brain] Falha no VerdictEngine primário, tentando fallbacks...`);
+        // Fallback para o comportamento anterior se o VerdictEngine falhar
+        if (!aiAnalysis) aiAnalysis = await aiService.generateReport(analysisPrompt);
+        if (extractedPromisesFromAI.length === 0) {
+          const structuredResult = await aiService.analyzeText(aiAnalysis);
+          extractedPromisesFromAI = structuredResult?.promises || [];
+        }
       }
 
       // FALLBACK FINAL: Se a IA falhar completamente ou não retornar promessas, usar o extrator local (NLP)
@@ -367,20 +379,32 @@ export class BrainAgent {
 		- Auditoria de Contradições: ${data.contrastAnalysis}
 
     SUA TAREFA:
-    Gere um PARECER TÉCNICO DE INTELIGÊNCIA baseado ESTRITAMENTE nas evidências fornecidas.
+    Gere um PARECER TÉCNICO DE INTELIGÊNCIA fundamentado e crítico, baseado ESTRITAMENTE nas evidências fornecidas. Você deve agir como um auditor que confronta o discurso político com a realidade orçamentária e legislativa.
 
-    REGRAS DE INTEGRIDADE (RIGOR MÁXIMO):
-    1. PROIBIDO ALUCINAR: Não invente datas, valores, projetos ou votos. Se a informação não está nas fontes, não a mencione como fato.
-    2. ANÁLISE DE LACUNAS: Se os dados oficiais forem escassos, seu papel é EXPLICAR O PORQUÊ e analisar a TENDÊNCIA baseada apenas no programa partidário e notícias reais.
-    3. DISTINÇÃO CLARA: Diferencie claramente o que é um FATO (voto registrado) do que é uma INTENÇÃO (declaração em notícia).
-    4. VEREDITO HONESTO: Se não houver elementos para uma comparação, admita a limitação técnica.
+    REGRAS DE INTEGRIDADE E FUNDAMENTAÇÃO (RIGOR MÁXIMO):
+    1. CITAÇÃO DE FONTES: Ao mencionar uma declaração ou fato, cite a fonte entre parênteses, ex: (Fonte: G1, 2024).
+    2. CONFRONTO DE DADOS: Utilize os dados do SICONFI para validar se as promessas mencionadas nas notícias são financeiramente exequíveis.
+    3. AUDITORIA LEGISLATIVA: Compare o discurso recente com o histórico de votações fornecido. Se ele diz apoiar a Saúde mas votou contra o piso da enfermagem, aponte a contradição com a data do voto.
+    4. PROIBIDO ALUCINAR: Não invente datas, valores, projetos ou votos. Se a informação não está nas fontes, não a mencione como fato.
+    5. ANÁLISE DE LACUNAS: Se os dados oficiais forem escassos, seu papel é EXPLICAR O PORQUÊ e analisar a TENDÊNCIA baseada apenas no programa partidário e notícias reais.
 
-    ESTRUTURA DO PARECER:
-    - Introdução (Contexto atual do político)
-    - Análise de Discurso vs. Realidade (O que ele diz vs. O que os dados mostram)
-    - Auditoria de Contradições (Confronto direto entre discurso e votos)
-    - Veredito de Viabilidade (As intenções dele cabem no orçamento mencionado?)
-    - Conclusão Técnica (Resumo da consistência do político)`;
+    ESTRUTURA DO PARECER (OBRIGATÓRIA):
+    ### 🛡️ PARECER TÉCNICO DE INTELIGÊNCIA - SETH VII
+
+    #### 1. Contexto e Discurso Atual
+    (Resumo das declarações recentes citando as fontes encontradas pelo Scout)
+
+    #### 2. Auditoria de Realidade (Dados Oficiais)
+    (Análise baseada no SICONFI e histórico da Câmara. Confrontar os valores das promessas com o orçamento real da categoria)
+
+    #### 3. Auditoria de Contradições e Consistência
+    (Confronto direto entre o que o político diz nas notícias vs. como ele votou na prática)
+
+    #### 4. Veredito de Viabilidade e Integridade
+    (Conclusão técnica sobre a consistência do político e a viabilidade fiscal de suas propostas)
+
+    #### 5. Fontes Auditadas
+    (Lista numerada das fontes utilizadas para este veredito)`;
   }
 }
 

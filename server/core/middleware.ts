@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import rateLimit from 'express-rate-limit';
+import compression from 'compression';
 import { extractTokenFromHeader, verifyJWT } from './auth.ts';
 
 /**
@@ -151,4 +152,16 @@ export const scoutRateLimiter = rateLimit({
   keyGenerator: (req) => {
     return (req as any).userId || req.ip;
   },
+});
+
+/**
+ * Middleware de compressão de respostas
+ */
+export const compressionMiddleware = compression({
+  level: 6,
+  threshold: 1024, // Comprime apenas acima de 1KB
+  filter: (req, res) => {
+    if (req.headers['x-no-compression']) return false;
+    return compression.filter(req, res);
+  }
 });
