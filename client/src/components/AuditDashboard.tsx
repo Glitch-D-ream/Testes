@@ -17,6 +17,7 @@ import { IntelligencePanel } from './IntelligencePanel';
 import { RiskPanel } from './RiskPanel';
 import { FinancePanel } from './FinancePanel';
 import { ForensicDossier } from './ForensicDossier';
+import { ForensicTextReport } from './ForensicTextReport';
 
 interface AuditDashboardProps {
   politicianName: string;
@@ -76,61 +77,32 @@ export const AuditDashboard: React.FC<AuditDashboardProps> = ({
   };
 
   return (
-    <div className="w-full space-y-6">
-      {/* Header com Métricas Principais */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        {/* Score de Viabilidade */}
-        <div className={`p-6 rounded-xl border border-slate-200 dark:border-slate-700 ${getScoreColor(analysisData.viabilityScore)}`}>
-          <div className="flex items-center justify-between mb-3">
-            <h4 className="font-semibold text-sm">Viabilidade</h4>
-            <TrendingUp size={18} />
-          </div>
-          <div className="flex items-baseline gap-2">
-            <span className="text-3xl font-bold">{analysisData.viabilityScore}</span>
-            <span className="text-sm opacity-75">%</span>
-          </div>
-          <div className="mt-3 w-full bg-black/10 rounded-full h-2">
-            <div
-              className={`${getScoreBgColor(analysisData.viabilityScore)} h-2 rounded-full transition-all`}
-              style={{ width: `${analysisData.viabilityScore}%` }}
-            />
+    <div className="w-full space-y-12">
+      {/* Cyber Header Metrics */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-1">
+        <div className="p-6 bg-card border border-border">
+          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground mb-2">Credibility Index</p>
+          <div className="flex items-baseline gap-1">
+            <span className="text-4xl font-black tracking-tighter text-emerald-500">{analysisData.viabilityScore}%</span>
           </div>
         </div>
-
-        {/* Nível de Confiança */}
-        <div className="p-6 rounded-xl border border-slate-200 dark:border-slate-700 bg-blue-50 dark:bg-blue-900/20 text-blue-600">
-          <div className="flex items-center justify-between mb-3">
-            <h4 className="font-semibold text-sm">Confiança</h4>
-            <Shield size={18} />
+        <div className="p-6 bg-card border border-border">
+          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground mb-2">Audit Confidence</p>
+          <div className="flex items-baseline gap-1">
+            <span className="text-4xl font-black tracking-tighter">{analysisData.confidenceLevel}%</span>
           </div>
-          <div className="flex items-baseline gap-2">
-            <span className="text-3xl font-bold">{analysisData.confidenceLevel}</span>
-            <span className="text-sm opacity-75">%</span>
-          </div>
-          <p className="text-xs mt-3 opacity-75">Baseado em {analysisData.sourcesAnalyzed} fontes</p>
         </div>
-
-        {/* Fontes Analisadas */}
-        <div className="p-6 rounded-xl border border-slate-200 dark:border-slate-700 bg-purple-50 dark:bg-purple-900/20 text-purple-600">
-          <div className="flex items-center justify-between mb-3">
-            <h4 className="font-semibold text-sm">Fontes</h4>
-            <FileText size={18} />
+        <div className="p-6 bg-card border border-border">
+          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground mb-2">Sources Verified</p>
+          <div className="flex items-baseline gap-1">
+            <span className="text-4xl font-black tracking-tighter">{analysisData.sourcesAnalyzed}</span>
           </div>
-          <div className="flex items-baseline gap-2">
-            <span className="text-3xl font-bold">{analysisData.sourcesAnalyzed}</span>
-            <span className="text-sm opacity-75">documentos</span>
-          </div>
-          <p className="text-xs mt-3 opacity-75">Últimas 24 horas</p>
         </div>
-
-        {/* Última Atualização */}
-        <div className="p-6 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/20 text-slate-600">
-          <div className="flex items-center justify-between mb-3">
-            <h4 className="font-semibold text-sm">Atualizado</h4>
-            <Clock size={18} />
+        <div className="p-6 bg-card border border-border">
+          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground mb-2">Last Sync</p>
+          <div className="flex items-baseline gap-1">
+            <span className="text-lg font-black tracking-tighter uppercase">{analysisData.lastUpdated}</span>
           </div>
-          <p className="text-sm font-mono">{analysisData.lastUpdated}</p>
-          <p className="text-xs mt-3 opacity-75">Análise em tempo real</p>
         </div>
       </div>
 
@@ -181,14 +153,25 @@ export const AuditDashboard: React.FC<AuditDashboardProps> = ({
       <div className="min-h-96">
         {activeTab === 'overview' && (
           <div className="space-y-6">
-            {/* Painéis de Inteligência Seth VII */}
-            <IntelligencePanel 
-              consensusMetrics={analysisData?.consensusMetrics}
-              absenceReport={analysisData?.absenceReport}
+
+
+            {/* Novo Relatório de Texto Forense */}
+            <ForensicTextReport 
+              verdict={{
+                summary: analysisData?.verdict?.summary || "Análise concluída com base nos dados orçamentários e discursivos disponíveis.",
+                score: analysisData?.viabilityScore || 0,
+                level: (analysisData?.viabilityScore || 0) < 40 ? 'CRÍTICO' : (analysisData?.viabilityScore || 0) < 70 ? 'ALERTA' : 'ESTÁVEL'
+              }}
+              keyFindings={analysisData?.promises?.map((p: any) => ({
+                title: p.category,
+                content: p.reasoning,
+                isContradiction: p.confidence < 0.5
+              })) || []}
+              technicalAnalysis={analysisData?.fullReport || "Processando relatório detalhado..."}
             />
 
-            {analysisData?.vulnerabilityReport && (
-              <ForensicVulnerabilityPanel report={analysisData.vulnerabilityReport} />
+            {analysisData?.contradictions && (
+              <ForensicDossier contradictions={analysisData.contradictions} />
             )}
 
             {analysisData?.benchmarkResult && (
@@ -199,55 +182,7 @@ export const AuditDashboard: React.FC<AuditDashboardProps> = ({
               <FinancePanel evidences={analysisData.financeEvidences} />
             )}
 
-            {analysisData?.contradictions && (
-              <ForensicDossier contradictions={analysisData.contradictions} />
-            )}
 
-            <RiskPanel risks={analysisData?.promises?.flatMap((p: any) => p.risks || [])} />
-
-            {/* Promessas */}
-            <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
-              <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50">
-                <h3 className="font-bold text-lg text-slate-900 dark:text-white">
-                  Promessas Identificadas
-                </h3>
-              </div>
-              <div className="divide-y divide-slate-200 dark:divide-slate-700">
-                {analysisData.promises.map((promise) => (
-                  <div
-                    key={promise.id}
-                    className="px-6 py-4 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors"
-                  >
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex-1">
-                        <h4 className="font-semibold text-slate-900 dark:text-white mb-1">
-                          {promise.title}
-                        </h4>
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs px-2 py-1 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300">
-                            {promise.category}
-                          </span>
-                          <span className="text-xs text-slate-500 dark:text-slate-400">
-                            Viabilidade: {promise.viability}%
-                          </span>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {promise.status === 'completed' && (
-                          <CheckCircle className="text-green-600" size={20} />
-                        )}
-                        {promise.status === 'in_progress' && (
-                          <Clock className="text-yellow-600 animate-spin" size={20} />
-                        )}
-                        {promise.status === 'pending' && (
-                          <AlertTriangle className="text-slate-400" size={20} />
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
           </div>
         )}
 
