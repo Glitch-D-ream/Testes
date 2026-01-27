@@ -11,139 +11,33 @@ export default function AnalysisNew() {
   const [analysisData, setAnalysisData] = useState<any>(null);
 
   useEffect(() => {
-    // Simular carregamento de dados
-    const timer = setTimeout(() => {
-      setAnalysisData({
-        politicianName: 'Jones Manoel',
-        viabilityScore: 42,
-        confidenceLevel: 88,
-        sourcesAnalyzed: 47,
-        lastUpdated: '27 de janeiro, 14:32',
-        promises: [
-          {
-            id: '1',
-            title: 'Reforma Urbana Radical com Combate à Especulação Imobiliária',
-            category: 'Urbanismo',
-            viability: 35,
-            status: 'completed',
-          },
-          {
-            id: '2',
-            title: 'Reestatização de Setores Estratégicos (Energia e Combustíveis)',
-            category: 'Economia',
-            viability: 28,
-            status: 'completed',
-          },
-          {
-            id: '3',
-            title: 'Expansão do Ensino Público de Qualidade',
-            category: 'Educação',
-            viability: 55,
-            status: 'in_progress',
-          },
-          {
-            id: '4',
-            title: 'Valorização da Produção Cultural Periférica',
-            category: 'Cultura',
-            viability: 62,
-            status: 'pending',
-          },
-        ],
-        influenceNodes: [
-          {
-            id: 'jones',
-            label: 'Jones Manoel',
-            type: 'politician',
-            size: 15,
-            color: '#3b82f6',
-          },
-          {
-            id: 'empresa1',
-            label: 'Petrobras',
-            type: 'company',
-            size: 10,
-            color: '#ef4444',
-          },
-          {
-            id: 'empresa2',
-            label: 'Caixa Econômica',
-            type: 'company',
-            size: 10,
-            color: '#ef4444',
-          },
-          {
-            id: 'doador1',
-            label: 'Sindicato dos Metalúrgicos',
-            type: 'donor',
-            size: 8,
-            color: '#f59e0b',
-          },
-          {
-            id: 'politico1',
-            label: 'Boulos',
-            type: 'politician',
-            size: 8,
-            color: '#8b5cf6',
-          },
-        ],
-        influenceEdges: [
-          {
-            source: 'jones',
-            target: 'empresa1',
-            weight: 2,
-            type: 'political',
-          },
-          {
-            source: 'jones',
-            target: 'empresa2',
-            weight: 1.5,
-            type: 'financial',
-          },
-          {
-            source: 'jones',
-            target: 'doador1',
-            weight: 2.5,
-            type: 'financial',
-          },
-          {
-            source: 'jones',
-            target: 'politico1',
-            weight: 1,
-            type: 'political',
-          },
-        ],
-        viabilityDimensions: [
-          {
-            name: 'Orçamentário',
-            value: 35,
-            description: 'Disponibilidade de recursos públicos',
-          },
-          {
-            name: 'Político',
-            value: 42,
-            description: 'Apoio legislativo necessário',
-          },
-          {
-            name: 'Jurídico',
-            value: 48,
-            description: 'Conformidade constitucional',
-          },
-          {
-            name: 'Técnico',
-            value: 55,
-            description: 'Viabilidade operacional',
-          },
-          {
-            name: 'Social',
-            value: 62,
-            description: 'Aceitação pública',
-          },
-        ],
-      });
-      setLoading(false);
-    }, 1500);
-
-    return () => clearTimeout(timer);
+    const fetchAnalysis = async () => {
+      if (!id) return;
+      try {
+        const apiUrl = import.meta.env.VITE_API_URL || '';
+        const response = await fetch(`${apiUrl}/api/analyze/${id}`);
+        if (response.ok) {
+          const data = await response.json();
+          setAnalysisData({
+            politicianName: data.author || 'Político Auditado',
+            viabilityScore: data.probabilityScore || 0,
+            confidenceLevel: 90,
+            sourcesAnalyzed: data.evidences?.length || 0,
+            lastUpdated: new Date(data.created_at).toLocaleDateString('pt-BR'),
+            promises: data.promises || [],
+            vulnerabilityReport: data.data_sources?.vulnerabilityReport,
+            benchmarkResult: data.data_sources?.benchmarkResult,
+            consensusMetrics: data.data_sources?.consensusMetrics,
+            absenceReport: data.data_sources?.absenceReport
+          });
+        }
+      } catch (err) {
+        console.error('Erro ao carregar análise:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchAnalysis();
   }, [id]);
 
   if (loading) {

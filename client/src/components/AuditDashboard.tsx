@@ -11,6 +11,10 @@ import {
 } from 'lucide-react';
 import InfluenceGraph from './InfluenceGraph';
 import ViabilityRadar from './ViabilityRadar';
+import { ForensicVulnerabilityPanel } from './ForensicVulnerabilityPanel';
+import { BenchmarkingPanel } from './BenchmarkingPanel';
+import { IntelligencePanel } from './IntelligencePanel';
+import { RiskPanel } from './RiskPanel';
 
 interface AuditDashboardProps {
   politicianName: string;
@@ -44,6 +48,10 @@ interface AuditDashboardProps {
       value: number;
       description: string;
     }>;
+    vulnerabilityReport?: any;
+    benchmarkResult?: any;
+    consensusMetrics?: any;
+    absenceReport?: any;
   };
 }
 
@@ -171,6 +179,22 @@ export const AuditDashboard: React.FC<AuditDashboardProps> = ({
       <div className="min-h-96">
         {activeTab === 'overview' && (
           <div className="space-y-6">
+            {/* Painéis de Inteligência Seth VII */}
+            <IntelligencePanel 
+              consensusMetrics={analysisData?.consensusMetrics}
+              absenceReport={analysisData?.absenceReport}
+            />
+
+            {analysisData?.vulnerabilityReport && (
+              <ForensicVulnerabilityPanel report={analysisData.vulnerabilityReport} />
+            )}
+
+            {analysisData?.benchmarkResult && (
+              <BenchmarkingPanel benchmark={analysisData.benchmarkResult} />
+            )}
+
+            <RiskPanel risks={analysisData?.promises?.flatMap((p: any) => p.risks || [])} />
+
             {/* Promessas */}
             <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
               <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50">
