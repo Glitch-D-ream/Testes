@@ -7,6 +7,7 @@ import { ForensicResultCard } from '../components/ForensicResultCard';
 import { IntelligencePanel } from '../components/IntelligencePanel';
 import { ForensicVulnerabilityPanel } from '../components/ForensicVulnerabilityPanel';
 import { BenchmarkingPanel } from '../components/BenchmarkingPanel';
+import EvidenceVault from '../components/EvidenceVault';
 import { useAnalysis } from '../hooks/useAnalysis';
 import { motion } from 'framer-motion';
 
@@ -97,8 +98,11 @@ export function AnalysisResults() {
           data={data}
         />
 
+        {/* Evidence Vault - NOVO COMPONENTE */}
+        <EvidenceVault sources={data.data_sources} />
+
         {/* Grid de Inteligência */}
-        <div className="space-y-8">
+        <div className="space-y-8 mt-8">
           <IntelligencePanel 
             consensusMetrics={data.data_sources?.consensusMetrics}
             absenceReport={data.data_sources?.absenceReport}
