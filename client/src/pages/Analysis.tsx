@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Download, Share2, Loader } from 'lucide-react';
 import { Button } from '../components/Button';
 import AuditDashboard from '../components/AuditDashboard';
+import { ForensicResultCard } from '../components/ForensicResultCard';
 
 export default function AnalysisNew() {
   const { id } = useParams();
@@ -110,8 +111,18 @@ export default function AnalysisNew() {
       </div>
 
       {/* Conteúdo Principal */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-lg border border-slate-200 dark:border-slate-700 overflow-hidden">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-8">
+        {/* Novo Card de Impacto Forense */}
+        <ForensicResultCard 
+          politicianName={analysisData?.politicianName}
+          score={analysisData?.viabilityScore || 0}
+          verdict={analysisData?.verdict?.summary || "Processando veredito final..."}
+          analysisDate={analysisData?.lastUpdated}
+          confidence={analysisData?.confidenceLevel || 90}
+          category={analysisData?.category || "GERAL"}
+        />
+
+        <div className="bg-white dark:bg-black rounded-sm shadow-2xl border border-border overflow-hidden">
           <div className="p-8">
             <AuditDashboard
               politicianName={analysisData?.politicianName}
