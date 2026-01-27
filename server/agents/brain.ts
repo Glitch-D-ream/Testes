@@ -282,13 +282,15 @@ DADOS OFICIAIS E ORÇAMENTÁRIOS (BASE TÉCNICA):
 - Resumo Orçamentário: ${data.budgetSummary || 'Dados não disponíveis'}
 - Histórico de Votações: ${data.votingHistory?.length > 0 ? data.votingHistory.map((v: any) => `${v.data}: ${v.tema} (Voto: ${v.voto})`).join('; ') : 'Nenhum voto nominal recente encontrado.'}
 
-SUA TAREFA:
-Gere um PARECER TÉCNICO DE INTELIGÊNCIA. 
-1. Se houver notícias, extraia as intenções e promessas, mesmo que implícitas.
-2. Compare essas intenções com os dados oficiais (Votos e Orçamento).
-3. Se os dados oficiais forem escassos, analise o PERFIL POLÍTICO baseado no partido e nas notícias, mas mantenha o tom técnico.
-4. NUNCA responda apenas "Dados não disponíveis". Se os dados forem poucos, faça uma análise de RISCO e TENDÊNCIA baseada no que existe.
-5. Use termos técnicos: "viabilidade fiscal", "contingenciamento", "base governista", "capital político".
+    SUA TAREFA:
+    Gere um PARECER TÉCNICO DE INTELIGÊNCIA baseado ESTRITAMENTE nas evidências fornecidas.
+
+    REGRAS DE INTEGRIDADE (CRÍTICO):
+    1. PROIBIDO ALUCINAR: Não invente datas, valores, projetos ou votos. Se a informação não está nas fontes, não a mencione como fato.
+    2. ANÁLISE DE LACUNAS: Se os dados oficiais forem escassos, seu papel é EXPLICAR O PORQUÊ (ex: "político em primeiro mandato", "ausência de votações nominais no período") e analisar a TENDÊNCIA baseada apenas no programa partidário e notícias reais.
+    3. DISTINÇÃO CLARA: Diferencie claramente o que é um FATO (voto registrado) do que é uma INTENÇÃO (declaração em notícia).
+    4. VEREDITO HONESTO: Se não houver elementos para uma comparação, admita a limitação técnica, mas descreva o perfil de atuação que as fontes disponíveis sugerem.
+    5. TERMOS TÉCNICOS: Use "viabilidade fiscal", "contingenciamento", "base governista" apenas quando houver contexto orçamentário ou político real para isso.
 
 ESTRUTURA DO PARECER:
 - Introdução (Contexto atual do político)
