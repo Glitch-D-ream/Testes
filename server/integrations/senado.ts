@@ -87,18 +87,18 @@ export async function getMateriasSenador(codigoSenador: number): Promise<any[]> 
     const cached = await cacheService.getGenericData<any[]>(cacheKey);
     if (cached) return cached;
 
-    const response = await axios.get(`${SENADO_API_BASE}/materia/autor/${codigoSenador}`, {
+    const response = await axios.get(`${SENADO_API_BASE}/${codigoSenador}/autorias`, {
       headers: { 'Accept': 'application/json' }
     });
 
-    const materiasRaw = response.data.ListaMateriasAutoria.Materias.Materia;
-    const materias = (Array.isArray(materiasRaw) ? materiasRaw : [materiasRaw]).slice(0, 10).map((m: any) => ({
-      id: m.CodigoMateria,
-      sigla: m.SiglaMateria,
-      numero: m.NumeroMateria,
-      ano: m.AnoMateria,
-      ementa: m.EmentaMateria || 'Sem ementa disponível',
-      url: `https://www25.senado.leg.br/web/atividade/materias/-/materia/${m.CodigoMateria}`
+    const materiasRaw = response.data.MateriasAutoriaParlamentar.Parlamentar.Autorias.Autoria;
+    const materias = (Array.isArray(materiasRaw) ? materiasRaw : [materiasRaw]).slice(0, 10).map((a: any) => ({
+      id: a.Materia.Codigo,
+      sigla: a.Materia.Sigla,
+      numero: a.Materia.Numero,
+      ano: a.Materia.Ano,
+      ementa: a.Materia.Ementa || 'Sem ementa disponível',
+      url: `https://www25.senado.leg.br/web/atividade/materias/-/materia/${a.Materia.Codigo}`
     }));
 
     await cacheService.saveGenericData(cacheKey, 'SENADO', materias, 7);

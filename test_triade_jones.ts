@@ -24,7 +24,7 @@ async function testJonesManoel() {
     console.log(`Fontes encontradas: ${result.sourcesCount}`);
     
     // Verificar se gerou promessas (isso indicaria que a IA funcionou)
-    // Nota: Como não temos a chave da IA configurada no ambiente local do Manus, 
+    // Nota: Como não temos a chave da IA configurada no ambiente local do Seth VII, 
     // esperamos ver como o sistema lida com o fallback.
   } catch (error) {
     console.error('❌ Erro durante o teste da tríade:', error);

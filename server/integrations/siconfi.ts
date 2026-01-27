@@ -59,7 +59,7 @@ export async function getBudgetData(
     const params = { 
       an_exercicio: queryYear, 
       id_ente: idEnte,
-      no_anexo: 'DCA-AnexoI-C'
+      no_anexo: 'DCA-AnexoI-E'
     };
     
     logger.info(`[SICONFI] [DEBUG] Query: ${JSON.stringify(params)} | Categoria: ${category}`);
@@ -78,6 +78,7 @@ export async function getBudgetData(
     }
 
     // Filtrar dados de Empenho e Liquidação
+    // Nota: No Anexo I-E (Despesas por Função), as colunas são "Despesas Empenhadas" e "Despesas Liquidadas"
     const empenhadoItem = response.data.items.find((i: any) => 
       i.coluna.includes('Despesas Empenhadas') && 
       i.conta.toUpperCase().includes(category.toUpperCase())
@@ -177,31 +178,31 @@ export async function validateBudgetViability(
 
 export function mapPromiseToSiconfiCategory(promiseCategory: string): string {
   const mapping: Record<string, string> = {
-    'SAUDE': 'SAUDE',
-    'HEALTH': 'SAUDE',
-    'EDUCACAO': 'EDUCACAO',
-    'EDUCATION': 'EDUCACAO',
-    'INFRAESTRUTURA': 'URBANISMO',
-    'INFRASTRUCTURE': 'URBANISMO',
-    'SEGURANCA': 'SEGURANCA_PUBLICA',
-    'SECURITY': 'SEGURANCA_PUBLICA',
-    'ECONOMIA': 'GESTAO_AMBIENTAL',
-    'ECONOMY': 'GESTAO_AMBIENTAL',
-    'AGRICULTURA': 'AGRICULTURA',
-    'AGRICULTURE': 'AGRICULTURA',
-    'CULTURA': 'CULTURA',
-    'CULTURE': 'CULTURA',
-    'TRANSPORTE': 'TRANSPORTE',
-    'TRANSPORT': 'TRANSPORTE',
-    'HABITACAO': 'HABITACAO',
-    'HOUSING': 'HABITACAO',
-    'SANEAMENTO': 'SANEAMENTO',
-    'SANITATION': 'SANEAMENTO',
-    'CIENCIA': 'CIENCIA_E_TECNOLOGIA',
-    'SCIENCE': 'CIENCIA_E_TECNOLOGIA',
-    'TRABALHO': 'TRABALHO',
-    'EMPLOYMENT': 'TRABALHO',
-    'SOCIAL': 'ASSISTENCIA_SOCIAL',
+    'SAUDE': '10 - Saúde',
+    'HEALTH': '10 - Saúde',
+    'EDUCACAO': '12 - Educação',
+    'EDUCATION': '12 - Educação',
+    'INFRAESTRUTURA': '15 - Urbanismo',
+    'INFRASTRUCTURE': '15 - Urbanismo',
+    'SEGURANCA': '06 - Segurança Pública',
+    'SECURITY': '06 - Segurança Pública',
+    'ECONOMIA': '04 - Administração',
+    'ECONOMY': '04 - Administração',
+    'AGRICULTURA': '20 - Agricultura',
+    'AGRICULTURE': '20 - Agricultura',
+    'CULTURA': '13 - Cultura',
+    'CULTURE': '13 - Cultura',
+    'TRANSPORTE': '26 - Transporte',
+    'TRANSPORT': '26 - Transporte',
+    'HABITACAO': '16 - Habitação',
+    'HOUSING': '16 - Habitação',
+    'SANEAMENTO': '17 - Saneamento',
+    'SANITATION': '17 - Saneamento',
+    'CIENCIA': '19 - Ciência e Tecnologia',
+    'SCIENCE': '19 - Ciência e Tecnologia',
+    'TRABALHO': '11 - Trabalho',
+    'EMPLOYMENT': '11 - Trabalho',
+    'SOCIAL': '08 - Assistência Social',
   };
   const normalized = promiseCategory.toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
   return mapping[normalized] || 'ADMINISTRACAO';
