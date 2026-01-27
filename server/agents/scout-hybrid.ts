@@ -1,5 +1,6 @@
+
 /**
- * Scout Agent Híbrido v2.4 - IRONCLAD + DOCUMENT FALLBACK
+ * Scout Agent Híbrido v2.6 - IRONCLAD + DOCUMENT FALLBACK + FEDERAL TRANSPARENCY
  * Foco em resiliência extrema: se as APIs falham, ele busca documentos diretos.
  */
 
@@ -7,10 +8,9 @@ import { logInfo, logError, logWarn } from '../core/logger.ts';
 import { directSearchImproved } from '../modules/direct-search-improved.ts';
 import { officialSourcesSearch } from '../modules/official-sources-search.ts';
 import { ingestionService } from '../services/ingestion.service.ts';
-import { douService } from '../services/dou.service.ts';
 import { transparenciaSPService } from '../services/transparencia-sp.service.ts';
 import { transparenciaPEService } from '../services/transparencia-pe.service.ts';
-import { jusBrasilScraper } from '../modules/jusbrasil-scraper.ts';
+import { transparenciaFederalService } from '../services/transparencia-federal.service.ts';
 import { IntelligentCache } from '../core/intelligent-cache.ts';
 
 export interface RawSource {
@@ -32,18 +32,19 @@ export class ScoutHybrid {
       const sources: RawSource[] = [];
       const apiFailures: string[] = [];
 
-      // FASE 1: Busca Paralela
+      // FASE 1: Busca Paralela (Regional + Federal + Notícias)
       const isRegionalPE = query.toLowerCase().includes('jones manoel') || query.toLowerCase().includes('pernambuco');
       const isRegionalSP = query.toLowerCase().includes('erika hilton') || query.toLowerCase().includes('são paulo');
 
       const fastResults = await Promise.all([
         officialSourcesSearch.search(query).catch((e) => { apiFailures.push('Oficial'); return []; }),
         directSearchImproved.search(query).catch((e) => { apiFailures.push('Notícias'); return []; }),
+        transparenciaFederalService.searchServidor(query).catch(() => { apiFailures.push('Federal'); return []; }),
         isRegionalSP ? transparenciaSPService.search(query).catch(() => { apiFailures.push('SP'); return []; }) : Promise.resolve([]),
         isRegionalPE ? transparenciaPEService.search(query).catch(() => { apiFailures.push('PE'); return []; }) : Promise.resolve([])
       ]);
 
-      const [officialResults, newsResults, spResults, peResults] = fastResults;
+      const [officialResults, newsResults, federalResults, spResults, peResults] = fastResults;
 
       // Se detectarmos falhas em APIs críticas, ativamos o Fallback de Documentos
       if (apiFailures.length > 0 || deepSearch) {
@@ -70,12 +71,13 @@ export class ScoutHybrid {
         sources.push(...(docsIngested.filter(s => s !== null) as RawSource[]));
       }
 
-      // Adicionar Oficiais e Notícias
+      // Adicionar Resultados Oficiais
       sources.push(...officialResults.map(r => ({
         title: r.title, url: r.url, content: (r as any).content || r.description, source: (r as any).source || 'Portal Oficial', 
         type: 'official' as const, confidence: 'high' as const, credibilityLayer: 'A' as const
       })));
 
+      // Processar Notícias
       const newsToIngest = newsResults.slice(0, 5);
       const newsIngested = await Promise.all(newsToIngest.map(async (r) => {
         try {
