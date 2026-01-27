@@ -9,10 +9,12 @@
   "scripts": {
     "build": "vite build && node scripts/build-server.js",
     "start": "node dist/index.js",
-    "worker:scout": "tsx server/scripts/scout-worker.ts"
+    "worker:scout": "tsx server/scripts/scout-worker.ts",
+    "worker:queue": "tsx server/scripts/queue-worker.ts"
   },
   "dependencies": {
     "@sentry/node": "^10.36.0",
+    "bull": "^4.16.5",
     "cheerio": "^1.2.0",
     "chromium-bidi": "^13.0.1",
     "compromise": "^14.14.5",
@@ -41,6 +43,7 @@
     "@supabase/supabase-js": "^2.48.1",
     "@tailwindcss/vite": "^4.0.0",
     "@types/bcryptjs": "^2.4.6",
+    "@types/bull": "^4.10.4",
     "@types/cookie-parser": "^1.4.8",
     "@types/express": "^5.0.0",
     "@types/jsonwebtoken": "^9.0.8",
