@@ -1,6 +1,6 @@
 /**
- * Scout Agent Híbrido v2.3 - IRONCLAD + REGIONAL
- * Foco em velocidade, resiliência e inteligência regional.
+ * Scout Agent Híbrido v2.4 - IRONCLAD + DOCUMENT FALLBACK
+ * Foco em resiliência extrema: se as APIs falham, ele busca documentos diretos.
  */
 
 import { logInfo, logError, logWarn } from '../core/logger.ts';
@@ -19,7 +19,7 @@ export interface RawSource {
   content: string;
   source: string;
   publishedAt?: string;
-  type: 'news' | 'social' | 'official';
+  type: 'news' | 'social' | 'official' | 'document';
   confidence: 'high' | 'medium' | 'low';
   credibilityLayer: 'A' | 'B' | 'C';
 }
@@ -30,67 +30,63 @@ export class ScoutHybrid {
       logInfo(`[ScoutHybrid] Iniciando busca híbrida (${deepSearch ? 'DEEP' : 'NORMAL'}): ${query}`);
       
       const sources: RawSource[] = [];
+      const apiFailures: string[] = [];
 
-      // FASE 1: Busca Rápida Paralela (Timeout de 15s)
-      logInfo(`[ScoutHybrid] FASE 1: Busca rápida em fontes oficiais, regionais e notícias...`);
-      
-      // Detecção dinâmica de região (Simples por enquanto)
+      // FASE 1: Busca Paralela
       const isRegionalPE = query.toLowerCase().includes('jones manoel') || query.toLowerCase().includes('pernambuco');
       const isRegionalSP = query.toLowerCase().includes('erika hilton') || query.toLowerCase().includes('são paulo');
 
       const fastResults = await Promise.all([
-        officialSourcesSearch.search(query).catch(() => []),
-        directSearchImproved.search(query).catch(() => []),
-        isRegionalSP ? transparenciaSPService.search(query).catch(() => []) : Promise.resolve([]),
-        isRegionalPE ? transparenciaPEService.search(query).catch(() => []) : Promise.resolve([])
+        officialSourcesSearch.search(query).catch((e) => { apiFailures.push('Oficial'); return []; }),
+        directSearchImproved.search(query).catch((e) => { apiFailures.push('Notícias'); return []; }),
+        isRegionalSP ? transparenciaSPService.search(query).catch(() => { apiFailures.push('SP'); return []; }) : Promise.resolve([]),
+        isRegionalPE ? transparenciaPEService.search(query).catch(() => { apiFailures.push('PE'); return []; }) : Promise.resolve([])
       ]);
 
       const [officialResults, newsResults, spResults, peResults] = fastResults;
 
-      // Adicionar Oficiais e Regionais
-      const combinedOfficial = [...officialResults, ...spResults, ...peResults];
-      sources.push(...combinedOfficial.map(r => ({
-        title: r.title, url: r.url, content: (r as any).content || r.description, source: (r as any).source || 'Portal Transparência', 
-        publishedAt: new Date().toISOString(),
+      // Se detectarmos falhas em APIs críticas, ativamos o Fallback de Documentos
+      if (apiFailures.length > 0 || deepSearch) {
+        logWarn(`[ScoutHybrid] Detectadas falhas ou modo Deep. Ativando busca direta por Documentos/PDFs...`);
+        const docQueries = [
+          `${query} filetype:pdf`,
+          `${query} "diário oficial"`,
+          `${query} contrato OR empenho OR licitação`
+        ];
+
+        const docResults = await Promise.all(docQueries.map(q => directSearchImproved.search(q).catch(() => [])));
+        const flatDocs = docResults.flat().slice(0, 5);
+
+        logInfo(`[ScoutHybrid] Ingerindo ${flatDocs.length} documentos/PDFs encontrados diretamente...`);
+        const docsIngested = await Promise.all(flatDocs.map(async (r) => {
+          try {
+            const result = await ingestionService.ingest(r.url, { keywords: [query] });
+            return result ? {
+              title: r.title, url: r.url, content: result.content, source: 'Documento Público', 
+              type: 'document' as const, confidence: 'high' as const, credibilityLayer: 'A' as const
+            } : null;
+          } catch { return null; }
+        }));
+        sources.push(...(docsIngested.filter(s => s !== null) as RawSource[]));
+      }
+
+      // Adicionar Oficiais e Notícias
+      sources.push(...officialResults.map(r => ({
+        title: r.title, url: r.url, content: (r as any).content || r.description, source: (r as any).source || 'Portal Oficial', 
         type: 'official' as const, confidence: 'high' as const, credibilityLayer: 'A' as const
       })));
 
-      // Ingestão de Notícias (Limitado a 5 fontes rápidas)
       const newsToIngest = newsResults.slice(0, 5);
-      logInfo(`[ScoutHybrid] Ingerindo ${newsToIngest.length} notícias rápidas...`);
-      
       const newsIngested = await Promise.all(newsToIngest.map(async (r) => {
         try {
-          const content = await Promise.race([
-            ingestionService.ingest(r.url),
-            new Promise<null>(resolve => setTimeout(() => resolve(null), 8000))
-          ]);
+          const content = await ingestionService.ingest(r.url);
           return content ? {
-            title: r.title, url: r.url, content: content.content, source: r.source, publishedAt: r.publishedAt,
-            type: 'news' as const, confidence: 'medium' as const, credibilityLayer: 'B' as const
+            title: r.title, url: r.url, content: content.content, source: r.source, type: 'news' as const, 
+            confidence: 'medium' as const, credibilityLayer: 'B' as const
           } : null;
         } catch { return null; }
       }));
-
       sources.push(...(newsIngested.filter(s => s !== null) as RawSource[]));
-
-      if (sources.length >= 5 && !deepSearch) return sources;
-
-      // FASE 2: Deep Search
-      logInfo(`[ScoutHybrid] FASE 2: Executando Deep Search...`);
-      const extraResults = await Promise.all([
-        directSearchImproved.search(`"${query}" entrevista OR discurso OR atuação regional`).catch(() => []),
-        jusBrasilScraper.searchAndScrape(query).catch(() => []),
-        douService.searchActs(query).catch(() => [])
-      ]);
-
-      const [extraNews, jusResults, douResults] = extraResults;
-      
-      // Adicionar resultados do Deep Search
-      sources.push(...jusResults.map(r => ({
-        title: r.title, url: r.url, content: r.content, source: 'JusBrasil', type: 'official' as const, 
-        confidence: 'high' as const, credibilityLayer: 'A' as const
-      })));
 
       return sources.filter(s => this.isValidUrl(s.url));
     });

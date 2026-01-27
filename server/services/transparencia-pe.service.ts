@@ -1,7 +1,6 @@
 
 import { logInfo, logError, logWarn } from '../core/logger.ts';
 import { browserScraper } from '../modules/browser-scraper.ts';
-import { ingestionService } from './ingestion.service.ts';
 
 export interface TransparenciaItem {
   title: string;
@@ -16,29 +15,40 @@ export class TransparenciaPEService {
   async search(query: string): Promise<TransparenciaItem[]> {
     logInfo(`[TransparenciaPE] Iniciando busca regional (Pernambuco) para: ${query}`);
     
-    // Portal da Transparência de PE
+    // Tentativa 1: Busca Direta no Portal
     const searchUrl = `${this.baseUrl}/busca?q=${encodeURIComponent(query)}`;
     
     try {
-      // Usar timeout curto para não travar o fluxo principal
-      const results = await Promise.race([
-        browserScraper.scrape(searchUrl),
-        new Promise<null>(resolve => setTimeout(() => resolve(null), 10000))
-      ]);
-
-      if (!results) {
-        logWarn(`[TransparenciaPE] Busca regional em PE demorou muito ou falhou.`);
-        return [];
+      const content = await browserScraper.scrape(searchUrl);
+      
+      if (content && content.length > 500) {
+        logInfo(`[TransparenciaPE] Sucesso na extração direta do portal.`);
+        return [{
+          title: `Portal da Transparência PE - Resultados para ${query}`,
+          url: searchUrl,
+          description: content.substring(0, 200) + '...',
+          date: new Date().toISOString()
+        }];
       }
 
-      return [{
-        title: `Portal da Transparência PE - Resultados para ${query}`,
-        url: searchUrl,
-        description: `Dados de empenhos, contratos e repasses do Estado de Pernambuco relacionados a ${query}.`,
-        date: new Date().toISOString()
-      }];
+      // Tentativa 2: Scraping de Última Instância (Busca via Google Dorking para achar PDFs no domínio)
+      logWarn(`[TransparenciaPE] Portal bloqueado ou vazio. Ativando Scraping de Última Instância...`);
+      const dorkUrl = `https://www.google.com/search?q=site:transparencia.pe.gov.br+"${query}"+filetype:pdf`;
+      const dorkContent = await browserScraper.scrape(dorkUrl);
+      
+      if (dorkContent && dorkContent.includes('http')) {
+        logInfo(`[TransparenciaPE] Encontrados documentos via Dorking.`);
+        return [{
+          title: `Documentos Públicos PE (via Dorking) - ${query}`,
+          url: dorkUrl,
+          description: 'Documentos e PDFs encontrados diretamente no domínio do Estado de Pernambuco.',
+          date: new Date().toISOString()
+        }];
+      }
+
+      return [];
     } catch (error: any) {
-      logError(`[TransparenciaPE] Erro na busca regional: ${error.message}`);
+      logError(`[TransparenciaPE] Falha total na busca regional: ${error.message}`);
       return [];
     }
   }
