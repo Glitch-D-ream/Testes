@@ -108,15 +108,15 @@ export function AnalysisResults() {
             </div>
             <div className="flex gap-2">
               <button
-                onClick={handleDownloadPDF}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition"
-                title="Baixar Relatório PDF"
+                onClick={() => alert('A geração de relatórios PDF está em manutenção temporária. Por favor, visualize os dados diretamente na plataforma.')}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-400 text-white rounded-md cursor-not-allowed opacity-75"
+                title="Funcionalidade em manutenção"
               >
                 <Download className="w-4 h-4" />
                 PDF
               </button>
               <button
-                onClick={() => alert('A geração de cards para redes sociais está em manutenção para melhorias no servidor. Por favor, use a exportação em PDF por enquanto.')}
+                onClick={() => alert('A geração de cards para redes sociais está em manutenção temporária. Por favor, visualize os dados diretamente na plataforma.')}
                 className="flex items-center gap-2 px-4 py-2 bg-indigo-400 text-white rounded-md cursor-not-allowed opacity-75"
                 title="Funcionalidade em manutenção"
               >

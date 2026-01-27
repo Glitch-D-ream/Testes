@@ -49,7 +49,7 @@ const __dirname = globalThis.__dirname;
       external: [
         'express', 'jsonwebtoken', 'bcryptjs', 'winston', 'dotenv', 
         '@supabase/supabase-js', 'nanoid', 'express-rate-limit', 
-        'cookie-parser', 'telegraf', 'jspdf', 'jspdf-autotable', 
+        'cookie-parser', 'telegraf', 
         'axios', 'zod', 'tsx', 'prom-client', '@sentry/node',
         'cheerio', 'puppeteer-core', 'playwright', 'playwright-core'
       ],
