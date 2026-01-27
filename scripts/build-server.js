@@ -44,6 +44,45 @@ globalThis.__dirname = __dirnameFunc(globalThis.__filename);
 const require = globalThis.require;
 const __filename = globalThis.__filename;
 const __dirname = globalThis.__dirname;
+
+// Polyfills para ambiente Node.js puro (necessários para bibliotecas como pdf-parse/pdfjs)
+if (typeof globalThis.DOMMatrix === 'undefined') {
+  globalThis.DOMMatrix = class DOMMatrix {
+    constructor(init) {
+      this.m11 = 1; this.m12 = 0; this.m13 = 0; this.m14 = 0;
+      this.m21 = 0; this.m22 = 1; this.m23 = 0; this.m24 = 0;
+      this.m31 = 0; this.m32 = 0; this.m33 = 1; this.m34 = 0;
+      this.m41 = 0; this.m42 = 0; this.m43 = 0; this.m44 = 1;
+      if (Array.isArray(init) || (init && init.buffer instanceof ArrayBuffer)) {
+        this.m11 = init[0]; this.m12 = init[1]; this.m21 = init[2]; this.m22 = init[3];
+        this.m41 = init[4]; this.m42 = init[5];
+      }
+    }
+    translate(x = 0, y = 0, z = 0) { return this; }
+    scale(x = 1, y = undefined, z = 1, originX = 0, originY = 0, originZ = 0) { return this; }
+    rotate(angle = 0, originX = 0, originY = 0) { return this; }
+    multiply(other) { return this; }
+    preMultiplySelf(other) { return this; }
+    invertSelf() { return this; }
+    multiplySelf(other) { return this; }
+  };
+}
+if (typeof globalThis.ImageData === 'undefined') {
+  globalThis.ImageData = class ImageData {
+    constructor(width, height) {
+      this.width = width; this.height = height;
+      this.data = new Uint8ClampedArray(width * height * 4);
+    }
+  };
+}
+if (typeof globalThis.Path2D === 'undefined') {
+  globalThis.Path2D = class Path2D {
+    constructor() {}
+    addPath() {} closePath() {} moveTo() {} lineTo() {}
+    bezierCurveTo() {} quadraticCurveTo() {} arc() {} arcTo() {}
+    ellipse() {} rect() {}
+  };
+}
 `,
       },
       external: [

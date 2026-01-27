@@ -28,3 +28,4 @@ relatorio_*.md
 .vercel
 .env*.local
 CREDENTIALS_CONFIG.md
+CREDENCIAIS_CONFIGURACAO.md
