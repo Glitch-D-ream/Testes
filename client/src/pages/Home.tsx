@@ -1,126 +1,113 @@
 
-import React, { useState } from 'react';
+import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Moon, Sun, ShieldCheck, Database, Cpu, Search, Activity, BarChart3, Terminal } from 'lucide-react';
+import { Shield, Search, Database, BarChart3, ChevronRight } from 'lucide-react';
 import SearchBar from '../components/SearchBar';
-import { Button } from '../components/Button';
 import { useDarkMode } from '../hooks/useDarkMode';
 
 export default function Home() {
   const navigate = useNavigate();
-  const { isDark, toggle } = useDarkMode();
+  const { isDark } = useDarkMode();
 
   return (
-    <div className="min-h-screen bg-background text-foreground cyber-grid selection:bg-emerald-500 selection:text-black">
-      {/* Navigation - Minimalist Cyber */}
-      <nav className="sticky top-0 z-50 border-b border-border bg-background/80 backdrop-blur-xl">
+    <div className="min-h-screen bg-white dark:bg-slate-950 selection:bg-blue-100 selection:text-blue-900">
+      {/* Header Simples */}
+      <nav className="border-b border-slate-100 dark:border-slate-900 bg-white/80 dark:bg-slate-950/80 backdrop-blur-md sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16 items-center">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-white dark:bg-emerald-500 rounded-sm flex items-center justify-center rotate-3 hover:rotate-0 transition-transform duration-300">
-                <ShieldCheck className="text-black" size={24} />
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
+                <Shield className="text-white" size={18} />
               </div>
-              <div className="flex flex-col">
-                <span className="font-black text-xl tracking-tighter leading-none">SETH VII</span>
-                <span className="text-[8px] font-bold tracking-[0.2em] text-emerald-500 uppercase">Cyber Intelligence</span>
-              </div>
+              <span className="font-bold text-xl text-slate-900 dark:text-white tracking-tight">Seth VII</span>
             </div>
-            
-            <div className="flex items-center gap-6">
-              <div className="hidden md:flex items-center gap-6 text-[10px] font-black uppercase tracking-widest">
-                <a href="/dashboard" className="hover:text-emerald-500 transition-colors">Global Index</a>
-                <a href="/methodology" className="hover:text-emerald-500 transition-colors">Protocol</a>
-                <a href="/about" className="hover:text-emerald-500 transition-colors">Terminal</a>
-              </div>
-              <button 
-                onClick={toggle}
-                className="p-2 hover:bg-white/5 rounded-full transition-colors"
-              >
-                {isDark ? <Sun size={18} /> : <Moon size={18} />}
+            <div className="flex items-center gap-6 text-sm font-medium text-slate-600 dark:text-slate-400">
+              <a href="#" className="hover:text-blue-600 transition-colors">Metodologia</a>
+              <a href="#" className="hover:text-blue-600 transition-colors">Transparência</a>
+              <button className="px-4 py-2 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-lg text-sm font-bold hover:opacity-90 transition-opacity">
+                Acessar API
               </button>
             </div>
           </div>
         </div>
       </nav>
 
-      {/* Hero Section - High Impact */}
-      <main className="relative pt-20 pb-32 overflow-hidden">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-          <div className="max-w-3xl">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 mb-8">
-              <Activity size={14} className="text-emerald-500 animate-pulse" />
-              <span className="text-[10px] font-black text-emerald-500 uppercase tracking-widest">Live Audit System v2.0</span>
-            </div>
-            
-            <h1 className="text-6xl md:text-8xl font-black tracking-tighter leading-[0.85] mb-8">
-              AUDITE A <span className="text-emerald-500">VERDADE</span> POLÍTICA.
-            </h1>
-            
-            <p className="text-lg md:text-xl text-muted-foreground font-medium mb-12 max-w-xl leading-relaxed">
-              O Seth VII cruza discursos brutos com execução orçamentária real para expor inconsistências com precisão forense.
-            </p>
-
-            <div className="max-w-2xl bg-card border border-border p-2 rounded-xl shadow-2xl">
-              <SearchBar />
-            </div>
-
-            <div className="mt-8 flex items-center gap-4 text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
-              <span>Popular:</span>
-              <button onClick={() => navigate('/analyze/nikolas')} className="hover:text-emerald-500 underline decoration-emerald-500/30">Nikolas Ferreira</button>
-              <button onClick={() => navigate('/analyze/lula')} className="hover:text-emerald-500 underline decoration-emerald-500/30">Lula</button>
-              <button onClick={() => navigate('/analyze/lira')} className="hover:text-emerald-500 underline decoration-emerald-500/30">Arthur Lira</button>
-            </div>
+      {/* Hero Section */}
+      <main className="pt-20 pb-32">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 mb-8">
+            <span className="text-xs font-bold text-blue-600 dark:text-blue-400">Auditoria Política em Tempo Real</span>
           </div>
-        </div>
+          
+          <h1 className="text-5xl md:text-7xl font-extrabold text-slate-900 dark:text-white tracking-tight mb-6">
+            A verdade por trás dos <br className="hidden md:block" /> 
+            <span className="text-blue-600">discursos políticos.</span>
+          </h1>
+          
+          <p className="text-lg md:text-xl text-slate-600 dark:text-slate-400 mb-12 max-w-2xl mx-auto leading-relaxed">
+            O Seth VII utiliza inteligência artificial para cruzar promessas e discursos com dados oficiais de execução orçamentária e legislativa.
+          </p>
 
-        {/* Decorative background element */}
-        <div className="absolute top-0 right-0 w-1/2 h-full opacity-20 pointer-events-none">
-            <div className="absolute top-1/2 right-0 -translate-y-1/2 w-[600px] h-[600px] bg-emerald-500/20 rounded-full blur-[120px]" />
+          <div className="max-w-2xl mx-auto bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-2 rounded-2xl shadow-xl shadow-blue-500/5">
+            <SearchBar />
+          </div>
+
+          <div className="mt-8 flex items-center justify-center gap-4 text-sm text-slate-500">
+            <span>Buscas recentes:</span>
+            <button onClick={() => navigate('/analyze/nikolas')} className="font-semibold text-slate-900 dark:text-white hover:text-blue-600 transition-colors">Nikolas Ferreira</button>
+            <button onClick={() => navigate('/analyze/lira')} className="font-semibold text-slate-900 dark:text-white hover:text-blue-600 transition-colors">Arthur Lira</button>
+          </div>
         </div>
       </main>
 
-      {/* Stats/Features - Grid Terminal Style */}
-      <section className="py-24 border-t border-border bg-black/50">
+      {/* Features Grid */}
+      <section className="py-24 bg-slate-50 dark:bg-slate-900/50 border-y border-slate-100 dark:border-slate-900">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-1">
-            <div className="p-8 border border-border bg-card/50 hover:bg-emerald-500/[0.02] transition-colors group">
-              <Terminal className="text-emerald-500 mb-6 group-hover:scale-110 transition-transform" size={32} />
-              <h3 className="text-xl font-black mb-4">EXTRAÇÃO FORENSE</h3>
-              <p className="text-sm text-muted-foreground leading-relaxed">
-                Nossa IA não resume; ela extrai citações diretas e as anexa a fatos oficiais irrefutáveis.
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
+            <div className="space-y-4">
+              <div className="w-12 h-12 bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800 flex items-center justify-center text-blue-600">
+                <Search size={24} />
+              </div>
+              <h3 className="text-xl font-bold text-slate-900 dark:text-white">Análise de Discurso</h3>
+              <p className="text-slate-600 dark:text-slate-400 leading-relaxed">
+                Mineramos discursos brutos em redes sociais e notícias para extrair promessas literais e compromissos públicos.
               </p>
             </div>
-            
-            <div className="p-8 border border-border bg-card/50 hover:bg-emerald-500/[0.02] transition-colors group">
-              <Database className="text-emerald-500 mb-6 group-hover:scale-110 transition-transform" size={32} />
-              <h3 className="text-xl font-black mb-4">NÚCLEO DE DADOS</h3>
-              <p className="text-sm text-muted-foreground leading-relaxed">
-                Conexão direta com SICONFI, Portal da Transparência e API da Câmara para validação fiscal em tempo real.
+
+            <div className="space-y-4">
+              <div className="w-12 h-12 bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800 flex items-center justify-center text-blue-600">
+                <Database size={24} />
+              </div>
+              <h3 className="text-xl font-bold text-slate-900 dark:text-white">Dados Oficiais</h3>
+              <p className="text-slate-600 dark:text-slate-400 leading-relaxed">
+                Cruzamento automático com o Portal da Transparência, SICONFI e API da Câmara para validação de fatos.
               </p>
             </div>
-            
-            <div className="p-8 border border-border bg-card/50 hover:bg-emerald-500/[0.02] transition-colors group">
-              <BarChart3 className="text-emerald-500 mb-6 group-hover:scale-110 transition-transform" size={32} />
-              <h3 className="text-xl font-black mb-4">BENCHMARKING</h3>
-              <p className="text-sm text-muted-foreground leading-relaxed">
-                Compare a produtividade e a fidelidade de qualquer político com a média real de seu grupo ideológico.
+
+            <div className="space-y-4">
+              <div className="w-12 h-12 bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800 flex items-center justify-center text-blue-600">
+                <BarChart3 size={24} />
+              </div>
+              <h3 className="text-xl font-bold text-slate-900 dark:text-white">Índice de Confiança</h3>
+              <p className="text-slate-600 dark:text-slate-400 leading-relaxed">
+                Cada análise gera um score de credibilidade baseado na consistência entre o que é dito e o que é efetivamente feito.
               </p>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Footer - Minimalist */}
-      <footer className="py-12 border-t border-border">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row justify-between items-center gap-8">
+      {/* Footer */}
+      <footer className="py-12 border-t border-slate-100 dark:border-slate-900">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row justify-between items-center gap-6">
           <div className="flex items-center gap-2">
-            <span className="font-black text-sm tracking-tighter">SETH VII</span>
-            <span className="text-[10px] text-muted-foreground">© 2026 AUDIT PROTOCOL</span>
+            <span className="font-bold text-slate-900 dark:text-white">Seth VII</span>
+            <span className="text-slate-400 text-sm">© 2026 Auditoria Política</span>
           </div>
-          <div className="flex gap-8 text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-            <a href="#" className="hover:text-emerald-500 transition-colors">Privacidade</a>
-            <a href="#" className="hover:text-emerald-500 transition-colors">API</a>
-            <a href="#" className="hover:text-emerald-500 transition-colors">Github</a>
+          <div className="flex gap-8 text-sm font-medium text-slate-500">
+            <a href="#" className="hover:text-blue-600 transition-colors">Privacidade</a>
+            <a href="#" className="hover:text-blue-600 transition-colors">Termos</a>
+            <a href="#" className="hover:text-blue-600 transition-colors">Contato</a>
           </div>
         </div>
       </footer>
