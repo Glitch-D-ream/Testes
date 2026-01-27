@@ -11,12 +11,21 @@ export default function EvidenceVault({ sources }: EvidenceVaultProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [selectedSource, setSelectedSource] = useState<any>(null);
 
-  const evidenceList = [
-    { type: 'API', name: 'Câmara dos Deputados', status: 'Sincronizado', icon: <Database size={16} /> },
-    { type: 'API', name: 'SICONFI (Tesouro Nacional)', status: 'Auditado', icon: <ShieldCheck size={16} /> },
-    { type: 'DOC', name: 'Diário Oficial da União', status: 'Extraído', icon: <FileText size={16} /> },
-    { type: 'WEB', name: 'Portais de Notícias & Blogs', status: 'Minerado', icon: <Link size={16} /> },
-  ];
+  const getEvidenceList = () => {
+    const list = [
+      { type: 'API', name: 'Câmara dos Deputados', status: sources?.projects?.length > 0 ? 'Sincronizado' : 'Consulta Direta', icon: <Database size={16} /> },
+      { type: 'API', name: 'SICONFI (Tesouro Nacional)', status: sources?.budgetVerdict ? 'Auditado' : 'Base Regional', icon: <ShieldCheck size={16} /> },
+      { type: 'WEB', name: 'Google News / RSS', status: 'Monitorado', icon: <Link size={16} /> },
+    ];
+
+    if (sources?.absenceReport) {
+      list.push({ type: 'DOC', name: 'Portal da Transparência', status: 'Extraído', icon: <FileText size={16} /> });
+    }
+
+    return list;
+  };
+
+  const evidenceList = getEvidenceList();
 
   return (
     <div className="mt-8">
@@ -98,31 +107,31 @@ export default function EvidenceVault({ sources }: EvidenceVaultProps) {
                   <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4">Dados Brutos & Documentos</h4>
                   
                   <div className="p-6 rounded-3xl bg-slate-900/30 border border-slate-800/50 space-y-4">
-                    <div className="flex items-center justify-between p-4 bg-slate-900/50 rounded-2xl border border-slate-800">
-                      <div className="flex items-center gap-3">
-                        <FileText className="text-blue-500" size={20} />
-                        <div>
-                          <p className="text-xs font-bold text-slate-200">Parecer_Tecnico_Audit.pdf</p>
-                          <p className="text-[9px] text-slate-500 uppercase font-black">PDF • 2.4MB • Gerado por BrainAgent</p>
+                    {sources?.projects?.slice(0, 2).map((p: any, i: number) => (
+                      <a href={`https://www.camara.leg.br/proposicoesWeb/fichadetramitacao?idProposicao=${p.id}`} target="_blank" rel="noopener noreferrer" key={i} className="flex items-center justify-between p-4 bg-slate-900/50 rounded-2xl border border-slate-800 hover:border-blue-500/30 transition-all">
+                        <div className="flex items-center gap-3">
+                          <FileText className="text-blue-500" size={20} />
+                          <div>
+                            <p className="text-xs font-bold text-slate-200">{p.siglaTipo} {p.numero}/{p.ano}</p>
+                            <p className="text-[9px] text-slate-500 uppercase font-black">PROJETO DE LEI • CÂMARA DOS DEPUTADOS</p>
+                          </div>
                         </div>
-                      </div>
-                      <button className="p-2 text-slate-400 hover:text-white transition-colors">
-                        <ExternalLink size={18} />
-                      </button>
-                    </div>
+                        <ExternalLink size={18} className="text-slate-500"/>
+                      </a>
+                    ))}
 
-                    <div className="flex items-center justify-between p-4 bg-slate-900/50 rounded-2xl border border-slate-800">
-                      <div className="flex items-center gap-3">
-                        <Link className="text-cyan-500" size={20} />
-                        <div>
-                          <p className="text-xs font-bold text-slate-200">Contrato_Licitacao_PE_2025.html</p>
-                          <p className="text-[9px] text-slate-500 uppercase font-black">URL • Transparência PE</p>
+                    {sources?.absenceReport?.pdfLink && (
+                       <a href={sources.absenceReport.pdfLink} target="_blank" rel="noopener noreferrer" className="flex items-center justify-between p-4 bg-slate-900/50 rounded-2xl border border-slate-800 hover:border-blue-500/30 transition-all">
+                        <div className="flex items-center gap-3">
+                          <FileText className="text-red-500" size={20} />
+                          <div>
+                            <p className="text-xs font-bold text-slate-200">Relatório de Faltas</p>
+                            <p className="text-[9px] text-slate-500 uppercase font-black">PDF • PORTAL DA TRANSPARÊNCIA</p>
+                          </div>
                         </div>
-                      </div>
-                      <button className="p-2 text-slate-400 hover:text-white transition-colors">
-                        <ExternalLink size={18} />
-                      </button>
-                    </div>
+                        <ExternalLink size={18} className="text-slate-500"/>
+                      </a>
+                    )}
                   </div>
 
                   <div className="p-6 rounded-3xl bg-blue-500/5 border border-blue-500/10">
