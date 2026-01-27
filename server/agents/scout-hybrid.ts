@@ -9,6 +9,8 @@ import { directSearchImproved } from '../modules/direct-search-improved.ts';
 import { officialSourcesSearch } from '../modules/official-sources-search.ts';
 import { multiScoutAgent } from './multi-scout.ts';
 import { contentScraper } from '../modules/content-scraper.ts';
+import { ingestionService } from '../services/ingestion.service.ts';
+import { douService } from '../services/dou.service.ts';
 
 export interface RawSource {
   title: string;
@@ -47,11 +49,25 @@ export class ScoutHybrid {
     const results = await Promise.all(searchPromises);
     const flatResults = results.flat();
 
+    // Busca complementar no DOU (Diário Oficial da União)
+    logInfo(`[ScoutHybrid] Iniciando busca complementar no DOU.`);
+    const douActs = await douService.searchActs(query);
+    const douResults = douActs.map(act => ({
+      title: `[DOU] ${act.title}`,
+      url: act.url,
+      snippet: act.content.substring(0, 500),
+      source: 'Diário Oficial da União',
+      publishedAt: act.date
+    }));
+
+    // Combinar resultados
+    const allResults = [...flatResults, ...douResults];
+
     // Filtrar e formatar
     const sources: RawSource[] = [];
     const uniqueUrls = new Set<string>();
 
-    for (const r of flatResults) {
+    for (const r of allResults) {
       if (uniqueUrls.has(r.url)) continue;
       uniqueUrls.add(r.url);
 
@@ -112,10 +128,13 @@ export class ScoutHybrid {
     // Processar Diretos (Scraping)
     const uniqueDirectResults = directResults.filter(r => !sources.some(s => s.url === r.url)).slice(0, 8); // Limitar a 8 fontes para evitar lentidão
     
-    logInfo(`[ScoutHybrid] Iniciando scraping paralelo de ${uniqueDirectResults.length} fontes...`);
+    logInfo(`[ScoutHybrid] Iniciando ingestão paralela de ${uniqueDirectResults.length} fontes (Multi-formato)...`);
     const directScrapePromises = uniqueDirectResults.map(async (r) => {
       try {
-        const fullContent = await contentScraper.scrape(r.url);
+        // Usar IngestionService para lidar com PDF, DOCX, XLSX e HTML
+        const ingestionResult = await ingestionService.ingest(r.url);
+        const fullContent = ingestionResult?.content || r.snippet;
+        
         const url = r.url.toLowerCase();
         let layer: 'A' | 'B' | 'C' = 'B';
         if (url.includes('.gov.br') || url.includes('.leg.br')) layer = 'A';
@@ -124,12 +143,13 @@ export class ScoutHybrid {
         return {
           title: r.title,
           url: r.url,
-          content: fullContent || r.snippet,
+          content: fullContent,
           source: r.source,
           publishedAt: r.publishedAt,
           type: 'news' as const,
           confidence: this.whitelist.some(d => r.url.includes(d)) ? 'high' as const : 'medium' as const,
-          credibilityLayer: layer
+          credibilityLayer: layer,
+          metadata: ingestionResult?.metadata
         };
       } catch (e) {
         return null;
