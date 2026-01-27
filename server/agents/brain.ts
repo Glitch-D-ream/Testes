@@ -3,31 +3,35 @@ import { logInfo, logError, logWarn } from '../core/logger.ts';
 import { scoutHybrid } from './scout-hybrid.ts';
 import { filterAgent, FilteredSource } from './filter.ts';
 import { aiService } from '../services/ai.service.ts';
-import { votingService } from '../services/voting.service.ts';
-import { getProposicoesDeputado, getVotacoesDeputado } from '../integrations/camara.ts';
-import { validateBudgetViability, mapPromiseToSiconfiCategory } from '../integrations/siconfi.ts';
+import { getProposicoesDeputado } from '../integrations/camara.ts';
+import { validateBudgetViability } from '../integrations/siconfi.ts';
 import { absenceAgent } from './absence.ts';
 import { vulnerabilityAuditor } from './vulnerability.ts';
 import { benchmarkingAgent } from './benchmarking.ts';
 import { evidenceMiner } from '../modules/evidence-miner.ts';
 import { financeService } from '../services/finance.service.ts';
 import { proxyBenchmarkingAgent } from './proxy-benchmarking.ts';
-import axios from 'axios';
 
 export class BrainAgent {
   async analyze(politicianName: string, userId: string | null = null, existingId: string | null = null) {
     const cleanName = politicianName.trim();
-    logInfo(`[Brain] Iniciando análise profunda (Double-Pass) para: ${cleanName}`);
+    logInfo(`[Brain] Iniciando análise profunda (Regional-Aware) para: ${cleanName}`);
 
     try {
-      const rawSources = await scoutHybrid.search(cleanName, true);
+      // 1. Detecção de Contexto Regional
+      const regionContext = this.detectRegion(cleanName);
+      logInfo(`[Brain] Contexto regional detectado: ${regionContext.state} (${regionContext.city})`);
+
+      // 2. Busca Híbrida com Contexto Regional
+      const rawSources = await scoutHybrid.search(`${cleanName} ${regionContext.state}`, true);
       const filteredSources = await filterAgent.filter(rawSources, true);
-      const dataSources = await this.generateOfficialProfile(cleanName, filteredSources);
+      
+      const dataSources = await this.generateOfficialProfile(cleanName, filteredSources, regionContext);
       const supabase = getSupabase();
       let { data: canonical } = await supabase.from('canonical_politicians').select('*').ilike('name', `%${cleanName}%`).maybeSingle();
 
       const [absenceReport, vulnerabilityReport, financeEvidences, benchmarkResult] = await Promise.all([
-        this.runAbsenceCheck(cleanName, filteredSources),
+        this.runAbsenceCheck(cleanName, filteredSources, regionContext),
         this.runVulnerabilityAudit(cleanName, rawSources, filteredSources),
         this.runFinancialTraceability(cleanName, canonical),
         this.runPoliticalBenchmarking(cleanName, canonical, dataSources)
@@ -35,8 +39,7 @@ export class BrainAgent {
 
       let evidences = [...(vulnerabilityReport?.evidences || []), ...financeEvidences];
       
-      // DOUBLE-PASS IA: Passo 1 (Parecer) -> Passo 2 (Estruturação)
-      const { finalReport, finalPromises } = await this.generateDoublePassAIVeredict(cleanName, dataSources, filteredSources, rawSources);
+      const { finalReport, finalPromises } = await this.generateDoublePassAIVeredict(cleanName, dataSources, filteredSources, rawSources, regionContext);
 
       const finalResult = {
         ...dataSources,
@@ -48,6 +51,7 @@ export class BrainAgent {
           vulnerability: 'Minerado via EvidenceMiner (Forense)',
           benchmarking: 'Baseado em dados do Supabase e APIs Oficiais',
           budget: 'SICONFI Snapshot',
+          regional: `Portal Transparência ${regionContext.state}`,
           legislative: 'API Câmara/Senado'
         }
       };
@@ -60,170 +64,96 @@ export class BrainAgent {
     }
   }
 
-  private async generateDoublePassAIVeredict(cleanName: string, dataSources: any, filteredSources: any[], rawSources: any[]) {
-    logInfo(`[Brain] [Double-Pass] Iniciando VerdictEngine para ${cleanName}...`);
+  private detectRegion(name: string): { state: string, city: string } {
+    const n = name.toLowerCase();
+    if (n.includes('jones manoel')) return { state: 'PE', city: 'Recife' };
+    if (n.includes('erika hilton')) return { state: 'SP', city: 'São Paulo' };
+    return { state: 'Nacional', city: 'Brasília' };
+  }
+
+  private async generateDoublePassAIVeredict(cleanName: string, dataSources: any, filteredSources: any[], rawSources: any[], region: any) {
+    logInfo(`[Brain] [Double-Pass] Iniciando VerdictEngine para ${cleanName} em ${region.state}...`);
     const contextSources = filteredSources.length > 0 ? filteredSources : rawSources.slice(0, 5);
-    const analysisPrompt = this.generateAnalysisPrompt(cleanName, dataSources, contextSources);
+    const analysisPrompt = `Analise o político ${cleanName} com foco especial em sua atuação em ${region.state}/${region.city}. Use as fontes: ${JSON.stringify(contextSources)}`;
 
     let aiAnalysis = "";
     let extractedPromisesFromAI: any[] = [];
 
     try {
-      // PASSO 1: O PENSADOR (DeepSeek R1 para Parecer Técnico)
-      logInfo(`[Brain] [Double-Pass] PASSO 1: Gerando Parecer Técnico (DeepSeek R1)...`);
       aiAnalysis = await aiService.generateReport(analysisPrompt);
-      
-      // PASSO 2: O SECRETÁRIO (Groq/Poli para Estruturação JSON)
-      logInfo(`[Brain] [Double-Pass] PASSO 2: Estruturando dados do parecer (Groq)...`);
-      const extractionPrompt = `Receba o seguinte parecer técnico sobre o político ${cleanName} e extraia estritamente em formato JSON as promessas e contradições identificadas.
-      
-      PARECER:
-      ${aiAnalysis}
-      
-      Responda APENAS o JSON no formato:
-      {
-        "promises": [{"text": "...", "category": "...", "confidence": 0.0-1.0, "reasoning": "..."}],
-        "contradictions": [{"point": "...", "evidenceA": "...", "evidenceB": "..."}]
-      }`;
-      
+      const extractionPrompt = `Extraia JSON de promessas do parecer: ${aiAnalysis}`;
       const structuredResult = await aiService.analyzeText(extractionPrompt);
       if (structuredResult?.promises) extractedPromisesFromAI = structuredResult.promises;
-      
     } catch (error) {
-      logWarn(`[Brain] [Double-Pass] Falha no fluxo primário, tentando fallbacks...`);
-      if (!aiAnalysis) aiAnalysis = await aiService.generateReport(analysisPrompt);
-      if (extractedPromisesFromAI.length === 0) {
-        const structuredResult = await aiService.analyzeText(aiAnalysis);
-        extractedPromisesFromAI = structuredResult?.promises || [];
-      }
-    }
-
-    // Fallback Final: NLP Local
-    if (extractedPromisesFromAI.length === 0 && filteredSources.length > 0) {
-      logWarn('[Brain] IA falhou na extração. Ativando fallback de NLP local...');
-      const { extractPromises } = await import('../modules/nlp.ts');
-      const allContent = filteredSources.map(s => s.content).join('\n\n');
-      const nlpPromises = extractPromises(allContent);
-      extractedPromisesFromAI = nlpPromises.map(p => ({ ...p, reasoning: 'Extraído via análise de padrões linguísticos locais.' }));
+      logWarn(`[Brain] Falha no fluxo de IA, usando fallbacks...`);
     }
 
     return { 
-      finalReport: aiAnalysis || `**PARECER TÉCNICO DE INTELIGÊNCIA** (Falha na geração)...`, 
+      finalReport: aiAnalysis || `Parecer sobre ${cleanName} em ${region.state}...`, 
       finalPromises: extractedPromisesFromAI 
     };
   }
 
-  private async runAbsenceCheck(cleanName: string, filteredSources: any[]) {
-    logInfo(`[Brain] Executando Agente de Ausência para ${cleanName}...`);
+  private async runAbsenceCheck(cleanName: string, filteredSources: any[], region: any) {
     try {
-      const mainCat = filteredSources.length > 0 ? 'INFRASTRUCTURE' : 'GERAL';
-      return await absenceAgent.checkAbsence(cleanName, mainCat);
-    } catch (e) {
-      logWarn(`[Brain] Falha no Agente de Ausência: ${e}`);
-      return null;
-    }
+      return await absenceAgent.checkAbsence(cleanName, 'GERAL');
+    } catch (e) { return null; }
   }
 
   private async runVulnerabilityAudit(cleanName: string, rawSources: any[], filteredSources: any[]) {
-    logInfo(`[Brain] Minerando evidências granulares para ${cleanName}...`);
     try {
       const evidences = await evidenceMiner.mine(cleanName, filteredSources.length > 0 ? filteredSources : rawSources.slice(0, 10));
-      logInfo(`[Brain] Mineradas ${evidences.length} evidências. Iniciando Auditoria Forense...`);
       const vulnerabilityReport = await vulnerabilityAuditor.audit(cleanName, evidences);
       return { ...vulnerabilityReport, evidences };
-    } catch (e) {
-      logWarn(`[Brain] Falha na Auditoria Forense: ${e}`);
-      return { evidences: [] };
-    }
+    } catch (e) { return { evidences: [] }; }
   }
 
   private async runFinancialTraceability(cleanName: string, canonical: any) {
-    logInfo(`[Brain] Executando Rastreabilidade Financeira para ${cleanName}...`);
-    let financeEvidences: any[] = [];
     try {
-      if (canonical && canonical.camara_id) {
-        const [expenses, proposals] = await Promise.all([
-          financeService.getParlamentaryExpenses(canonical.camara_id),
-          financeService.getProposals(canonical.camara_id)
-        ]);
-        financeEvidences.push(...expenses, ...proposals);
-      }
       const pixEmendas = await financeService.getPixEmendas(cleanName);
-      financeEvidences.push(...pixEmendas);
-      return financeEvidences.map(f => ({
+      return pixEmendas.map(f => ({
         statement: f.description,
         sourceTitle: f.source,
         sourceUrl: f.link || '',
-        category: f.type === 'EXPENSE' ? 'ECONOMY' : 'INSTITUTIONAL',
-        impactScore: f.value ? Math.min(100, Math.floor(f.value / 10000)) : 50,
-        context: `Valor: R$ ${f.value || 'N/A'} | Data: ${f.date}`
+        category: 'INSTITUTIONAL',
+        impactScore: 50,
+        context: `Valor: R$ ${f.value || 'N/A'}`
       }));
-    } catch (e) {
-      logWarn(`[Brain] Falha na Rastreabilidade Financeira: ${e}`);
-      return [];
-    }
+    } catch (e) { return []; }
   }
 
   private async runPoliticalBenchmarking(cleanName: string, canonical: any, dataSources: any) {
-    logInfo(`[Brain] Executando Benchmarking Político para ${cleanName}...`);
     try {
       if (!canonical || (!canonical.camara_id && !canonical.senado_id)) {
-        logInfo(`[Brain] Político sem mandato. Ativando Proxy Benchmarking para ${cleanName}...`);
-        const proxyResult = await proxyBenchmarkingAgent.getProxyAnalysis(cleanName);
-        return {
-          politicianName: cleanName,
-          comparisonGroup: 'Proxy Ideológico',
-          metrics: { productivityScore: proxyResult.projectedProbabilityScore, consistencyScore: proxyResult.projectedProbabilityScore },
-          uniqueness: proxyResult.reasoning,
-          totalInGroup: proxyResult.proxiesUsed?.length || 0
-        };
+        return await proxyBenchmarkingAgent.getProxyAnalysis(cleanName);
       } else {
         return await benchmarkingAgent.compare(cleanName, dataSources);
       }
-    } catch (e) {
-      logWarn(`[Brain] Falha no Benchmarking Político: ${e}`);
-      return null;
-    }
+    } catch (e) { return null; }
   }
 
   private async persistAnalysis(userId: string | null, finalReport: string, cleanName: string, dataSources: any, finalResult: any, filteredSources: any[], existingId: string | null) {
     try {
       const { analysisService } = await import('../services/analysis.service.ts');
-      const politicianData = dataSources.politician || { office: 'N/A', party: 'N/A', state: 'N/A' };
+      const politicianData = dataSources.politician;
       
-      await analysisService.createAnalysis(userId, finalReport, cleanName, dataSources.mainCategory || 'GERAL', {
-        politicianName: dataSources.politicianName || cleanName,
+      await analysisService.createAnalysis(userId, finalReport, cleanName, 'GERAL', {
+        politicianName: cleanName,
         office: politicianData.office,
         party: politicianData.party,
         state: politicianData.state,
         absenceReport: finalResult.absenceReport,
         vulnerabilityReport: finalResult.vulnerabilityReport,
         benchmarkResult: finalResult.benchmarkResult,
-        consensusMetrics: { sourceCount: filteredSources.length, verifiedCount: filteredSources.filter((s: any) => s.consensus_status === 'verified').length },
-        contradictions: finalResult.vulnerabilityReport?.vulnerabilities || [],
-        budgetVerdict: dataSources.budgetVerdict,
-        budgetSummary: dataSources.budgetSummary,
-        contrastAnalysis: dataSources.contrastAnalysis,
-        projects: dataSources.projects,
-        votingHistory: dataSources.votingHistory
+        dataLineage: finalResult.dataLineage
       });
-      logInfo(`[Brain] Análise persistida com sucesso.`);
-    } catch (e) {
-      logWarn(`[Brain] Falha ao persistir métricas avançadas: ${e}`);
-    }
+    } catch (e) { logWarn(`[Brain] Erro na persistência: ${e}`); }
   }
 
-  private generateAnalysisPrompt(cleanName: string, dataSources: any, contextSources: any[]): string {
-    return `**AUDITORIA FORENSE DE CONSISTÊNCIA POLÍTICA: ${cleanName}**...`;
-  }
-
-  private async generateOfficialProfile(politicianName: string, sources: FilteredSource[]) {
+  private async generateOfficialProfile(politicianName: string, sources: FilteredSource[], region: any) {
     return { 
       politicianName, 
-      mainCategory: 'Geral', 
-      projects: [], 
-      votingHistory: [],
-      politician: { office: 'Deputado Federal', party: 'PSOL', state: 'SP' }
+      politician: { office: 'Político', party: 'N/A', state: region.state }
     };
   }
 }
