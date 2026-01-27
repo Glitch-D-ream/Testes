@@ -29,7 +29,8 @@ export default function AnalysisNew() {
             benchmarkResult: data.data_sources?.benchmarkResult,
             consensusMetrics: data.data_sources?.consensusMetrics,
             absenceReport: data.data_sources?.absenceReport,
-            financeEvidences: data.data_sources?.financeEvidences
+            financeEvidences: data.data_sources?.financeEvidences,
+            contradictions: data.data_sources?.contradictions
           });
         }
       } catch (err) {

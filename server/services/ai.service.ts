@@ -24,36 +24,50 @@ export interface AIAnalysisResult {
 
 export class AIService {
   private promptTemplate(text: string): string {
-    return `Você é o Auditor-Chefe da Seth VII, especializado em análise de risco político e viabilidade fiscal. Sua missão é realizar uma auditoria profunda e exaustiva do texto fornecido.
-	
-	DIRETRIZES DE AUDITORIA (RIGOR MÁXIMO):
-	1. PROFUNDIDADE ANALÍTICA: Não aceite respostas superficiais. Se o texto menciona um projeto, analise sua viabilidade técnica e política.
-	2. FIDELIDADE AOS FATOS: Extraia apenas o que está explicitamente no texto ou é uma dedução lógica direta. Não invente dados fictícios.
-	3. EXTRAÇÃO DE INTENÇÕES: Identifique promessas, compromissos ou tendências de atuação. Use o campo "reasoning" para explicar o PORQUÊ daquela promessa ser viável ou não.
-	4. ANÁLISE DE RISCO: Identifique obstáculos reais (fiscais, legislativos, políticos).
-	5. PROIBIDO ALUCINAR: Se não houver dados para um campo numérico, use 0. Nunca invente valores.
+    return `Você é o Núcleo de Inteligência Forense da Seth VII. Sua missão é realizar uma auditoria técnica, FRIA e IMPARCIAL sobre o comportamento de agentes públicos.
+
+DIRETRIZES DE AUDITORIA:
+1. POSTURA: Seja clínico. Evite adjetivos emocionais. Foque no GAP (distância) entre o DISCURSO e o FATO.
+2. EXTRAÇÃO DE DISCURSO: Identifique citações diretas ou promessas claras. Registre a fonte.
+3. IDENTIFICAÇÃO DE CONTRADIÇÕES: Compare o discurso com dados de votação, gastos ou leis.
+4. RIGOR: Se não houver evidência clara de contradição, não a invente. Aponte apenas inconsistências lógicas ou factuais.
 
 Responda estritamente em formato JSON:
 {
   "promises": [
     {
-      "text": "A promessa ou intenção clara",
+      "text": "Citação direta ou promessa clara",
       "category": "Saúde|Educação|Economia|Segurança|Infraestrutura|Geral",
-      "estimatedValue": 0, 
       "confidence": 0.0 a 1.0,
-      "source_url": "URL da fonte onde a promessa foi identificada",
-      "quote": "Citação exata do texto que comprova a promessa",
-      "negated": false,
-      "conditional": false,
-      "reasoning": "Análise técnica detalhada sobre a viabilidade fiscal e política.",
-      "risks": ["Risco técnico 1", "Risco político 2"]
+      "source_url": "URL da fonte",
+      "quote": "Texto original exato",
+      "reasoning": "Explicação técnica da inconsistência ou viabilidade.",
+      "risks": ["Risco 1", "Risco 2"]
     }
   ],
-  "overallSentiment": "Técnico|Populista|Informativo|Oportunista",
+  "contradictions": [
+    {
+      "topic": "Assunto da contradição",
+      "discourse": {
+        "text": "O que o alvo disse",
+        "source": "Nome da fonte",
+        "url": "URL",
+        "date": "Data"
+      },
+      "reality": {
+        "text": "O fato oficial que contradiz",
+        "source": "Fonte oficial (Câmara, SICONFI, etc)",
+        "url": "URL oficial",
+        "date": "Data do fato"
+      },
+      "gapAnalysis": "Análise fria do desvio entre discurso e fato."
+    }
+  ],
+  "overallSentiment": "Analítico|Factual|Inconsistente",
   "credibilityScore": 0-100,
   "verdict": {
-    "facts": ["Fato principal identificado"],
-    "skepticism": ["Obstáculo crítico para o sucesso do político"]
+    "facts": ["Fato 1", "Fato 2"],
+    "skepticism": ["Dúvida técnica fundamentada"]
   }
 }
 
@@ -91,6 +105,7 @@ ${text}`;
         if (content && (content.promises || content.verdict || content.facts)) {
           return {
             promises: content.promises || [],
+            contradictions: content.contradictions || [],
             overallSentiment: content.overallSentiment || 'Informativo',
             credibilityScore: content.credibilityScore || 50,
             verdict: content.verdict || { facts: content.facts || [], skepticism: content.skepticism || [] }
