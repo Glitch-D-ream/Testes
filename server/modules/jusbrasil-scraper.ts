@@ -23,15 +23,28 @@ export class JusBrasilScraper {
     logInfo(`[JusBrasilScraper] Iniciando busca jurídica especializada para: ${politicianName}`);
     
     try {
-      // 1. Buscar links do JusBrasil via DirectSearch
-      const query = `site:jusbrasil.com.br "${politicianName}" processo OR jurisprudência`;
-      const searchResults = await directSearchImproved.search(query);
+      // 1. Buscar links do JusBrasil via DirectSearch (Query mais flexível)
+      const queries = [
+        `site:jusbrasil.com.br "${politicianName}"`,
+        `"${politicianName}" JusBrasil processo`,
+        `"${politicianName}" JusBrasil jurisprudência`
+      ];
       
-      const jusLinks = searchResults
-        .filter(r => r.url.includes('jusbrasil.com.br'))
+      let allResults: any[] = [];
+      for (const q of queries) {
+        const results = await directSearchImproved.search(q);
+        allResults = [...allResults, ...results];
+      }
+      
+      // Remover duplicatas e filtrar por JusBrasil
+      const jusLinks = allResults
+        .filter((r, index, self) => 
+          r.url.includes('jusbrasil.com.br') && 
+          self.findIndex(t => t.url === r.url) === index
+        )
         .slice(0, 5);
 
-      logInfo(`[JusBrasilScraper] Encontrados ${jusLinks.length} links no JusBrasil.`);
+      logInfo(`[JusBrasilScraper] Encontrados ${jusLinks.length} links únicos no JusBrasil.`);
 
       const records: JusBrasilRecord[] = [];
 

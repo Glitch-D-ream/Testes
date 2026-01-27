@@ -101,9 +101,22 @@ export class BrowserScraper {
         const selectors = 'script, style, nav, footer, header, aside, iframe, noscript, .ads, .advertisement, .social-share, .comments, .cookie-banner, #onetrust-consent-sdk';
         document.querySelectorAll(selectors).forEach(el => el.remove());
       });
-
-      // Extração de conteúdo
+      // Extração de conteúdo (Otimizado para conteúdo completo e bypass de overlays)
       const content = await page.evaluate(() => {
+        // 1. Remover elementos obstrutivos (paywalls, modais, ads)
+        const toRemove = [
+          'nav', 'footer', 'script', 'style', 'iframe', 'header', 
+          '.ads', '.sidebar', '.modal', '.overlay', '.paywall', 
+          '[id*="paywall"]', '[class*="paywall"]', '[id*="modal"]', '[class*="modal"]'
+        ];
+        toRemove.forEach(selector => {
+          document.querySelectorAll(selector).forEach(el => (el as HTMLElement).style.display = 'none');
+        });
+
+        // 2. Restaurar scroll se estiver bloqueado por modal
+        document.body.style.overflow = 'visible';
+        document.documentElement.style.overflow = 'visible';
+
         const selectors = [
           'article', 'main', '.content-text__container', '.c-news__body', 
           '.c-article__content', '.texto-materia', '.c-content-text', 
@@ -117,7 +130,7 @@ export class BrowserScraper {
         let root: Element | null = null;
         for (const s of selectors) {
           const el = document.querySelector(s);
-          if (el && el.innerText.length > 500) {
+          if (el && el.innerText.length > 400) {
             root = el;
             break;
           }
@@ -128,10 +141,11 @@ export class BrowserScraper {
         const elements = Array.from(root.querySelectorAll('p, h1, h2, h3, li, div[class*="text"], div[class*="content"]'));
         
         return elements
-          .map(el => (el as HTMLElement).innerText.trim())
-          .filter(t => t.length > 40 && !t.includes('©') && !t.includes('Copyright'))
-          .filter((t, i, arr) => arr.indexOf(t) === i)
-          .join('\n\n');
+          .map(el => (el as HTMLElement).innerText)
+          .filter(text => text.length > 20)
+          .join('\n\n')
+          .replace(/\s+/g, ' ')
+          .trim();
       });
 
       const cleanContent = content.trim();

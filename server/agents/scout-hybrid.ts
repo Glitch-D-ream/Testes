@@ -136,12 +136,20 @@ export class ScoutHybrid {
 
     // PARALELIZAR FASE 1 E FASE 2 + Buscas Especializadas
     logInfo(`[ScoutHybrid] FASE 1 & 2: Buscando em fontes oficiais, notícias e processos em paralelo...`);
+    
     const [officialResults, newsResults, interviewResults, legalResults, spResults, jusBrasilResults] = await Promise.all([
-      officialSourcesSearch.search(query).catch(e => { logWarn(`Oficiais falharam: ${e.message}`); return []; }),
+      officialSourcesSearch.search(query).catch(async (e) => { 
+        logWarn(`[ScoutHybrid] APIs Oficiais falharam: ${e.message}. Ativando fallback via Browser...`);
+        // Fallback: Buscar no Google/DuckDuckGo focando em domínios governamentais
+        return directSearchImproved.search(`site:gov.br "${query}" OR site:jus.br "${query}"`);
+      }),
       directSearchImproved.search(query).catch(e => { logWarn(`Busca direta falhou: ${e.message}`); return []; }),
       directSearchImproved.search(`"${query}" entrevista OR declarou OR anunciou`).catch(() => []),
       directSearchImproved.search(`"${query}" processo judicial OR investigação OR tribunal`).catch(() => []),
-      transparenciaSPService.search(query).catch(() => []),
+      transparenciaSPService.search(query).catch(async () => {
+        logWarn(`[ScoutHybrid] Portal Transparência SP falhou. Ativando fallback via Browser...`);
+        return directSearchImproved.search(`site:transparencia.sp.gov.br "${query}"`);
+      }),
       jusBrasilScraper.searchAndScrape(query).catch(() => [])
     ]);
 
