@@ -120,37 +120,47 @@ ${text}`;
   }
 
   async analyzeText(text: string): Promise<AIAnalysisResult> {
+    // Tenta primeiro o Pollinations (Poli IA) se configurado para alta velocidade ou como fallback primário
+    // O Poli IA é gratuito e resiliente, ideal para manter o sistema vivo
+    
     const openRouterKey = process.env.OPENROUTER_API_KEY;
-    if (openRouterKey && !openRouterKey.includes('your-')) {
-      const result = await CircuitBreaker.call(
-        'DeepSeek-R1',
-        () => deepSeekService.analyzeText(text, openRouterKey),
-        async () => {
-          logWarn(`[AI] DeepSeek R1 falhou ou circuito aberto, tentando Groq...`);
-          return null as any;
-        }
-      );
-      if (result) return result;
-    }
-
     const groqKey = process.env.GROQ_API_KEY;
-    if (groqKey && !groqKey.includes('your-')) {
-      const result = await CircuitBreaker.call(
-        'Groq',
-        async () => {
-          const completion = await groqService.generateCompletion('Você é um analista político sênior. Responda apenas JSON.', this.promptTemplate(text));
-          const jsonMatch = completion.match(/\{[\s\S]*\}/);
-          if (jsonMatch) return JSON.parse(jsonMatch[0]) as AIAnalysisResult;
-          throw new Error('JSON inválido do Groq');
-        },
-        async () => {
-          logWarn(`[AI] Groq falhou ou circuito aberto, tentando Pollinations...`);
-          return null as any;
-        }
-      );
-      if (result) return result;
+
+    // Tentativa 1: DeepSeek (Alta Precisão)
+    if (openRouterKey && !openRouterKey.includes('your-')) {
+      try {
+        const result = await CircuitBreaker.call(
+          'DeepSeek-R1',
+          () => deepSeekService.analyzeText(text, openRouterKey),
+          async () => null as any
+        );
+        if (result) return result;
+      } catch (e) {
+        logWarn(`[AI] DeepSeek falhou, escalando...`);
+      }
     }
 
+    // Tentativa 2: Groq (Velocidade)
+    if (groqKey && !groqKey.includes('your-')) {
+      try {
+        const result = await CircuitBreaker.call(
+          'Groq',
+          async () => {
+            const completion = await groqService.generateCompletion('Você é um analista político sênior. Responda apenas JSON.', this.promptTemplate(text));
+            const jsonMatch = completion.match(/\{[\s\S]*\}/);
+            if (jsonMatch) return JSON.parse(jsonMatch[0]) as AIAnalysisResult;
+            throw new Error('JSON inválido do Groq');
+          },
+          async () => null as any
+        );
+        if (result) return result;
+      } catch (e) {
+        logWarn(`[AI] Groq falhou, escalando para Poli IA...`);
+      }
+    }
+
+    // Tentativa Final: Poli IA (Resiliência Total)
+    logInfo(`[AI] Ativando Camada de Resiliência: Poli IA`);
     return await this.analyzeWithOpenSource(text);
   }
 
