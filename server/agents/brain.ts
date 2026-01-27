@@ -12,30 +12,44 @@ import { benchmarkingAgent } from './benchmarking.ts';
 import { evidenceMiner } from '../modules/evidence-miner.ts';
 import { financeService } from '../services/finance.service.ts';
 import { proxyBenchmarkingAgent } from './proxy-benchmarking.ts';
+import { targetDiscoveryService } from '../services/target-discovery.service.ts';
 
 export class BrainAgent {
   async analyze(politicianName: string, userId: string | null = null, existingId: string | null = null) {
     const cleanName = politicianName.trim();
-    logInfo(`[Brain] Iniciando análise profunda (Regional-Aware) para: ${cleanName}`);
+    logInfo(`[Brain] Iniciando análise profunda (Self-Discovery) para: ${cleanName}`);
 
     try {
-      const regionContext = this.detectRegion(cleanName);
-      logInfo(`[Brain] Contexto regional detectado: ${regionContext.state} (${regionContext.city})`);
+      // 1. Descoberta Dinâmica de Alvo (Identidade Autônoma)
+      const profile = await targetDiscoveryService.discover(cleanName);
+      logInfo(`[Brain] Alvo Identificado: ${profile.office} ${profile.name} (${profile.party})`);
 
-      // 1. Coleta e Filtragem (Garantir que fontes brutas não sumam)
-      const rawSources = await scoutHybrid.search(`${cleanName} ${regionContext.state}`, true);
+      const regionContext = { 
+        state: profile.state !== 'Brasil' ? profile.state : this.detectRegion(cleanName).state,
+        city: profile.city || this.detectRegion(cleanName).city
+      };
+
+      // 2. Coleta e Filtragem Baseada no Perfil Descoberto
+      const searchQuery = `${profile.office} ${profile.name} ${profile.party} ${regionContext.state}`;
+      const rawSources = await scoutHybrid.search(searchQuery, true);
       logInfo(`[Brain] Scout coletou ${rawSources.length} fontes brutas.`);
       
       const filteredSources = await filterAgent.filter(rawSources, true);
       logInfo(`[Brain] Filter manteve ${filteredSources.length} fontes relevantes.`);
       
-      const dataSources = await this.generateOfficialProfile(cleanName, filteredSources, regionContext);
+      const dataSources = { 
+        politicianName: profile.name, 
+        politician: { office: profile.office, party: profile.party, state: profile.state } 
+      };
+      
       const supabase = getSupabase();
       let { data: canonical } = await supabase.from('canonical_politicians').select('*').ilike('name', `%${cleanName}%`).maybeSingle();
 
-      // 2. Execução Paralela dos Agentes Especializados
+      // 3. Execução Paralela dos Agentes Especializados (Ajustado pelo Cargo)
+      const isLegislative = profile.office.toLowerCase().includes('deputado') || profile.office.toLowerCase().includes('senador');
+
       const [absenceReport, vulnerabilityReport, financeEvidences, benchmarkResult] = await Promise.all([
-        this.runAbsenceCheck(cleanName, filteredSources, regionContext),
+        isLegislative ? this.runAbsenceCheck(cleanName, filteredSources, regionContext) : Promise.resolve(null),
         this.runVulnerabilityAudit(cleanName, rawSources, filteredSources),
         this.runFinancialTraceability(cleanName, canonical),
         this.runPoliticalBenchmarking(cleanName, canonical, dataSources)
@@ -212,41 +226,11 @@ PARECER:`;
   }
 
   private async generateOfficialProfile(politicianName: string, sources: FilteredSource[], region: any) {
-    const name = politicianName.toLowerCase();
-    
-    // Power Target Resolver: Mapeamento de Políticos Notórios
-    if (name.includes('lula') || name.includes('luiz inácio')) {
-      return {
-        politicianName: 'Luiz Inácio Lula da Silva',
-        politician: { office: 'Presidente da República', party: 'PT', state: 'Brasil' }
-      };
-    }
-    if (name.includes('bolsonaro') || name.includes('jair')) {
-      return {
-        politicianName: 'Jair Messias Bolsonaro',
-        politician: { office: 'Ex-Presidente / Político', party: 'PL', state: 'Brasil' }
-      };
-    }
-    if (name.includes('tarcisio') || name.includes('tarcísio')) {
-      return {
-        politicianName: 'Tarcísio de Freitas',
-        politician: { office: 'Governador', party: 'Republicanos', state: 'SP' }
-      };
-    }
-    if (name.includes('haddad')) {
-      return {
-        politicianName: 'Fernando Haddad',
-        politician: { office: 'Ministro da Fazenda', party: 'PT', state: 'Brasil' }
-      };
-    }
-
-    // Fallback: Tentar extrair do contexto das fontes se não for um Power Target
-    const hasCongressContext = sources.some(s => s.content.toLowerCase().includes('deputado') || s.content.toLowerCase().includes('câmara'));
-    
+    // Agora este método é apenas um fallback, pois usamos o TargetDiscoveryService
     return { 
       politicianName, 
       politician: { 
-        office: hasCongressContext ? 'Deputado Federal' : 'Agente Político', 
+        office: 'Agente Político', 
         party: 'Em Análise', 
         state: region.state 
       }
