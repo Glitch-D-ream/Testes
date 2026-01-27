@@ -210,7 +210,10 @@ export class BrainAgent {
         aiAnalysis: finalReport,
         mainCategory: dataSources.mainCategory,
         promises: finalPromises,
-        dataSources: finalResult
+        dataSources: {
+          ...finalResult,
+          contradictions: vulnerabilityReport?.vulnerabilities || []
+        }
       });
 
       return finalResult;

@@ -20,17 +20,26 @@ export default function AnalysisNew() {
           const data = await response.json();
           setAnalysisData({
             politicianName: data.author || 'Político Auditado',
-            viabilityScore: data.probabilityScore || 0,
-            confidenceLevel: 90,
-            sourcesAnalyzed: data.evidences?.length || 0,
+            viabilityScore: data.probability_score || 0,
+            confidenceLevel: data.data_sources?.consensusMetrics?.sourceCount ? 95 : 70,
+            sourcesAnalyzed: data.data_sources?.consensusMetrics?.sourceCount || 0,
             lastUpdated: new Date(data.created_at).toLocaleDateString('pt-BR'),
-            promises: data.promises || [],
+            promises: data.extracted_promises || [],
+            fullReport: data.text || "Relatório em processamento...",
+            verdict: {
+              summary: data.data_sources?.budgetSummary || "Análise baseada em dados oficiais e discursos minerados.",
+            },
             vulnerabilityReport: data.data_sources?.vulnerabilityReport,
             benchmarkResult: data.data_sources?.benchmarkResult,
             consensusMetrics: data.data_sources?.consensusMetrics,
             absenceReport: data.data_sources?.absenceReport,
             financeEvidences: data.data_sources?.financeEvidences,
-            contradictions: data.data_sources?.contradictions
+            contradictions: data.data_sources?.contradictions || data.data_sources?.vulnerabilityReport?.vulnerabilities?.map((v: any) => ({
+              type: v.type,
+              description: v.description,
+              severity: v.severity,
+              evidence: v.evidence
+            }))
           });
         }
       } catch (err) {
