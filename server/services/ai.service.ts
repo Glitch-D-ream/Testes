@@ -144,9 +144,10 @@ ${text}`;
       } catch (e) { logWarn(`[AI] Groq falhou...`); }
     }
 
-    // 4. Fallback: Camada de Resiliência Gratuita (Poli IA)
-    logInfo(`[AI] Usando Camada de Resiliência Gratuita (Poli IA)`);
-    return await this.analyzeWithOpenSource(text);
+    // 4. Fallback: Nexo de Resiliência Gratuita (Multi-Provedor)
+    logInfo(`[AI] Ativando Nexo de Resiliência Gratuita...`);
+    const { aiResilienceNexus } = await import('./ai-resilience-nexus.ts');
+    return await aiResilienceNexus.chatJSON<AIAnalysisResult>(text);
   }
 
   async generateReport(prompt: string): Promise<string> {
@@ -157,19 +158,15 @@ ${text}`;
       logWarn(`[AI] Gemini Service falhou no relatório. Tentando fallbacks...`); 
     }
 
-    // 2. Fallback para Pollinations
-    const models = ['deepseek-r1', 'qwen-qwq', 'mistral-large'];
-    for (const model of models) {
-      try {
-        logInfo(`[AI] Gerando relatório via Pollinations (${model})...`);
-        const response = await axios.post('https://text.pollinations.ai/', {
-          messages: [{ role: 'user', content: prompt }],
-          model: model
-        }, { timeout: 45000 });
-        if (response.data) return typeof response.data === 'string' ? response.data : JSON.stringify(response.data);
-      } catch (error) { continue; }
+    // 2. Fallback para Nexo de Resiliência
+    try {
+      logInfo(`[AI] Gerando relatório via Nexo de Resiliência...`);
+      const { aiResilienceNexus } = await import('./ai-resilience-nexus.ts');
+      const response = await aiResilienceNexus.chat(prompt);
+      return response.content;
+    } catch (e) {
+      return `FALHA NA GERAÇÃO DE IA. DADOS BRUTOS: ${prompt.substring(0, 500)}`;
     }
-    return `FALHA NA GERAÇÃO DE IA. DADOS BRUTOS: ${prompt.substring(0, 500)}`;
   }
 }
 
