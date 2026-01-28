@@ -1,3 +1,11 @@
+/**
+ * Brain Agent v5.0 - SETH VII
+ * 
+ * Orquestrador principal com integração completa:
+ * - Fase 1: Coleta de Promessas (Entrevistas, Discursos, Plano de Governo)
+ * - Fase 2: Cruzamentos (Promessa vs Voto, Promessa vs Gasto, Temporal)
+ * - Fase 3: Veredito Forense com evidências
+ */
 
 import { getSupabase } from '../core/database.ts';
 import { logInfo, logError, logWarn } from '../core/logger.ts';
@@ -18,26 +26,44 @@ import { dataCorrelator } from './correlator.ts';
 import { governmentPlanExtractorService } from '../services/government-plan-extractor.service.ts';
 import { scoutInterviewAgent } from './scout-interview.ts';
 import { scoutSpeechAgent } from './scout-speech.ts';
+// Novos agentes de coerência (Fase 2)
+import { coherenceVoteAgent, VoteCoherenceResult } from './coherence-vote.ts';
+import { coherenceExpenseAgent, ExpenseCoherenceResult, ExpenseProfile } from './coherence-expense.ts';
+import { coherenceTemporalAgent, TemporalAnalysisResult } from './coherence-temporal.ts';
+
+export interface CoherenceAnalysis {
+  voteAnalysis: VoteCoherenceResult[];
+  expenseAnalysis: { results: ExpenseCoherenceResult[]; profile: ExpenseProfile };
+  temporalAnalysis: TemporalAnalysisResult;
+  overallScore: number;
+  verdict: string;
+  redFlags: string[];
+}
 
 export class BrainAgent {
   async analyze(politicianName: string, userId: string | null = null, existingId: string | null = null) {
     const cleanName = politicianName.trim();
-    logInfo(`[Brain] Iniciando análise profunda (Self-Discovery) para: ${cleanName}`);
+    logInfo(`[Brain v5] Iniciando análise profunda para: ${cleanName}`);
 
     try {
-      // 1. Descoberta Dinâmica de Alvo (Identidade Autônoma)
+      // ═══════════════════════════════════════════════════════════════════════
+      // ETAPA 0: Descoberta de Identidade
+      // ═══════════════════════════════════════════════════════════════════════
       const profile = await targetDiscoveryService.discover(cleanName);
-      logInfo(`[Brain] Alvo Identificado: ${profile.office} ${profile.name} (${profile.party})`);
+      logInfo(`[Brain v5] Alvo: ${profile.office} ${profile.name} (${profile.party})`);
 
       const regionContext = { 
         state: profile.state !== 'Brasil' ? profile.state : this.detectRegion(cleanName).state,
         city: profile.city || this.detectRegion(cleanName).city
       };
 
-      // 2. Coleta Multidimensional (Scout + CaseMiner)
+      // ═══════════════════════════════════════════════════════════════════════
+      // FASE 1: COLETA DE PROMESSAS
+      // ═══════════════════════════════════════════════════════════════════════
+      logInfo(`[Brain v5] === FASE 1: COLETA DE PROMESSAS ===`);
+      
       const searchQuery = `${profile.office} ${profile.name} ${profile.party} ${regionContext.state}`;
       
-      logInfo(`[Brain] Iniciando Coleta Multidimensional para: ${profile.name}`);
       const [rawSources, caseEvidences, governmentPromises, interviewPromises, speechPromises] = await Promise.all([
         scoutHybrid.search(searchQuery, true),
         scoutCaseMiner.mine(profile.name),
@@ -46,11 +72,38 @@ export class BrainAgent {
         scoutSpeechAgent.searchAndExtract(profile.name).catch(() => [])
       ]);
       
-      logInfo(`[Brain] Scout coletou ${rawSources.length} fontes. CaseMiner coletou ${caseEvidences.length} evidências profundas.`);
-      logInfo(`[Brain] Promessas coletadas: Plano de Governo (${governmentPromises.length}), Entrevistas (${interviewPromises.length}), Discursos (${speechPromises.length})`);
+      logInfo(`[Brain v5] Fontes: ${rawSources.length} | Casos: ${caseEvidences.length}`);
+      logInfo(`[Brain v5] Promessas: Governo(${governmentPromises.length}) | Entrevistas(${interviewPromises.length}) | Discursos(${speechPromises.length})`);
       
+      // Consolidar todas as promessas
+      const allPromises = [
+        ...governmentPromises.map((p: any) => ({
+          text: p.text || p.promise,
+          category: p.category || 'GERAL',
+          source: 'Plano de Governo (TSE)',
+          date: p.date,
+          quote: p.quote
+        })),
+        ...interviewPromises.map((p: any) => ({
+          text: p.text,
+          category: p.category || 'GERAL',
+          source: `Entrevista: ${p.source?.platform || 'N/A'}`,
+          date: p.source?.date,
+          quote: p.quote
+        })),
+        ...speechPromises.map((p: any) => ({
+          text: p.text,
+          category: p.category || 'GERAL',
+          source: `Discurso: ${p.source?.session || 'N/A'}`,
+          date: p.source?.date,
+          quote: p.quote
+        }))
+      ];
+
+      logInfo(`[Brain v5] Total de promessas consolidadas: ${allPromises.length}`);
+
       const filteredSources = await filterAgent.filter(rawSources, true);
-      logInfo(`[Brain] Filter manteve ${filteredSources.length} fontes relevantes.`);
+      logInfo(`[Brain v5] Fontes filtradas: ${filteredSources.length}`);
       
       const dataSources = { 
         politicianName: profile.name, 
@@ -60,21 +113,44 @@ export class BrainAgent {
       const supabase = getSupabase();
       let { data: canonical } = await supabase.from('canonical_politicians').select('*').ilike('name', `%${cleanName}%`).maybeSingle();
 
-      // 3. Execução Paralela dos Agentes Especializados (Ajustado pelo Cargo)
+      // ═══════════════════════════════════════════════════════════════════════
+      // FASE 2: CRUZAMENTOS E ANÁLISE DE COERÊNCIA
+      // ═══════════════════════════════════════════════════════════════════════
+      logInfo(`[Brain v5] === FASE 2: CRUZAMENTOS E ANÁLISE DE COERÊNCIA ===`);
+      
       const isLegislative = profile.office.toLowerCase().includes('deputado') || profile.office.toLowerCase().includes('senador');
 
-      const [absenceReport, vulnerabilityReport, financeEvidences, benchmarkResult] = await Promise.all([
+      // Executar análises em paralelo
+      const [
+        absenceReport, 
+        vulnerabilityReport, 
+        financeEvidences, 
+        benchmarkResult,
+        voteAnalysis,
+        expenseAnalysis,
+        temporalAnalysis
+      ] = await Promise.all([
         isLegislative ? this.runAbsenceCheck(cleanName, filteredSources, regionContext) : Promise.resolve(null),
         this.runVulnerabilityAudit(cleanName, rawSources, filteredSources),
         this.runFinancialTraceability(cleanName, canonical),
-        this.runPoliticalBenchmarking(cleanName, canonical, dataSources)
+        this.runPoliticalBenchmarking(cleanName, canonical, dataSources),
+        // Novos agentes de coerência
+        allPromises.length > 0 ? coherenceVoteAgent.analyze(profile.name, allPromises) : Promise.resolve([]),
+        allPromises.length > 0 ? coherenceExpenseAgent.analyze(profile.name, allPromises) : Promise.resolve({ results: [], profile: { totalExpenses: 0, byCategory: {}, topCategories: [], redFlags: [] } }),
+        this.prepareTemporalAnalysis(profile.name, allPromises)
       ]);
 
-      logInfo(`[Brain] Agentes Especializados concluíram. Vulnerabilidades: ${vulnerabilityReport?.evidences?.length || 0}, Financeiro: ${financeEvidences.length}`);
+      logInfo(`[Brain v5] Análise de coerência concluída`);
+      logInfo(`[Brain v5] - Votações analisadas: ${voteAnalysis.length}`);
+      logInfo(`[Brain v5] - Gastos analisados: ${expenseAnalysis.results.length}`);
+      logInfo(`[Brain v5] - Contradições temporais: ${temporalAnalysis.contradictions.length}`);
+
+      // Calcular score geral de coerência
+      const coherenceAnalysis = this.calculateCoherenceScore(voteAnalysis, expenseAnalysis, temporalAnalysis);
 
       let evidences = [...(vulnerabilityReport?.evidences || []), ...financeEvidences];
       
-      // 3. Correlação Profunda de Dados
+      // Correlação de dados
       const correlations = await dataCorrelator.correlate({
         absence: absenceReport,
         vulnerability: vulnerabilityReport,
@@ -82,7 +158,11 @@ export class BrainAgent {
         sources: filteredSources
       });
 
-      // 4. Geração do Veredito (Double-Pass) - Injetando contexto de todos os agentes + correlações
+      // ═══════════════════════════════════════════════════════════════════════
+      // FASE 3: GERAÇÃO DO VEREDITO FORENSE
+      // ═══════════════════════════════════════════════════════════════════════
+      logInfo(`[Brain v5] === FASE 3: GERAÇÃO DO VEREDITO FORENSE ===`);
+
       const combinedContext = {
         officialProfile: dataSources,
         absence: absenceReport,
@@ -93,12 +173,50 @@ export class BrainAgent {
         promises: {
           government: governmentPromises,
           interviews: interviewPromises,
-          speeches: speechPromises
+          speeches: speechPromises,
+          all: allPromises
+        },
+        coherenceAnalysis: {
+          voteAnalysis: voteAnalysis.map(v => ({
+            promise: v.promise.text,
+            score: v.coherenceScore,
+            verdict: v.verdict,
+            summary: v.summary,
+            relatedVotes: v.relatedVotes.map(rv => ({
+              proposicao: rv.vote.proposicao,
+              voto: rv.vote.voto,
+              relation: rv.relation,
+              explanation: rv.explanation
+            }))
+          })),
+          expenseAnalysis: {
+            profile: expenseAnalysis.profile,
+            results: expenseAnalysis.results.map(e => ({
+              promise: e.promise.text,
+              score: e.coherenceScore,
+              verdict: e.verdict,
+              summary: e.summary,
+              redFlags: e.redFlags
+            }))
+          },
+          temporalAnalysis: {
+            score: temporalAnalysis.consistencyScore,
+            summary: temporalAnalysis.summary,
+            contradictions: temporalAnalysis.contradictions.map(c => ({
+              type: c.type,
+              severity: c.severity,
+              explanation: c.explanation,
+              timeDifference: c.timeDifference
+            }))
+          },
+          overallScore: coherenceAnalysis.overallScore,
+          verdict: coherenceAnalysis.verdict,
+          redFlags: coherenceAnalysis.redFlags
         },
         sources: filteredSources.map(s => ({ title: s.title, content: s.content.substring(0, 800), url: s.url }))
       };
 
-      const { finalReport, finalPromises } = await this.generateDoublePassAIVeredict(cleanName, combinedContext, filteredSources, rawSources, regionContext);
+      const { finalReport, finalPromises } = await this.generateForensicVerdict(cleanName, combinedContext, filteredSources, rawSources, regionContext);
 
       const finalResult = {
         ...dataSources,
@@ -106,27 +224,106 @@ export class BrainAgent {
         vulnerabilityReport,
         benchmarkResult,
         evidences,
+        coherenceAnalysis,
+        promises: {
+          total: allPromises.length,
+          government: governmentPromises.length,
+          interviews: interviewPromises.length,
+          speeches: speechPromises.length,
+          items: allPromises.slice(0, 10) // Top 10 promessas
+        },
         dataLineage: {
           vulnerability: 'Minerado via EvidenceMiner (Forense)',
           benchmarking: 'Baseado em dados do Supabase e APIs Oficiais',
           budget: 'SICONFI Snapshot',
           regional: `Portal Transparência ${regionContext.state}`,
           legislative: 'API Câmara/Senado',
-          cases: 'Navegação profunda via Scout Case Miner v3.2'
+          cases: 'Navegação profunda via Scout Case Miner v3.2',
+          coherence: 'Análise de Coerência v1.0 (Vote, Expense, Temporal)'
         },
-        // Garantir que as métricas de consenso apareçam no frontend
         consensusMetrics: {
           sourceCount: rawSources.length,
-          verifiedCount: filteredSources.length
+          verifiedCount: filteredSources.length,
+          coherenceScore: coherenceAnalysis.overallScore
         }
       };
 
       await this.persistAnalysis(userId, finalReport, cleanName, dataSources, finalResult, filteredSources, existingId);
       return finalResult;
     } catch (error) {
-      logError(`[Brain] Falha na análise de ${cleanName}`, error as Error);
+      logError(`[Brain v5] Falha na análise de ${cleanName}`, error as Error);
       throw error;
     }
+  }
+
+  /**
+   * Prepara dados para análise temporal
+   */
+  private async prepareTemporalAnalysis(politicianName: string, promises: any[]): Promise<TemporalAnalysisResult> {
+    const statements = promises.map(p => ({
+      text: p.text,
+      date: p.date || new Date().toISOString().split('T')[0],
+      source: p.source,
+      category: p.category,
+      quote: p.quote
+    }));
+
+    return coherenceTemporalAgent.analyze(politicianName, statements);
+  }
+
+  /**
+   * Calcula score geral de coerência
+   */
+  private calculateCoherenceScore(
+    voteAnalysis: VoteCoherenceResult[],
+    expenseAnalysis: { results: ExpenseCoherenceResult[]; profile: ExpenseProfile },
+    temporalAnalysis: TemporalAnalysisResult
+  ): CoherenceAnalysis {
+    // Calcular médias
+    const avgVoteScore = voteAnalysis.length > 0 
+      ? Math.round(voteAnalysis.reduce((sum, r) => sum + r.coherenceScore, 0) / voteAnalysis.length)
+      : 50;
+    
+    const avgExpenseScore = expenseAnalysis.results.length > 0
+      ? Math.round(expenseAnalysis.results.reduce((sum, r) => sum + r.coherenceScore, 0) / expenseAnalysis.results.length)
+      : 50;
+    
+    const temporalScore = temporalAnalysis.consistencyScore || 50;
+
+    // Score geral ponderado
+    const overallScore = Math.round(
+      (avgVoteScore * 0.35) + 
+      (avgExpenseScore * 0.35) + 
+      (temporalScore * 0.30)
+    );
+
+    // Consolidar red flags
+    const redFlags: string[] = [
+      ...(expenseAnalysis.profile.redFlags || []),
+      ...expenseAnalysis.results.flatMap(r => r.redFlags || []),
+      ...temporalAnalysis.contradictions
+        .filter(c => c.severity === 'HIGH')
+        .map(c => `${c.type}: ${c.explanation}`)
+    ];
+
+    // Determinar veredito
+    let verdict = '';
+    if (overallScore >= 70) {
+      verdict = 'POLÍTICO MAJORITARIAMENTE COERENTE';
+    } else if (overallScore >= 40) {
+      verdict = 'POLÍTICO PARCIALMENTE COERENTE - ATENÇÃO NECESSÁRIA';
+    } else {
+      verdict = 'POLÍTICO INCOERENTE - MÚLTIPLAS CONTRADIÇÕES DETECTADAS';
+    }
+
+    return {
+      voteAnalysis,
+      expenseAnalysis,
+      temporalAnalysis,
+      overallScore,
+      verdict,
+      redFlags: [...new Set(redFlags)].slice(0, 10) // Top 10 red flags únicas
+    };
   }
 
   private detectRegion(name: string): { state: string, city: string } {
@@ -137,54 +334,103 @@ export class BrainAgent {
     return { state: 'Nacional', city: 'Brasília' };
   }
 
-  private async generateDoublePassAIVeredict(cleanName: string, combinedContext: any, filteredSources: any[], rawSources: any[], region: any) {
-    logInfo(`[Brain] [Double-Pass] Iniciando VerdictEngine para ${cleanName} em ${region.state}...`);
+  /**
+   * Gera veredito forense com análise de coerência integrada
+   */
+  private async generateForensicVerdict(cleanName: string, combinedContext: any, filteredSources: any[], rawSources: any[], region: any) {
+    logInfo(`[Brain v5] Gerando Veredito Forense para ${cleanName}...`);
     
     let aiAnalysis = "";
     let extractedPromisesFromAI: any[] = [];
 
     try {
       const strictPrompt = `
-DOSSIÊ DE INTELIGÊNCIA FORENSE - SETH VII v3.0 (IRONCLAD DEEP)
+DOSSIÊ DE INTELIGÊNCIA FORENSE - SETH VII v5.0 (COHERENCE ENGINE)
+═══════════════════════════════════════════════════════════════════════════════
+
 ALVO: ${cleanName}
 IDENTIDADE: ${combinedContext.officialProfile.politician.office} (${combinedContext.officialProfile.politician.party})
 
-DADOS BRUTOS PARA CORRELAÇÃO:
+═══════════════════════════════════════════════════════════════════════════════
+SEÇÃO 1: ANÁLISE DE COERÊNCIA (NOVO)
+═══════════════════════════════════════════════════════════════════════════════
+
+SCORE GERAL DE COERÊNCIA: ${combinedContext.coherenceAnalysis.overallScore}%
+VEREDITO: ${combinedContext.coherenceAnalysis.verdict}
+
+PROMESSAS COLETADAS (${combinedContext.promises.all.length} total):
+${combinedContext.promises.all.slice(0, 5).map((p: any, i: number) => `
+${i+1}. [${p.category}] "${p.text}"
+   Fonte: ${p.source}
+   ${p.quote ? `Citação: "${p.quote}"` : ''}
+`).join('')}
+
+ANÁLISE PROMESSA vs VOTO:
+${combinedContext.coherenceAnalysis.voteAnalysis.slice(0, 3).map((v: any) => `
+- Promessa: "${v.promise.substring(0, 60)}..."
+  Score: ${v.score}% | Veredito: ${v.verdict}
+  ${v.summary}
+`).join('')}
+
+ANÁLISE PROMESSA vs GASTO:
+Perfil Financeiro:
+- Total: R$ ${combinedContext.coherenceAnalysis.expenseAnalysis.profile.totalExpenses?.toFixed(2) || 'N/A'}
+- Top categorias: ${combinedContext.coherenceAnalysis.expenseAnalysis.profile.topCategories?.slice(0, 3).map((c: any) => `${c.category} (${c.percentage}%)`).join(', ') || 'N/A'}
+
+${combinedContext.coherenceAnalysis.expenseAnalysis.results.slice(0, 3).map((e: any) => `
+- Promessa: "${e.promise.substring(0, 60)}..."
+  Score: ${e.score}% | Veredito: ${e.verdict}
+  ${e.summary}
+`).join('')}
+
+CONTRADIÇÕES TEMPORAIS:
+Score de Consistência: ${combinedContext.coherenceAnalysis.temporalAnalysis.score}%
+${combinedContext.coherenceAnalysis.temporalAnalysis.contradictions.slice(0, 3).map((c: any) => `
+- ${c.type} (${c.severity}): ${c.explanation}
+  Diferença temporal: ${c.timeDifference}
+`).join('')}
+
+RED FLAGS:
+${combinedContext.coherenceAnalysis.redFlags.slice(0, 5).map((r: string) => `⚠️ ${r}`).join('\n')}
+
+═══════════════════════════════════════════════════════════════════════════════
+SEÇÃO 2: DADOS COMPLEMENTARES
+═══════════════════════════════════════════════════════════════════════════════
+
 - PERFIL OFICIAL: ${JSON.stringify(combinedContext.officialProfile)}
 - AUDITORIA DE AUSÊNCIA: ${JSON.stringify(combinedContext.absence)}
-- VULNERABILIDADES TÉCNICAS: ${JSON.stringify(combinedContext.vulnerability)}
-- CORRELAÇÕES DETECTADAS: ${JSON.stringify(combinedContext.correlations)}
-- EVIDÊNCIAS DE CASOS/ENTREVISTAS: ${JSON.stringify(combinedContext.caseEvidences)}
-- PROMESSAS COLETADAS:
-  * PLANO DE GOVERNO (${combinedContext.promises.government.length}): ${JSON.stringify(combinedContext.promises.government.slice(0, 5))}
-  * ENTREVISTAS (${combinedContext.promises.interviews.length}): ${JSON.stringify(combinedContext.promises.interviews.slice(0, 5))}
-  * DISCURSOS (${combinedContext.promises.speeches.length}): ${JSON.stringify(combinedContext.promises.speeches.slice(0, 5))}
-- FONTES PRIMÁRIAS (CITE-AS): ${JSON.stringify(combinedContext.sources)}
+- VULNERABILIDADES: ${JSON.stringify(combinedContext.vulnerability)}
+- CORRELAÇÕES: ${JSON.stringify(combinedContext.correlations)}
+- FONTES PRIMÁRIAS: ${JSON.stringify(combinedContext.sources.slice(0, 5))}
 
-INSTRUÇÕES MANDATÓRIAS:
-1. SEJA INCISIVO: Não use "pode ser", use "os dados indicam". Conecte o dinheiro (emendas) com os votos e discursos.
-2. CITAÇÃO DIRETA: Você DEVE citar nomes de projetos, valores em Reais (R$) e títulos de notícias/documentos presentes nas fontes.
-3. ANÁLISE DE IMPACTO: Explique O QUE a ausência ou vulnerabilidade significa para o cidadão.
-4. ESTRUTURA DE ALTO NÍVEL:
-   - QUADRO EXECUTIVO: Fatos de impacto imediato.
-   - CORRELAÇÃO DE DADOS: Onde o dinheiro e o poder se encontram (conecte as fontes).
-   - VETORES DE RISCO: Vulnerabilidades e inconsistências detectadas com evidências.
-   - VEREDITO FORENSE: Parecer final baseado na densidade de dados.
+═══════════════════════════════════════════════════════════════════════════════
+INSTRUÇÕES PARA O PARECER
+═══════════════════════════════════════════════════════════════════════════════
 
-Se os dados forem mínimos, não invente, mas explore ao máximo as conexões entre o pouco que existe.
-NÃO use tom de biografia. Use tom de relatório de agência de inteligência.
+1. ESTRUTURA OBRIGATÓRIA:
+   - QUADRO EXECUTIVO: Fatos de impacto imediato baseados na análise de coerência
+   - CONTRADIÇÕES DETECTADAS: Liste as principais contradições entre promessa e prática
+   - PERFIL FINANCEIRO: Analise os gastos vs promessas
+   - VETORES DE RISCO: Vulnerabilidades e red flags com evidências
+   - VEREDITO FORENSE: Parecer final com score de coerência
+
+2. SEJA INCISIVO: Use os dados de coerência para fundamentar cada afirmação
+3. CITE VALORES: Mencione R$, percentuais, datas específicas
+4. CONECTE OS PONTOS: Relacione promessas com votos e gastos
 
 PARECER TÉCNICO:`;
+
       aiAnalysis = await aiService.generateReport(strictPrompt);
+      
       const extractionPrompt = `Extraia JSON de promessas do parecer: ${aiAnalysis}`;
       const structuredResult = await aiService.analyzeText(extractionPrompt);
       if (structuredResult?.promises) extractedPromisesFromAI = structuredResult.promises;
     } catch (error) {
-      logWarn(`[Brain] Falha no fluxo de IA, usando fallbacks...`);
+      logWarn(`[Brain v5] Falha no fluxo de IA, usando fallbacks...`);
     }
 
     return { 
-      finalReport: aiAnalysis || `Parecer técnico atualizado sobre ${cleanName} em ${region.state}...`, 
+      finalReport: aiAnalysis || `Parecer técnico sobre ${cleanName}. Score de Coerência: ${combinedContext.coherenceAnalysis.overallScore}%`, 
       finalPromises: extractedPromisesFromAI 
     };
   }
@@ -246,7 +492,8 @@ PARECER TÉCNICO:`;
           absenceReport: finalResult.absenceReport,
           vulnerabilityReport: finalResult.vulnerabilityReport,
           benchmarkResult: finalResult.benchmarkResult,
-          caseEvidences: finalResult.caseEvidences,
+          coherenceAnalysis: finalResult.coherenceAnalysis,
+          promises: finalResult.promises,
           dataLineage: finalResult.dataLineage,
           evidences: finalResult.evidences
         })
@@ -257,20 +504,8 @@ PARECER TÉCNICO:`;
       } else {
         await supabase.from('analyses').insert([analysisData]);
       }
-      logInfo(`[Brain] Análise persistida com sucesso para ${cleanName}`);
-    } catch (e) { logWarn(`[Brain] Erro na persistência: ${e}`); }
-  }
-
-  private async generateOfficialProfile(politicianName: string, sources: FilteredSource[], region: any) {
-    // Agora este método é apenas um fallback, pois usamos o TargetDiscoveryService
-    return { 
-      politicianName, 
-      politician: { 
-        office: 'Agente Político', 
-        party: 'Em Análise', 
-        state: region.state 
-      }
-    };
+      logInfo(`[Brain v5] Análise persistida com sucesso para ${cleanName}`);
+    } catch (e) { logWarn(`[Brain v5] Erro na persistência: ${e}`); }
   }
 }
 
