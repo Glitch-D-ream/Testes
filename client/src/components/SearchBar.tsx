@@ -46,11 +46,13 @@ export default function SearchBar() {
         pollCount++;
         try {
           const statusRes = await fetch(`${apiUrl}/api/search/status/${id}`).catch(() => null);
+          
+          // Se o servidor demorar ou falhar, não paramos imediatamente, mas aumentamos o rigor
           if (!statusRes || !statusRes.ok) {
-            if (pollCount > 40) {
+            if (pollCount > 60) { // Aumentado para 3 minutos de tolerância
               clearInterval(pollInterval);
               setIsProcessing(false);
-              setError('Conexão instável com o servidor.');
+              setError('O servidor está processando uma carga alta. Verifique o histórico em instantes.');
             }
             return;
           }
@@ -65,12 +67,13 @@ export default function SearchBar() {
           } else if (data.status === 'failed') {
             clearInterval(pollInterval);
             setIsProcessing(false);
-            setError(data.error_message || 'Dados insuficientes para auditoria.');
-          } else {
-            if (pollCount < 5) setStatus('Scout: Minerando web e portais...');
-            else if (pollCount < 15) setStatus('Ironclad: Validando orçamentos...');
-            else if (pollCount < 30) setStatus('Brain: Gerando veredito técnico...');
-            else setStatus('Finalizando dossiê forense...');
+            setError(data.error_message || 'O motor de auditoria encontrou inconsistências fatais nos dados.');
+          } else if (data.status === 'processing') {
+            // Atualização dinâmica de status baseada no tempo real
+            if (pollCount < 10) setStatus('Scout: Minerando web e portais oficiais...');
+            else if (pollCount < 25) setStatus('Ironclad: Validando orçamentos e emendas...');
+            else if (pollCount < 45) setStatus('Brain: Correlacionando fatos e discursos...');
+            else setStatus('Finalizando dossiê forense (IA Raciocínio Profundo)...');
           }
         } catch (err) {
           console.error('Erro no polling:', err);

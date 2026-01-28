@@ -100,28 +100,34 @@ export class SearchService {
     }]);
 
     // 3. Execução Assíncrona (Não bloqueia o retorno da API)
-    setImmediate(async () => {
-      try {
-        logInfo(`[Orchestrator] [Job:${analysisId}] Iniciando Tríade Completa para: ${politicianName}`);
-        
-        // FASE 1: Scout - Busca de notícias e dados (Deep Search habilitado para máxima qualidade)
-        const rawSources = await scoutAgent.search(politicianName, true);
-        logInfo(`[Orchestrator] [Job:${analysisId}] Scout encontrou ${rawSources.length} fontes.`);
-        
-        // FASE 2: Filter - Filtragem de promessas e compromissos
-        // Se houver poucas fontes, usamos o modo flexível
-        const useFlexibleMode = rawSources.length < 5;
-        const filteredSources = await filterAgent.filter(rawSources, useFlexibleMode);
-        logInfo(`[Orchestrator] [Job:${analysisId}] Filter selecionou ${filteredSources.length} fontes relevantes.`);
-        
-        // FASE 3: Brain - Consolidação com Dados Oficiais (Câmara, Senado, SICONFI)
-        logInfo(`[Orchestrator] [Job:${analysisId}] Chamando Brain para análise consolidada...`);
-        // CORREÇÃO: A assinatura do BrainAgent.analyze é (politicianName, userId, existingId)
-        // O parâmetro filteredSources não deve ser passado aqui, pois o BrainAgent já faz sua própria busca/filtro internamente.
-        await brainAgent.analyze(politicianName, userId, analysisId);
-        
-        logInfo(`[Orchestrator] [Job:${analysisId}] Análise concluída com sucesso.`);
-      } catch (error: any) {
+      setImmediate(async () => {
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Tempo limite de processamento excedido (180s)')), 180000)
+        );
+
+        try {
+          logInfo(`[Orchestrator] [Job:${analysisId}] Iniciando Tríade Completa para: ${politicianName}`);
+          
+          await Promise.race([
+            (async () => {
+              // FASE 1: Scout - Busca de notícias e dados
+              const rawSources = await scoutAgent.search(politicianName, true);
+              logInfo(`[Orchestrator] [Job:${analysisId}] Scout encontrou ${rawSources.length} fontes.`);
+              
+              // FASE 2: Filter - Filtragem de promessas e compromissos
+              const useFlexibleMode = rawSources.length < 5;
+              const filteredSources = await filterAgent.filter(rawSources, useFlexibleMode);
+              logInfo(`[Orchestrator] [Job:${analysisId}] Filter selecionou ${filteredSources.length} fontes relevantes.`);
+              
+              // FASE 3: Brain - Consolidação com Dados Oficiais
+              logInfo(`[Orchestrator] [Job:${analysisId}] Chamando Brain para análise consolidada...`);
+              await brainAgent.analyze(politicianName, userId, analysisId);
+            })(),
+            timeoutPromise
+          ]);
+          
+          logInfo(`[Orchestrator] [Job:${analysisId}] Análise concluída com sucesso.`);
+        } catch (error: any) {
         const errorMessage = error.message || 'Erro técnico durante a auditoria';
         logError(`[Orchestrator] [Job:${analysisId}] Falha na Auditoria Real: ${errorMessage}`);
         
