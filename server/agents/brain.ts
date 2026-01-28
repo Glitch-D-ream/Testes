@@ -15,6 +15,9 @@ import { financeService } from '../services/finance.service.ts';
 import { proxyBenchmarkingAgent } from './proxy-benchmarking.ts';
 import { targetDiscoveryService } from '../services/target-discovery.service.ts';
 import { dataCorrelator } from './correlator.ts';
+import { governmentPlanExtractorService } from '../services/government-plan-extractor.service.ts';
+import { scoutInterviewAgent } from './scout-interview.ts';
+import { scoutSpeechAgent } from './scout-speech.ts';
 
 export class BrainAgent {
   async analyze(politicianName: string, userId: string | null = null, existingId: string | null = null) {
@@ -35,12 +38,16 @@ export class BrainAgent {
       const searchQuery = `${profile.office} ${profile.name} ${profile.party} ${regionContext.state}`;
       
       logInfo(`[Brain] Iniciando Coleta Multidimensional para: ${profile.name}`);
-      const [rawSources, caseEvidences] = await Promise.all([
+      const [rawSources, caseEvidences, governmentPromises, interviewPromises, speechPromises] = await Promise.all([
         scoutHybrid.search(searchQuery, true),
-        scoutCaseMiner.mine(profile.name)
+        scoutCaseMiner.mine(profile.name),
+        governmentPlanExtractorService.extractFromTSE(profile.name, profile.state, 2022).catch(() => []),
+        scoutInterviewAgent.searchAndExtract(profile.name).catch(() => []),
+        scoutSpeechAgent.searchAndExtract(profile.name).catch(() => [])
       ]);
       
       logInfo(`[Brain] Scout coletou ${rawSources.length} fontes. CaseMiner coletou ${caseEvidences.length} evidências profundas.`);
+      logInfo(`[Brain] Promessas coletadas: Plano de Governo (${governmentPromises.length}), Entrevistas (${interviewPromises.length}), Discursos (${speechPromises.length})`);
       
       const filteredSources = await filterAgent.filter(rawSources, true);
       logInfo(`[Brain] Filter manteve ${filteredSources.length} fontes relevantes.`);
@@ -83,6 +90,11 @@ export class BrainAgent {
         benchmarking: benchmarkResult,
         financial: financeEvidences,
         correlations: correlations,
+        promises: {
+          government: governmentPromises,
+          interviews: interviewPromises,
+          speeches: speechPromises
+        },
         sources: filteredSources.map(s => ({ title: s.title, content: s.content.substring(0, 800), url: s.url }))
       };
 
@@ -143,6 +155,10 @@ DADOS BRUTOS PARA CORRELAÇÃO:
 - VULNERABILIDADES TÉCNICAS: ${JSON.stringify(combinedContext.vulnerability)}
 - CORRELAÇÕES DETECTADAS: ${JSON.stringify(combinedContext.correlations)}
 - EVIDÊNCIAS DE CASOS/ENTREVISTAS: ${JSON.stringify(combinedContext.caseEvidences)}
+- PROMESSAS COLETADAS:
+  * PLANO DE GOVERNO (${combinedContext.promises.government.length}): ${JSON.stringify(combinedContext.promises.government.slice(0, 5))}
+  * ENTREVISTAS (${combinedContext.promises.interviews.length}): ${JSON.stringify(combinedContext.promises.interviews.slice(0, 5))}
+  * DISCURSOS (${combinedContext.promises.speeches.length}): ${JSON.stringify(combinedContext.promises.speeches.slice(0, 5))}
 - FONTES PRIMÁRIAS (CITE-AS): ${JSON.stringify(combinedContext.sources)}
 
 INSTRUÇÕES MANDATÓRIAS:
