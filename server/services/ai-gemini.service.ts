@@ -13,42 +13,59 @@ export class GeminiService {
   }
 
   /**
-   * Analisa texto usando Gemini 1.5 Flash (Free Tier)
+   * Analisa texto usando Gemini 1.5 Flash ou Fallbacks Gratuitos Robustos
    */
   async analyzeText(text: string, promptTemplate: (text: string) => string): Promise<AIAnalysisResult> {
-    logInfo('[Gemini] Iniciando análise forense...');
+    logInfo('[Gemini] Iniciando análise forense v3.2...');
 
-    try {
-      let content = "";
-      
-      if (this.apiKey && !this.apiKey.includes('your-')) {
-        // Fluxo com chave oficial
+    // Tentar primeiro com a chave oficial se existir
+    if (this.apiKey && !this.apiKey.includes('your-')) {
+      try {
+        logInfo('[Gemini] Tentando API Oficial...');
         const response = await axios.post(
           `${this.baseUrl}?key=${this.apiKey}`,
           {
             contents: [{ parts: [{ text: promptTemplate(text) }] }],
             generationConfig: { temperature: 0.1, responseMimeType: "application/json" }
           },
-          { timeout: 60000 }
+          { timeout: 45000 }
         );
-        content = response.data.candidates[0].content.parts[0].text;
-      } else {
-        // Fluxo Zero-Key via Pollinations (que agora suporta gemini-flash como modelo)
-        logInfo('[Gemini] Usando Bridge Zero-Key (Pollinations Gemini Flash)...');
-        const response = await axios.post('https://text.pollinations.ai/', {
-          messages: [{ role: 'user', content: promptTemplate(text) }],
-          model: 'gemini-flash',
-          jsonMode: true
-        }, { timeout: 60000 });
-        content = typeof response.data === 'string' ? response.data : JSON.stringify(response.data);
+        const content = response.data.candidates[0].content.parts[0].text;
+        return normalizationService.normalizeAIOutput(content);
+      } catch (error: any) {
+        logWarn(`[Gemini] API Oficial falhou: ${error.message}. Tentando Bridge...`);
       }
+    }
+
+    // Fallback 1: Pollinations Gemini-Flash (Zero-Key)
+    try {
+      logInfo('[Gemini] Usando Bridge Pollinations (Gemini Flash)...');
+      const response = await axios.post('https://text.pollinations.ai/', {
+        messages: [{ role: 'user', content: promptTemplate(text) }],
+        model: 'gemini', // Pollinations mapeia 'gemini' para o flash mais recente
+        jsonMode: true,
+        seed: Math.floor(Math.random() * 1000000) // Evitar cache de erro
+      }, { timeout: 50000 });
       
+      const content = typeof response.data === 'string' ? response.data : JSON.stringify(response.data);
       return normalizationService.normalizeAIOutput(content);
     } catch (error: any) {
-      logError(`[Gemini] Falha na análise: ${error.message}`);
-      if (error.response) {
-        logError(`[Gemini] Status: ${error.response.status} - Data: ${JSON.stringify(error.response.data)}`);
-      }
+      logWarn(`[Gemini] Bridge Pollinations falhou: ${error.message}. Tentando Fallback Final...`);
+    }
+
+    // Fallback 2: Pollinations Llama-3.3 (Extremamente estável)
+    try {
+      logInfo('[Gemini] Usando Fallback Final (Llama 3.3)...');
+      const response = await axios.post('https://text.pollinations.ai/', {
+        messages: [{ role: 'user', content: promptTemplate(text) }],
+        model: 'llama',
+        jsonMode: true
+      }, { timeout: 50000 });
+      
+      const content = typeof response.data === 'string' ? response.data : JSON.stringify(response.data);
+      return normalizationService.normalizeAIOutput(content);
+    } catch (error: any) {
+      logError(`[Gemini] Todos os motores falharam: ${error.message}`);
       throw error;
     }
   }
@@ -57,19 +74,17 @@ export class GeminiService {
    * Geração de texto genérico (relatórios)
    */
   async generateCompletion(prompt: string): Promise<string> {
-    if (!this.apiKey) throw new Error('GEMINI_API_KEY não configurada');
-
     try {
-      const response = await axios.post(
-        `${this.baseUrl}?key=${this.apiKey}`,
-        {
-          contents: [{ parts: [{ text: prompt }] }]
-        }
-      );
-      return response.data.candidates[0].content.parts[0].text;
+      // Tentar Pollinations diretamente para rapidez em relatórios
+      const response = await axios.post('https://text.pollinations.ai/', {
+        messages: [{ role: 'user', content: prompt }],
+        model: 'openai' // Mapeia para gpt-4o-mini ou similar gratuito
+      }, { timeout: 30000 });
+      
+      return typeof response.data === 'string' ? response.data : response.data.choices?.[0]?.message?.content || JSON.stringify(response.data);
     } catch (error: any) {
-      logError(`[Gemini] Falha na geração: ${error.message}`);
-      return `FALHA NA GERAÇÃO GEMINI: ${error.message}`;
+      logError(`[Gemini] Falha na geração de relatório: ${error.message}`);
+      return `ERRO NA GERAÇÃO: O sistema de IA está temporariamente sobrecarregado. Tente novamente em instantes.`;
     }
   }
 }

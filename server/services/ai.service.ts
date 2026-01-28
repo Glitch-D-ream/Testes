@@ -122,11 +122,11 @@ ${text}`;
     const groqKey = process.env.GROQ_API_KEY;
     const geminiKey = process.env.GEMINI_API_KEY;
 
-    // 1. Tentar Gemini Free (Novo Provedor Principal v3.2)
-    if (geminiKey && !geminiKey.includes('your-')) {
-      try {
-        return await geminiService.analyzeText(text, this.promptTemplate.bind(this));
-      } catch (e) { logWarn(`[AI] Gemini falhou...`); }
+    // 1. Tentar Gemini Service (Motor Principal v3.2 com Fallbacks Internos)
+    try {
+      return await geminiService.analyzeText(text, this.promptTemplate.bind(this));
+    } catch (e) { 
+      logWarn(`[AI] Gemini Service falhou completamente. Tentando outros provedores...`); 
     }
 
     // 2. Tentar DeepSeek (OpenRouter)
@@ -150,12 +150,11 @@ ${text}`;
   }
 
   async generateReport(prompt: string): Promise<string> {
-    // 1. Tentar Gemini para relatórios
-    const geminiKey = process.env.GEMINI_API_KEY;
-    if (geminiKey && !geminiKey.includes('your-')) {
-      try {
-        return await geminiService.generateCompletion(prompt);
-      } catch (e) { logWarn(`[AI] Gemini falhou no relatório...`); }
+    // 1. Tentar Gemini Service para relatórios
+    try {
+      return await geminiService.generateCompletion(prompt);
+    } catch (e) { 
+      logWarn(`[AI] Gemini Service falhou no relatório. Tentando fallbacks...`); 
     }
 
     // 2. Fallback para Pollinations
