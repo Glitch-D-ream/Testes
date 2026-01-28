@@ -1,13 +1,63 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Shield, Search, Database, BarChart3, Activity, Globe, Cpu, ChevronRight } from 'lucide-react';
 import SearchBar from '../components/SearchBar';
 import RecentAudits from '../components/RecentAudits';
+import AgentModal from '../components/AgentModal';
 import { motion } from 'framer-motion';
 
 export default function Home() {
   const navigate = useNavigate();
+  const [selectedAgent, setSelectedAgent] = useState<any>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  const agents = {
+    scout: {
+      title: "Scout Hybrid",
+      icon: <Globe size={28} />,
+      desc: "Rede de agentes que mineram portais oficiais, diários e redes sociais em busca de promessas literais.",
+      details: [
+        "Monitoramento de Diários Oficiais",
+        "Scraping de Redes Sociais",
+        "Indexação de Portais de Transparência",
+        "Detecção de Falas em Entrevistas"
+      ],
+      technical: "Engine: Playwright + HuggingFace NER. Latência: < 2s por fonte. Cobertura: Nacional (Federal/Estadual).",
+      color: "blue"
+    },
+    brain: {
+      title: "Brain Agent",
+      icon: <Cpu size={28} />,
+      desc: "Motor de auditoria forense que cruza falas com o SICONFI e APIs da Câmara para detectar incoerências.",
+      details: [
+        "Correlação Orçamentária",
+        "Análise de Consistência Histórica",
+        "Cálculo de Probabilidade de Entrega",
+        "Detecção de Gap de Radicalismo"
+      ],
+      technical: "Engine: Gemini 1.5 Flash + DeepSeek R1. Lógica: Inferência Bayesiana para Score de Credibilidade.",
+      color: "cyan"
+    },
+    ironclad: {
+      title: "Ironclad Vault",
+      icon: <Database size={28} />,
+      desc: "Snapshot nacional persistente que garante auditoria mesmo quando portais governamentais estão offline.",
+      details: [
+        "Cache de Dados Governamentais",
+        "Snapshot SICONFI (LOA/PLOA)",
+        "Base Histórica do TSE",
+        "Resiliência de API (Nível 4)"
+      ],
+      technical: "Storage: Supabase JSONB + Redis. Sincronização: A cada 6h via GitHub Actions (Scout Worker).",
+      color: "indigo"
+    }
+  };
+
+  const openAgent = (agentKey: keyof typeof agents) => {
+    setSelectedAgent(agents[agentKey]);
+    setIsModalOpen(true);
+  };
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -46,8 +96,8 @@ export default function Home() {
               </div>
             </div>
             <div className="hidden md:flex items-center gap-8 text-xs font-bold uppercase tracking-widest text-slate-400">
-              <a href="#" className="hover:text-blue-400 transition-colors">Metodologia</a>
-              <a href="#" className="hover:text-blue-400 transition-colors">Rede de Agentes</a>
+              <button onClick={() => openAgent('brain')} className="hover:text-blue-400 transition-colors uppercase">Metodologia</button>
+              <button onClick={() => openAgent('scout')} className="hover:text-blue-400 transition-colors uppercase">Rede de Agentes</button>
               <button 
                 onClick={() => navigate('/dashboard')}
                 className="px-5 py-2.5 bg-slate-900 border border-slate-700 text-slate-200 rounded-xl hover:bg-slate-800 hover:border-blue-500/50 transition-all flex items-center gap-2"
@@ -72,7 +122,7 @@ export default function Home() {
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
               <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
             </span>
-            <span className="text-[10px] font-black text-blue-400 uppercase tracking-[0.2em]">Sistema de Auditoria Ativo • v2.6 Ironclad</span>
+            <span className="text-[10px] font-black text-blue-400 uppercase tracking-[0.2em]">Sistema de Auditoria Ativo • v3.2 Ironclad</span>
           </motion.div>
           
           <motion.h1 variants={itemVariants} className="text-6xl md:text-8xl font-black text-white tracking-tight mb-8 leading-[0.9]">
@@ -131,26 +181,36 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             <FeatureCard 
-              icon={<Globe size={28} />}
-              title="Scout Hybrid"
-              desc="Rede de agentes que mineram portais oficiais, diários e redes sociais em busca de promessas literais."
-              color="blue"
+              icon={agents.scout.icon}
+              title={agents.scout.title}
+              desc={agents.scout.desc}
+              color={agents.scout.color}
+              onClick={() => openAgent('scout')}
             />
             <FeatureCard 
-              icon={<Cpu size={28} />}
-              title="Brain Agent"
-              desc="Motor de auditoria forense que cruza falas com o SICONFI e APIs da Câmara para detectar incoerências."
-              color="cyan"
+              icon={agents.brain.icon}
+              title={agents.brain.title}
+              desc={agents.brain.desc}
+              color={agents.brain.color}
+              onClick={() => openAgent('brain')}
             />
             <FeatureCard 
-              icon={<Database size={28} />}
-              title="Ironclad Vault"
-              desc="Snapshot nacional persistente que garante auditoria mesmo quando portais governamentais estão offline."
-              color="indigo"
+              icon={agents.ironclad.icon}
+              title={agents.ironclad.title}
+              desc={agents.ironclad.desc}
+              color={agents.ironclad.color}
+              onClick={() => openAgent('ironclad')}
             />
           </div>
         </div>
       </section>
+
+      {/* Agent Modal */}
+      <AgentModal 
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        agent={selectedAgent}
+      />
 
       {/* Footer */}
       <footer className="relative z-10 py-16 border-t border-slate-900">
@@ -173,7 +233,7 @@ export default function Home() {
   );
 }
 
-function FeatureCard({ icon, title, desc, color }: { icon: React.ReactNode, title: string, desc: string, color: string }) {
+function FeatureCard({ icon, title, desc, color, onClick }: { icon: React.ReactNode, title: string, desc: string, color: string, onClick: () => void }) {
   const colors: any = {
     blue: "text-blue-400 bg-blue-400/10 border-blue-500/20",
     cyan: "text-cyan-400 bg-cyan-400/10 border-cyan-500/20",
@@ -190,7 +250,7 @@ function FeatureCard({ icon, title, desc, color }: { icon: React.ReactNode, titl
         {desc}
       </p>
       <button 
-        onClick={() => navigate('/methodology')}
+        onClick={onClick}
         className="mt-8 flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-blue-500 group-hover:gap-4 transition-all"
       >
         Ver Detalhes <ChevronRight size={14} />
