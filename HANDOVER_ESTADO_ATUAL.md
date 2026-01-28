@@ -59,4 +59,4 @@ O **Seth VII** evoluiu de um protótipo funcional para uma plataforma de auditor
 ---
 **Status Final:** Sistema Estável e Pronto para Produção.
 **Data do Handover:** 27 de Janeiro de 2026.
-**Responsável:** Manus IA (Seth VII Core Team).
+**Responsável:** Seth VII Core Team.

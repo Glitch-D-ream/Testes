@@ -31,10 +31,11 @@ app.use((req, res, next) => {
   const allowedOrigins = process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : [];
   const origin = req.headers.origin;
   
-  if (process.env.NODE_ENV !== 'production') {
-    res.header('Access-Control-Allow-Origin', '*');
-  } else if (origin && allowedOrigins.includes(origin)) {
+  // CORS mais flexível para evitar bloqueios em produção/dev
+  if (origin) {
     res.header('Access-Control-Allow-Origin', origin);
+  } else {
+    res.header('Access-Control-Allow-Origin', '*');
   }
   
   res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, x-xsrf-token');

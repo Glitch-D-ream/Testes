@@ -11,6 +11,7 @@ import { ingestionService } from '../services/ingestion.service.ts';
 import { transparenciaSPService } from '../services/transparencia-sp.service.ts';
 import { transparenciaPEService } from '../services/transparencia-pe.service.ts';
 import { transparenciaFederalService } from '../services/transparencia-federal.service.ts';
+import { camaraApiService } from '../services/camara-api.service.ts';
 import { IntelligentCache } from '../core/intelligent-cache.ts';
 
 export interface RawSource {
@@ -50,6 +51,42 @@ export class ScoutHybrid {
 
       const [officialResults, newsResults, federalResults, extraFederalResults, spResults, peResults] = fastResults;
       
+      // FASE 1.5: Busca em APIs Oficiais (Câmara)
+      const camaraId = await camaraApiService.findDeputadoId(query);
+      if (camaraId) {
+        logInfo(`[ScoutHybrid] Deputado Federal detectado. Coletando dados oficiais da Câmara...`);
+        const [discursos, despesas, proposicoes] = await Promise.all([
+          camaraApiService.getDiscursos(camaraId),
+          camaraApiService.getDespesas(camaraId),
+          camaraApiService.getProposicoes(camaraId)
+        ]);
+
+        if (discursos.length > 0) {
+          sources.push({
+            title: `Discursos Oficiais - Câmara dos Deputados`,
+            url: `https://www.camara.leg.br/deputados/${camaraId}`,
+            content: discursos.slice(0, 5).map(d => `[${d.dataHoraInicio}] ${d.transcricao}`).join('\n\n'),
+            source: 'Câmara dos Deputados',
+            type: 'official',
+            confidence: 'high',
+            credibilityLayer: 'A'
+          });
+        }
+
+        if (despesas.length > 0) {
+          const resumoDespesas = despesas.slice(0, 10).map(d => `${d.tipoDespesa}: R$ ${d.valorLiquido} (${d.dataDocumento})`).join('\n');
+          sources.push({
+            title: `Gastos Parlamentares Recentes`,
+            url: `https://www.camara.leg.br/deputados/${camaraId}`,
+            content: `RESUMO DE GASTOS:\n${resumoDespesas}`,
+            source: 'Cota Parlamentar',
+            type: 'official',
+            confidence: 'high',
+            credibilityLayer: 'A'
+          });
+        }
+      }
+
       // Combinar resultados federais extras
       newsResults.push(...extraFederalResults);
 
