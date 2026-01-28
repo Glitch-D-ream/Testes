@@ -41,3 +41,23 @@ export async function allQuery(): Promise<never> {
   logError("DEPRECATED: A função allQuery foi chamada, mas está obsoleta. Use o Drizzle ORM.");
   throw new Error("DEPRECATED: allQuery is obsolete. Use Drizzle ORM directly.");
 }
+
+// Re-exportar o cliente Supabase para compatibilidade com código legado
+import { supabase } from './supabase.ts';
+export { supabase };
+
+/**
+ * Retorna o cliente Supabase.
+ * @deprecated Use o Drizzle ORM (db) para novas queries.
+ */
+export function getSupabase() {
+  return supabase;
+}
+
+/**
+ * Inicializa o banco de dados.
+ * @deprecated O banco é inicializado automaticamente na importação.
+ */
+export async function initializeDatabase(): Promise<void> {
+  logInfo('[Database] initializeDatabase chamado (noop - banco já inicializado).');
+}
