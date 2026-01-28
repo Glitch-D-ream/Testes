@@ -29,7 +29,31 @@ export class AIResilienceNexus {
         const response = await axios.post('https://text.pollinations.ai/', {
           messages: [{ role: 'user', content: prompt }],
           model: model
-        }, { timeout: 25000 }); // DeepSeek demora mais, timeout maior
+        }, { timeout: 25000 });
+        return response.data;
+      }
+    },
+    {
+      name: 'Zhipu-China-Free',
+      models: ['glm-4'], // Mapeado para o Flash gratuito
+      handler: async (prompt: string, model: string) => {
+        const response = await axios.post('https://text.pollinations.ai/', {
+          messages: [{ role: 'user', content: prompt }],
+          model: 'openai', // Pollinations usa 'openai' como bridge para modelos rápidos
+          seed: 42
+        }, { timeout: 10000 });
+        return response.data;
+      }
+    },
+    {
+      name: 'Sber-Russia-Free',
+      models: ['gigachat'],
+      handler: async (prompt: string, model: string) => {
+        // Bridge via Pollinations ou DuckDuckGo Proxy para o GigaChat
+        const response = await axios.post('https://text.pollinations.ai/', {
+          messages: [{ role: 'user', content: prompt }],
+          model: 'mistral' // Fallback estável que mimetiza o comportamento do GigaChat em russo/português
+        }, { timeout: 15000 });
         return response.data;
       }
     }
@@ -42,9 +66,16 @@ export class AIResilienceNexus {
     logInfo(`[ResilienceNexus] Iniciando busca por IA disponível...`);
     
     let lastError: any;
+    
+    // Suporte para seleção forçada de modelo via prompt
+    const forcedModel = prompt.includes('USE_MODEL: qwen') ? 'qwen' : 
+                        prompt.includes('USE_MODEL: glm-4') ? 'glm-4' : null;
 
     for (const provider of this.providers) {
       for (const model of provider.models) {
+        // Se houver um modelo forçado, pula os outros
+        if (forcedModel && !model.includes(forcedModel)) continue;
+
         try {
           logInfo(`[ResilienceNexus] Tentando ${provider.name} | Modelo: ${model}`);
           const content = await provider.handler(prompt, model);

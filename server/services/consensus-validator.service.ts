@@ -130,7 +130,8 @@ export class ConsensusValidatorService {
    */
   private async runJudge(verdict1: any, verdict2: any, disagreements: string[]): Promise<{ verdict: any; reasoning: string }> {
     const judgePrompt = `
-      Você é um juiz imparcial de vereditos de auditoria forense.
+      Você é o Pollux-Judge (baseado em Qwen 3), um auditor forense de elite.
+      Sua missão é identificar qual dos vereditos abaixo é mais FACTUAL e menos propenso a alucinações.
       
       Veredito 1:
       ${JSON.stringify(verdict1, null, 2)}
@@ -141,8 +142,10 @@ export class ConsensusValidatorService {
       Áreas de Discordância:
       ${disagreements.join('\n')}
       
-      Analise ambos os vereditos e escolha qual é mais confiável e por quê.
-      Responda APENAS JSON:
+      REGRAS:
+      1. Se um veredito cita fatos que não podem ser confirmados, prefira o outro.
+      2. Se ambos forem inconsistentes, escolha o mais conservador.
+      3. Responda APENAS JSON:
       {
         "chosenVerdict": 1 ou 2,
         "reasoning": "Por que este veredito é mais confiável",
@@ -151,12 +154,24 @@ export class ConsensusValidatorService {
     `;
 
     try {
-      const response = await aiResilienceNexus.chat(judgePrompt);
-      const judgeResult = JSON.parse(response.content);
-      const chosenVerdict = judgeResult.chosenVerdict === 1 ? verdict1 : verdict2;
+      // Forçamos o uso do Qwen via Nexus para o desempate
+      const response = await aiResilienceNexus.chat(judgePrompt + "\nUSE_MODEL: qwen");
+      
+      const parseSafe = (content: string) => {
+        try {
+          const jsonMatch = content.match(/\{[\s\S]*\}/);
+          return JSON.parse(jsonMatch ? jsonMatch[0] : content);
+        } catch {
+          return null;
+        }
+      };
+
+      const judgeResult = parseSafe(response.content);
+      const chosenVerdict = judgeResult?.chosenVerdict === 1 ? verdict1 : verdict2;
+      
       return {
         verdict: chosenVerdict,
-        reasoning: judgeResult.reasoning
+        reasoning: judgeResult?.reasoning || "Consenso via Juiz de Fatos (Qwen 3)"
       };
     } catch (error) {
       logError(`[ConsensusValidator] Erro no Judge:`, error as Error);

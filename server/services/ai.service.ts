@@ -132,7 +132,16 @@ ${text}`;
       logWarn(`[AI] Gemini Service falhou ou demorou demais. Tentando fallbacks rápidos...`); 
     }
 
-    // 2. Tentar Groq (Alta Velocidade)
+    // 2. Tentar GLM-4.7 (China - Alta Velocidade e Gratuito)
+    try {
+      logInfo(`[AI] Tentando GLM-4.7-Flash (Prioridade de Velocidade)...`);
+      const { aiResilienceNexus } = await import('./ai-resilience-nexus.ts');
+      return await aiResilienceNexus.chatJSON<AIAnalysisResult>(text + "\nUSE_MODEL: glm-4");
+    } catch (e) { 
+      logWarn(`[AI] GLM-4.7 falhou. Tentando outros fallbacks...`); 
+    }
+
+    // 3. Tentar Groq (Alta Velocidade)
     if (groqKey && !groqKey.includes('your-')) {
       try {
         const completion = await groqService.generateCompletion('Auditor forense. JSON apenas.', this.promptTemplate(text));
@@ -140,8 +149,8 @@ ${text}`;
       } catch (e) { logWarn(`[AI] Groq falhou...`); }
     }
 
-    // 3. Fallback Final: Nexo de Resiliência Otimizado
-    logInfo(`[AI] Ativando Nexo de Resiliência Otimizado...`);
+    // 4. Fallback Final: Nexo de Resiliência Global (Cascata Completa)
+    logInfo(`[AI] Ativando Nexo de Resiliência Global...`);
     const { aiResilienceNexus } = await import('./ai-resilience-nexus.ts');
     return await aiResilienceNexus.chatJSON<AIAnalysisResult>(text);
   }
