@@ -1,8 +1,8 @@
 /**
- * Scout Interview Agent v2.0
+ * Scout Interview Agent v3.0 - INCISIVO
  * 
  * Busca e extrai promessas de entrevistas, debates e podcasts
- * CORRIGIDO: Agora faz scraping real do conteúdo das páginas
+ * COM ANÁLISE PROFUNDA: viabilidade, histórico, impacto, contradições
  */
 
 import axios from 'axios';
@@ -15,7 +15,7 @@ export interface InterviewSource {
   url: string;
   platform: string;
   date?: string;
-  content?: string;  // Conteúdo real da página (não mais transcript)
+  content?: string;
   duration?: string;
   views?: number;
 }
@@ -27,7 +27,20 @@ export interface InterviewPromise {
   timestamp?: string;
   confidence: number;
   context: string;
-  quote?: string;  // Citação direta do político
+  quote?: string;
+  // NOVOS CAMPOS - Análise profunda
+  viability: {
+    score: number;  // 0-100
+    analysis: string;
+    obstacles: string[];
+  };
+  impact: {
+    beneficiaries: string[];
+    affected: string[];
+    scale: 'LOCAL' | 'ESTADUAL' | 'NACIONAL';
+  };
+  historicalContext?: string;
+  potentialContradictions?: string[];
 }
 
 export class ScoutInterviewAgent {
@@ -53,7 +66,6 @@ export class ScoutInterviewAgent {
 
   /**
    * Busca entrevistas em formato texto (portais de notícias)
-   * PRIORIDADE: Fontes com texto completo
    */
   private async searchNewsInterviews(politicianName: string): Promise<InterviewSource[]> {
     const sources: InterviewSource[] = [];
@@ -63,7 +75,8 @@ export class ScoutInterviewAgent {
         `"${politicianName}" entrevista exclusiva`,
         `"${politicianName}" "em entrevista" disse`,
         `"${politicianName}" declarou promete`,
-        `"${politicianName}" "vai fazer" promessa`
+        `"${politicianName}" "vai fazer" promessa`,
+        `"${politicianName}" compromisso anunciou`
       ];
 
       for (const query of queries) {
@@ -81,7 +94,6 @@ export class ScoutInterviewAgent {
             const source = (item.match(/<source[^>]*>(.*?)<\/source>/))?.[1] || 'Portal de Notícias';
             const pubDate = (item.match(/<pubDate>(.*?)<\/pubDate>/))?.[1] || '';
 
-            // Evitar duplicatas
             if (!sources.find(s => s.url === link)) {
               sources.push({
                 title: title.replace(/&amp;/g, '&'),
@@ -154,13 +166,11 @@ export class ScoutInterviewAgent {
 
   /**
    * Faz scraping do conteúdo real de uma entrevista
-   * NOVO: Usa o contentScraper para extrair texto completo
    */
   async scrapeContent(interview: InterviewSource): Promise<string | null> {
     logInfo(`[ScoutInterview] Fazendo scraping de: ${interview.url}`);
 
     try {
-      // Não fazer scraping de vídeos do YouTube (não tem texto)
       if (interview.url.includes('youtube.com') || interview.url.includes('youtu.be')) {
         logWarn(`[ScoutInterview] Pulando vídeo do YouTube (sem transcrição): ${interview.url}`);
         return null;
@@ -183,56 +193,100 @@ export class ScoutInterviewAgent {
   }
 
   /**
-   * Extrai promessas de uma entrevista usando IA
-   * CORRIGIDO: Agora usa conteúdo real, não apenas título
+   * Extrai promessas de uma entrevista usando IA - VERSÃO INCISIVA
    */
   async extractPromises(interview: InterviewSource, politicianName: string): Promise<InterviewPromise[]> {
     logInfo(`[ScoutInterview] Extraindo promessas de: ${interview.title}`);
 
     try {
-      // CRÍTICO: Verificar se temos conteúdo real
       if (!interview.content || interview.content.length < 300) {
         logWarn(`[ScoutInterview] Sem conteúdo suficiente para extrair promessas de: ${interview.title}`);
         return [];
       }
 
-      // Limitar tamanho do conteúdo para não estourar o contexto da IA
-      const limitedContent = interview.content.substring(0, 8000);
+      const limitedContent = interview.content.substring(0, 10000);
 
       const prompt = `
-VOCÊ É UM EXTRATOR DE PROMESSAS POLÍTICAS DO SETH VII.
+VOCÊ É UM INVESTIGADOR POLÍTICO FORENSE DO SETH VII.
+SUA MISSÃO: Extrair e ANALISAR CRITICAMENTE todas as promessas e compromissos do político.
 
+═══════════════════════════════════════════════════════════════════════════════
 POLÍTICO ALVO: ${politicianName}
 FONTE: ${interview.platform}
 TÍTULO: ${interview.title}
 DATA: ${interview.date || 'N/A'}
 URL: ${interview.url}
+═══════════════════════════════════════════════════════════════════════════════
 
-CONTEÚDO COMPLETO DA ENTREVISTA:
+CONTEÚDO DA ENTREVISTA:
 ${limitedContent}
 
-INSTRUÇÕES RIGOROSAS:
-1. Extraia APENAS promessas, compromissos e declarações de intenção FEITAS POR ${politicianName}
-2. NÃO invente promessas - extraia APENAS o que está explícito no texto
-3. Inclua a CITAÇÃO DIRETA (entre aspas) quando disponível
-4. Se não houver promessas claras, retorne um array vazio
-5. Classifique por categoria (ECONOMIA, SAÚDE, EDUCAÇÃO, SEGURANÇA, INFRAESTRUTURA, POLÍTICA, etc)
-6. Atribua confiança baseado na clareza e firmeza da declaração
+═══════════════════════════════════════════════════════════════════════════════
+INSTRUÇÕES DE EXTRAÇÃO FORENSE:
+═══════════════════════════════════════════════════════════════════════════════
 
-RESPONDA APENAS JSON:
+1. EXTRAÇÃO DE PROMESSAS:
+   - Identifique TODAS as promessas, compromissos e declarações de intenção
+   - Inclua a CITAÇÃO DIRETA exata entre aspas
+   - NÃO invente - extraia apenas o que está EXPLÍCITO no texto
+
+2. ANÁLISE DE VIABILIDADE (para cada promessa):
+   - É tecnicamente possível?
+   - Há orçamento disponível?
+   - Depende de aprovação de outros poderes?
+   - Quais são os obstáculos reais?
+
+3. ANÁLISE DE IMPACTO:
+   - QUEM se beneficia diretamente?
+   - QUEM pode ser prejudicado?
+   - Qual a escala? (Local, Estadual, Nacional)
+
+4. CONTEXTO HISTÓRICO:
+   - O político já prometeu isso antes?
+   - Há contradição com posições anteriores?
+   - Qual o histórico dele nesse tema?
+
+5. ALERTAS CRÍTICOS:
+   - A promessa parece eleitoreira/populista?
+   - Há interesses ocultos possíveis?
+   - Quem financia campanhas relacionadas a esse tema?
+
+═══════════════════════════════════════════════════════════════════════════════
+RESPONDA APENAS JSON (seja INCISIVO e CRÍTICO):
+═══════════════════════════════════════════════════════════════════════════════
+
 {
   "promises": [
     {
-      "text": "resumo da promessa",
-      "quote": "citação direta do político entre aspas",
-      "category": "CATEGORIA",
+      "text": "resumo objetivo da promessa",
+      "quote": "citação EXATA do político entre aspas",
+      "category": "ECONOMIA|SAÚDE|EDUCAÇÃO|SEGURANÇA|INFRAESTRUTURA|POLÍTICA|SOCIAL|MEIO_AMBIENTE",
       "context": "contexto em que a promessa foi feita",
-      "confidence": 0-100
+      "viability": {
+        "score": 0-100,
+        "analysis": "análise crítica da viabilidade",
+        "obstacles": ["obstáculo 1", "obstáculo 2"]
+      },
+      "impact": {
+        "beneficiaries": ["quem ganha"],
+        "affected": ["quem pode perder"],
+        "scale": "LOCAL|ESTADUAL|NACIONAL"
+      },
+      "historicalContext": "o que sabemos sobre o histórico do político nesse tema",
+      "potentialContradictions": ["possíveis contradições com posições anteriores"],
+      "confidence": 0-100,
+      "alerts": ["alerta crítico 1", "alerta crítico 2"]
     }
-  ]
+  ],
+  "overallAssessment": {
+    "totalPromises": número,
+    "viablePromises": número,
+    "populistAlerts": número,
+    "summary": "avaliação geral das promessas em 2-3 frases INCISIVAS"
+  }
 }
 
-SE NÃO HOUVER PROMESSAS CLARAS, RETORNE: {"promises": []}`;
+SE NÃO HOUVER PROMESSAS CLARAS, RETORNE: {"promises": [], "overallAssessment": {"totalPromises": 0, "viablePromises": 0, "populistAlerts": 0, "summary": "Nenhuma promessa identificada no conteúdo."}}`;
 
       const response = await aiResilienceNexus.chat(prompt);
       
@@ -245,7 +299,6 @@ SE NÃO HOUVER PROMESSAS CLARAS, RETORNE: {"promises": []}`;
       const parsed = JSON.parse(jsonMatch[0]);
       const promises = parsed.promises || [];
 
-      // Filtrar promessas sem texto ou muito curtas
       const validPromises = promises.filter((p: any) => p.text && p.text.length > 20);
 
       return validPromises.map((p: any) => ({
@@ -254,7 +307,11 @@ SE NÃO HOUVER PROMESSAS CLARAS, RETORNE: {"promises": []}`;
         source: interview,
         confidence: p.confidence || 50,
         context: p.context || '',
-        quote: p.quote || ''
+        quote: p.quote || '',
+        viability: p.viability || { score: 50, analysis: 'Não analisado', obstacles: [] },
+        impact: p.impact || { beneficiaries: [], affected: [], scale: 'NACIONAL' },
+        historicalContext: p.historicalContext || '',
+        potentialContradictions: p.potentialContradictions || []
       }));
 
     } catch (error: any) {
@@ -265,7 +322,6 @@ SE NÃO HOUVER PROMESSAS CLARAS, RETORNE: {"promises": []}`;
 
   /**
    * Busca, faz scraping e extrai promessas em um único fluxo
-   * CORRIGIDO: Agora faz scraping real antes de extrair
    */
   async searchAndExtract(politicianName: string): Promise<InterviewPromise[]> {
     const interviews = await this.search(politicianName);
@@ -273,29 +329,23 @@ SE NÃO HOUVER PROMESSAS CLARAS, RETORNE: {"promises": []}`;
 
     logInfo(`[ScoutInterview] Processando ${interviews.length} entrevistas...`);
 
-    // Processar apenas entrevistas de texto (não YouTube)
     const textInterviews = interviews.filter(i => 
       !i.url.includes('youtube.com') && !i.url.includes('youtu.be')
     );
 
     logInfo(`[ScoutInterview] ${textInterviews.length} entrevistas com texto disponível`);
 
-    // Processar até 5 entrevistas
     for (const interview of textInterviews.slice(0, 5)) {
-      // PASSO 1: Fazer scraping do conteúdo real
       const content = await this.scrapeContent(interview);
       
       if (content) {
         interview.content = content;
-        
-        // PASSO 2: Extrair promessas do conteúdo real
         const promises = await this.extractPromises(interview, politicianName);
         allPromises.push(...promises);
         
         logInfo(`[ScoutInterview] ${promises.length} promessas extraídas de: ${interview.title}`);
       }
 
-      // Pequena pausa para não sobrecarregar
       await new Promise(resolve => setTimeout(resolve, 500));
     }
 

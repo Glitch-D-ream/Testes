@@ -1,13 +1,13 @@
 /**
- * Coherence Vote Agent v1.0
+ * Coherence Vote Agent v2.0 - INCISIVO
  * 
- * Cruza promessas extraídas com votações na Câmara dos Deputados
- * Identifica contradições entre discurso e prática legislativa
+ * Cruza promessas com votações do político
+ * COM ANÁLISE PROFUNDA: impacto, interesses, lobbies, doadores
  */
 
 import { logInfo, logError, logWarn } from '../core/logger.ts';
 import { aiResilienceNexus } from '../services/ai-resilience-nexus.ts';
-import { getDeputadoId, getVotacoesDeputado, Vote } from '../integrations/camara.ts';
+import { getDeputadoId, getVotacoesDeputado } from '../integrations/camara.ts';
 
 export interface PromiseInput {
   text: string;
@@ -17,30 +17,45 @@ export interface PromiseInput {
   quote?: string;
 }
 
-export interface VoteCoherenceResult {
-  promise: PromiseInput;
-  relatedVotes: VoteAnalysis[];
-  coherenceScore: number;  // 0-100
-  verdict: 'COERENTE' | 'PARCIALMENTE_COERENTE' | 'INCOERENTE' | 'SEM_DADOS';
-  summary: string;
+export interface Vote {
+  proposicao: string;
+  ementa: string;
+  data?: string;
+  voto: string;
+  orientacao?: string;
+  rebeldia?: boolean;
 }
 
-export interface VoteAnalysis {
+export interface RelatedVote {
   vote: Vote;
   relation: 'APOIA' | 'CONTRADIZ' | 'NEUTRO';
   explanation: string;
-  severity: 'HIGH' | 'MEDIUM' | 'LOW';
+  impactAnalysis: string;
+  beneficiaries: string[];
+  potentialLobby?: string;
+}
+
+export interface VoteCoherenceResult {
+  promise: PromiseInput;
+  relatedVotes: RelatedVote[];
+  coherenceScore: number;
+  verdict: 'COERENTE' | 'PARCIALMENTE_COERENTE' | 'INCOERENTE';
+  summary: string;
+  deepAnalysis: {
+    votingPattern: string;
+    possibleInterests: string[];
+    impactOnCitizens: string;
+    followTheMoneyAlerts: string[];
+  };
 }
 
 export class CoherenceVoteAgent {
   /**
-   * Analisa a coerência entre promessas e votações
+   * Analisa coerência entre promessas e votações
    */
-  async analyze(
-    politicianName: string,
-    promises: PromiseInput[]
-  ): Promise<VoteCoherenceResult[]> {
-    logInfo(`[CoherenceVote] Analisando coerência de ${promises.length} promessas para: ${politicianName}`);
+  async analyze(politicianName: string, promises: PromiseInput[]): Promise<VoteCoherenceResult[]> {
+    logInfo(`[CoherenceVote] Iniciando análise para: ${politicianName}`);
+    logInfo(`[CoherenceVote] Promessas a analisar: ${promises.length}`);
 
     const results: VoteCoherenceResult[] = [];
 
@@ -53,22 +68,34 @@ export class CoherenceVoteAgent {
           promise: p,
           relatedVotes: [],
           coherenceScore: 50,
-          verdict: 'SEM_DADOS' as const,
-          summary: 'Não foi possível encontrar o político na base da Câmara dos Deputados.'
+          verdict: 'PARCIALMENTE_COERENTE' as const,
+          summary: 'Não foi possível encontrar o político no sistema da Câmara.',
+          deepAnalysis: {
+            votingPattern: 'N/A',
+            possibleInterests: [],
+            impactOnCitizens: 'N/A',
+            followTheMoneyAlerts: []
+          }
         }));
       }
 
-      // 2. Buscar votações do deputado
-      const votes = await getVotacoesDeputado(deputadoId);
-      logInfo(`[CoherenceVote] ${votes.length} votações encontradas para análise`);
+      // 2. Buscar votações
+      const votes = await getVotacoesDeputado(deputadoId, 50);
+      logInfo(`[CoherenceVote] ${votes.length} votações encontradas`);
 
       if (votes.length === 0) {
         return promises.map(p => ({
           promise: p,
           relatedVotes: [],
           coherenceScore: 50,
-          verdict: 'SEM_DADOS' as const,
-          summary: 'Nenhuma votação recente encontrada para análise.'
+          verdict: 'PARCIALMENTE_COERENTE' as const,
+          summary: 'Nenhuma votação recente encontrada para análise.',
+          deepAnalysis: {
+            votingPattern: 'Sem dados suficientes',
+            possibleInterests: [],
+            impactOnCitizens: 'Não foi possível avaliar',
+            followTheMoneyAlerts: []
+          }
         }));
       }
 
@@ -86,7 +113,7 @@ export class CoherenceVoteAgent {
   }
 
   /**
-   * Analisa uma promessa específica contra as votações
+   * Analisa uma promessa específica contra as votações - VERSÃO INCISIVA
    */
   private async analyzePromiseVsVotes(
     promise: PromiseInput,
@@ -96,159 +123,158 @@ export class CoherenceVoteAgent {
     logInfo(`[CoherenceVote] Analisando promessa: ${promise.text.substring(0, 50)}...`);
 
     try {
-      // Usar IA para identificar votações relacionadas e analisar coerência
       const prompt = `
-VOCÊ É UM ANALISTA DE COERÊNCIA POLÍTICA DO SETH VII.
+═══════════════════════════════════════════════════════════════════════════════
+ANÁLISE FORENSE DE COERÊNCIA POLÍTICA - SETH VII v2.0
+═══════════════════════════════════════════════════════════════════════════════
 
-POLÍTICO: ${politicianName}
+VOCÊ É UM INVESTIGADOR POLÍTICO ESPECIALIZADO EM ANÁLISE DE VOTAÇÕES.
+SUA MISSÃO: Identificar CONTRADIÇÕES entre o que o político PROMETE e como ele VOTA.
+
+═══════════════════════════════════════════════════════════════════════════════
+POLÍTICO ALVO: ${politicianName}
+═══════════════════════════════════════════════════════════════════════════════
 
 PROMESSA ANALISADA:
-- Texto: "${promise.text}"
-- Categoria: ${promise.category}
-- Fonte: ${promise.source}
-- Data: ${promise.date || 'N/A'}
-${promise.quote ? `- Citação direta: "${promise.quote}"` : ''}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Texto: "${promise.text}"
+Categoria: ${promise.category}
+Fonte: ${promise.source}
+Data: ${promise.date || 'N/A'}
+${promise.quote ? `Citação direta: "${promise.quote}"` : ''}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-VOTAÇÕES DO POLÍTICO (últimas 20):
+HISTÓRICO DE VOTAÇÕES (últimas ${votes.length}):
 ${votes.map((v, i) => `
-${i+1}. [${v.data?.split('T')[0] || 'N/A'}] ${v.proposicao}
-   Voto: ${v.voto}
-   Ementa: ${v.ementa}
-   Orientação do partido: ${v.orientacao || 'N/A'}
-   Votou contra o partido: ${v.rebeldia ? 'SIM' : 'NÃO'}
+[${i+1}] ${v.data?.split('T')[0] || 'N/A'} | ${v.proposicao}
+    Voto: ${v.voto}
+    Ementa: ${v.ementa}
+    Orientação do partido: ${v.orientacao || 'N/A'}
+    Votou contra o partido: ${v.rebeldia ? '⚠️ SIM (REBELDIA)' : 'NÃO'}
 `).join('')}
 
-INSTRUÇÕES:
-1. Identifique votações que têm RELAÇÃO TEMÁTICA com a promessa
-2. Para cada votação relacionada, analise se o voto APOIA ou CONTRADIZ a promessa
-3. Considere que votar "Sim" em algo que vai CONTRA a promessa é uma contradição
-4. Considere que votar "Não" em algo que APOIA a promessa é uma contradição
-5. Atribua um score de coerência (0-100)
+═══════════════════════════════════════════════════════════════════════════════
+INSTRUÇÕES DE ANÁLISE FORENSE:
+═══════════════════════════════════════════════════════════════════════════════
 
-RESPONDA APENAS JSON:
+1. IDENTIFICAÇÃO DE VOTAÇÕES RELACIONADAS:
+   - Encontre TODAS as votações que têm relação temática com a promessa
+   - Considere relações diretas E indiretas
+   - Não ignore votações que pareçam "técnicas" - muitas vezes escondem interesses
+
+2. ANÁLISE DE COERÊNCIA:
+   - Votar SIM em algo que CONTRADIZ a promessa = INCOERÊNCIA
+   - Votar NÃO em algo que APOIA a promessa = INCOERÊNCIA
+   - Votar contra a orientação do partido em tema da promessa = ALERTA
+
+3. ANÁLISE DE IMPACTO (para cada voto):
+   - QUEM se beneficia com esse voto?
+   - QUEM é prejudicado?
+   - Há INTERESSES ECONÔMICOS por trás?
+   - Há LOBBIES conhecidos nesse tema?
+
+4. FOLLOW THE MONEY:
+   - Esse voto beneficia setores que financiam campanhas?
+   - Há padrão de votos favoráveis a determinados setores?
+   - O político vota consistentemente a favor de quem?
+
+5. IMPACTO NO CIDADÃO:
+   - Como esse voto afeta a vida do cidadão comum?
+   - O voto está alinhado com o interesse público?
+
+═══════════════════════════════════════════════════════════════════════════════
+RESPONDA APENAS JSON (seja INCISIVO e NÃO TENHA MEDO de apontar contradições):
+═══════════════════════════════════════════════════════════════════════════════
+
 {
   "relatedVotes": [
     {
-      "voteIndex": 1,
+      "proposicao": "nome da proposição",
+      "voto": "SIM/NÃO/ABSTENÇÃO",
+      "data": "data do voto",
       "relation": "APOIA|CONTRADIZ|NEUTRO",
-      "explanation": "explicação da relação",
-      "severity": "HIGH|MEDIUM|LOW"
+      "explanation": "explicação detalhada de como esse voto se relaciona com a promessa",
+      "impactAnalysis": "análise do impacto real desse voto para a população",
+      "beneficiaries": ["quem se beneficia com esse voto"],
+      "potentialLobby": "possível lobby ou interesse econômico por trás"
     }
   ],
   "coherenceScore": 0-100,
-  "verdict": "COERENTE|PARCIALMENTE_COERENTE|INCOERENTE|SEM_DADOS",
-  "summary": "resumo da análise em 2-3 frases"
+  "verdict": "COERENTE|PARCIALMENTE_COERENTE|INCOERENTE",
+  "summary": "resumo INCISIVO da análise em 2-3 frases",
+  "deepAnalysis": {
+    "votingPattern": "padrão identificado nas votações do político",
+    "possibleInterests": ["interesses que parecem guiar os votos"],
+    "impactOnCitizens": "como os votos afetam o cidadão comum",
+    "followTheMoneyAlerts": ["alertas sobre possíveis conexões financeiras"]
+  }
 }
 
-SE NÃO HOUVER VOTAÇÕES RELACIONADAS, RETORNE:
+SE NÃO HOUVER VOTAÇÕES RELACIONADAS:
 {
   "relatedVotes": [],
   "coherenceScore": 50,
-  "verdict": "SEM_DADOS",
-  "summary": "Não foram encontradas votações relacionadas a esta promessa."
+  "verdict": "PARCIALMENTE_COERENTE",
+  "summary": "Não foram encontradas votações diretamente relacionadas a esta promessa no período analisado.",
+  "deepAnalysis": {
+    "votingPattern": "Insuficiente para análise",
+    "possibleInterests": [],
+    "impactOnCitizens": "Não foi possível avaliar",
+    "followTheMoneyAlerts": []
+  }
 }`;
 
       const response = await aiResilienceNexus.chat(prompt);
       
       const jsonMatch = response.content.match(/\{[\s\S]*\}/);
       if (!jsonMatch) {
-        logWarn(`[CoherenceVote] Resposta da IA não contém JSON válido`);
-        return this.createEmptyResult(promise);
+        throw new Error('Resposta da IA não contém JSON válido');
       }
 
       const parsed = JSON.parse(jsonMatch[0]);
 
-      // Mapear os índices de volta para os votos reais
-      const relatedVotes: VoteAnalysis[] = (parsed.relatedVotes || [])
-        .filter((rv: any) => rv.voteIndex && rv.voteIndex <= votes.length)
-        .map((rv: any) => ({
-          vote: votes[rv.voteIndex - 1],
-          relation: rv.relation || 'NEUTRO',
-          explanation: rv.explanation || '',
-          severity: rv.severity || 'LOW'
-        }));
-
       return {
         promise,
-        relatedVotes,
+        relatedVotes: (parsed.relatedVotes || []).map((rv: any) => ({
+          vote: {
+            proposicao: rv.proposicao,
+            ementa: rv.ementa || '',
+            data: rv.data,
+            voto: rv.voto
+          },
+          relation: rv.relation || 'NEUTRO',
+          explanation: rv.explanation || '',
+          impactAnalysis: rv.impactAnalysis || '',
+          beneficiaries: rv.beneficiaries || [],
+          potentialLobby: rv.potentialLobby
+        })),
         coherenceScore: parsed.coherenceScore || 50,
-        verdict: parsed.verdict || 'SEM_DADOS',
-        summary: parsed.summary || 'Análise não disponível.'
+        verdict: parsed.verdict || 'PARCIALMENTE_COERENTE',
+        summary: parsed.summary || 'Análise inconclusiva.',
+        deepAnalysis: parsed.deepAnalysis || {
+          votingPattern: 'N/A',
+          possibleInterests: [],
+          impactOnCitizens: 'N/A',
+          followTheMoneyAlerts: []
+        }
       };
 
     } catch (error: any) {
       logError(`[CoherenceVote] Erro ao analisar promessa: ${error.message}`);
-      return this.createEmptyResult(promise);
-    }
-  }
-
-  /**
-   * Cria resultado vazio para casos de erro
-   */
-  private createEmptyResult(promise: PromiseInput): VoteCoherenceResult {
-    return {
-      promise,
-      relatedVotes: [],
-      coherenceScore: 50,
-      verdict: 'SEM_DADOS',
-      summary: 'Não foi possível realizar a análise de coerência.'
-    };
-  }
-
-  /**
-   * Gera um relatório consolidado de todas as análises
-   */
-  generateReport(results: VoteCoherenceResult[]): string {
-    if (results.length === 0) {
-      return 'Nenhuma promessa analisada.';
-    }
-
-    const coherent = results.filter(r => r.verdict === 'COERENTE').length;
-    const partial = results.filter(r => r.verdict === 'PARCIALMENTE_COERENTE').length;
-    const incoherent = results.filter(r => r.verdict === 'INCOERENTE').length;
-    const noData = results.filter(r => r.verdict === 'SEM_DADOS').length;
-
-    const avgScore = Math.round(
-      results.reduce((sum, r) => sum + r.coherenceScore, 0) / results.length
-    );
-
-    let report = `
-## ANÁLISE DE COERÊNCIA: PROMESSAS vs VOTAÇÕES
-
-**Score Médio de Coerência:** ${avgScore}%
-
-**Resumo:**
-- ✅ Coerentes: ${coherent}
-- ⚠️ Parcialmente coerentes: ${partial}
-- ❌ Incoerentes: ${incoherent}
-- ❓ Sem dados: ${noData}
-
-### Detalhamento:
-`;
-
-    for (const result of results) {
-      const icon = result.verdict === 'COERENTE' ? '✅' : 
-                   result.verdict === 'INCOERENTE' ? '❌' : 
-                   result.verdict === 'PARCIALMENTE_COERENTE' ? '⚠️' : '❓';
-
-      report += `
-#### ${icon} ${result.promise.text.substring(0, 60)}...
-- **Categoria:** ${result.promise.category}
-- **Score:** ${result.coherenceScore}%
-- **Veredito:** ${result.verdict}
-- **Análise:** ${result.summary}
-`;
-
-      if (result.relatedVotes.length > 0) {
-        report += `- **Votações relacionadas:**\n`;
-        for (const va of result.relatedVotes) {
-          const voteIcon = va.relation === 'APOIA' ? '👍' : va.relation === 'CONTRADIZ' ? '👎' : '➖';
-          report += `  - ${voteIcon} ${va.vote.proposicao} (${va.vote.voto}): ${va.explanation}\n`;
+      return {
+        promise,
+        relatedVotes: [],
+        coherenceScore: 50,
+        verdict: 'PARCIALMENTE_COERENTE',
+        summary: `Erro na análise: ${error.message}`,
+        deepAnalysis: {
+          votingPattern: 'Erro na análise',
+          possibleInterests: [],
+          impactOnCitizens: 'Não foi possível avaliar',
+          followTheMoneyAlerts: []
         }
-      }
+      };
     }
-
-    return report;
   }
 }
 

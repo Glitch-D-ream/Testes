@@ -1,8 +1,8 @@
 /**
- * Coherence Expense Agent v1.0
+ * Coherence Expense Agent v2.0 - INCISIVO
  * 
- * Cruza promessas extraídas com gastos da cota parlamentar e emendas
- * Identifica se os gastos estão alinhados com as promessas feitas
+ * Cruza promessas com gastos da cota parlamentar
+ * COM ANÁLISE PROFUNDA: fornecedores, padrões suspeitos, comparativos
  */
 
 import { logInfo, logError, logWarn } from '../core/logger.ts';
@@ -22,10 +22,17 @@ export interface ExpenseCoherenceResult {
   promise: PromiseInput;
   relatedExpenses: ExpenseAnalysis[];
   totalRelatedValue: number;
-  coherenceScore: number;  // 0-100
+  coherenceScore: number;
   verdict: 'COERENTE' | 'PARCIALMENTE_COERENTE' | 'INCOERENTE' | 'SEM_DADOS';
   summary: string;
   redFlags: string[];
+  deepAnalysis: {
+    alignmentWithPromise: string;
+    spendingPriorities: string;
+    supplierAnalysis: string;
+    comparisonWithPeers: string;
+    citizenImpact: string;
+  };
 }
 
 export interface ExpenseAnalysis {
@@ -38,7 +45,14 @@ export interface ExpenseProfile {
   totalExpenses: number;
   byCategory: Record<string, { total: number; percentage: number; count: number }>;
   topCategories: { category: string; total: number; percentage: number }[];
+  topSuppliers: { name: string; total: number; count: number }[];
   redFlags: string[];
+  suspiciousPatterns: Array<{
+    type: string;
+    description: string;
+    severity: 'LOW' | 'MEDIUM' | 'HIGH';
+    evidence: string;
+  }>;
 }
 
 export class CoherenceExpenseAgent {
@@ -54,7 +68,6 @@ export class CoherenceExpenseAgent {
     const results: ExpenseCoherenceResult[] = [];
 
     try {
-      // 1. Buscar ID do deputado
       const deputadoId = await getDeputadoId(politicianName);
       if (!deputadoId) {
         logWarn(`[CoherenceExpense] Deputado não encontrado: ${politicianName}`);
@@ -64,7 +77,6 @@ export class CoherenceExpenseAgent {
         };
       }
 
-      // 2. Buscar gastos do deputado (2024 e 2023)
       const expenses2024 = await financeService.getParlamentaryExpenses(deputadoId, 2024);
       const expenses2023 = await financeService.getParlamentaryExpenses(deputadoId, 2023);
       const allExpenses = [...expenses2024, ...expenses2023];
@@ -78,10 +90,8 @@ export class CoherenceExpenseAgent {
         };
       }
 
-      // 3. Criar perfil de gastos
       const profile = this.createExpenseProfile(allExpenses);
 
-      // 4. Para cada promessa, analisar gastos relacionados
       for (const promise of promises) {
         const result = await this.analyzePromiseVsExpenses(promise, allExpenses, profile, politicianName);
         results.push(result);
@@ -99,10 +109,12 @@ export class CoherenceExpenseAgent {
   }
 
   /**
-   * Cria perfil consolidado de gastos
+   * Cria perfil consolidado de gastos com detecção de padrões suspeitos
    */
   private createExpenseProfile(expenses: FinanceEvidence[]): ExpenseProfile {
     const byCategory: Record<string, { total: number; count: number }> = {};
+    const bySupplier: Record<string, { total: number; count: number }> = {};
+    const valueFrequency: Record<number, number> = {};
     let totalExpenses = 0;
 
     for (const expense of expenses) {
@@ -115,6 +127,20 @@ export class CoherenceExpenseAgent {
       byCategory[category].total += value;
       byCategory[category].count += 1;
       totalExpenses += value;
+
+      // Rastrear fornecedores
+      const supplier = expense.source || 'NÃO INFORMADO';
+      if (!bySupplier[supplier]) {
+        bySupplier[supplier] = { total: 0, count: 0 };
+      }
+      bySupplier[supplier].total += value;
+      bySupplier[supplier].count += 1;
+
+      // Rastrear frequência de valores
+      if (value > 100) {
+        const roundedValue = Math.round(value * 100) / 100;
+        valueFrequency[roundedValue] = (valueFrequency[roundedValue] || 0) + 1;
+      }
     }
 
     // Calcular percentuais
@@ -132,45 +158,77 @@ export class CoherenceExpenseAgent {
       .sort((a, b) => b.total - a.total)
       .slice(0, 5);
 
-    // Detectar red flags
+    // Top fornecedores
+    const topSuppliers = Object.entries(bySupplier)
+      .map(([name, data]) => ({ name, ...data }))
+      .sort((a, b) => b.total - a.total)
+      .slice(0, 10);
+
+    // Detectar red flags e padrões suspeitos
     const redFlags: string[] = [];
+    const suspiciousPatterns: ExpenseProfile['suspiciousPatterns'] = [];
     
-    // Red flag: Mais de 50% em uma única categoria
+    // 1. Concentração excessiva em uma categoria
     const topCategory = topCategories[0];
     if (topCategory && topCategory.percentage > 50) {
       redFlags.push(`${topCategory.percentage}% dos gastos concentrados em "${topCategory.category}"`);
+      suspiciousPatterns.push({
+        type: 'CONCENTRAÇÃO_EXCESSIVA',
+        description: `Mais da metade dos gastos em uma única categoria`,
+        severity: topCategory.percentage > 70 ? 'HIGH' : 'MEDIUM',
+        evidence: `${topCategory.category}: R$ ${topCategory.total.toFixed(2)} (${topCategory.percentage}%)`
+      });
     }
 
-    // Red flag: Gastos com combustíveis muito altos
+    // 2. Gastos com combustíveis muito altos
     const combustiveis = byCategoryWithPercentage['COMBUSTÍVEIS E LUBRIFICANTES.'];
     if (combustiveis && combustiveis.percentage > 30) {
       redFlags.push(`Gastos elevados com combustíveis: ${combustiveis.percentage}% do total`);
+      suspiciousPatterns.push({
+        type: 'COMBUSTÍVEIS_ELEVADOS',
+        description: `Gastos com combustíveis acima da média`,
+        severity: combustiveis.percentage > 50 ? 'HIGH' : 'MEDIUM',
+        evidence: `R$ ${combustiveis.total.toFixed(2)} (${combustiveis.percentage}%)`
+      });
     }
 
-    // Red flag: Valores repetidos (possível irregularidade)
-    const values = expenses.map(e => e.value).filter(v => v && v > 100);
-    const valueCounts: Record<number, number> = {};
-    for (const v of values) {
-      if (v) {
-        valueCounts[v] = (valueCounts[v] || 0) + 1;
-      }
-    }
-    for (const [value, count] of Object.entries(valueCounts)) {
+    // 3. Valores repetidos (possível fracionamento)
+    for (const [value, count] of Object.entries(valueFrequency)) {
       if (count >= 5) {
         redFlags.push(`Valor R$ ${Number(value).toFixed(2)} aparece ${count} vezes (possível padrão suspeito)`);
+        suspiciousPatterns.push({
+          type: 'VALORES_REPETIDOS',
+          description: `Mesmo valor aparece múltiplas vezes - possível fracionamento`,
+          severity: count >= 10 ? 'HIGH' : 'MEDIUM',
+          evidence: `R$ ${value} x ${count} ocorrências`
+        });
       }
+    }
+
+    // 4. Fornecedor dominante
+    if (topSuppliers[0] && (topSuppliers[0].total / totalExpenses) > 0.3) {
+      const supplierPercentage = Math.round((topSuppliers[0].total / totalExpenses) * 100);
+      redFlags.push(`Fornecedor "${topSuppliers[0].name}" recebeu ${supplierPercentage}% do total`);
+      suspiciousPatterns.push({
+        type: 'FORNECEDOR_DOMINANTE',
+        description: `Um único fornecedor concentra grande parte dos pagamentos`,
+        severity: supplierPercentage > 50 ? 'HIGH' : 'MEDIUM',
+        evidence: `${topSuppliers[0].name}: R$ ${topSuppliers[0].total.toFixed(2)} (${supplierPercentage}%)`
+      });
     }
 
     return {
       totalExpenses,
       byCategory: byCategoryWithPercentage,
       topCategories,
-      redFlags
+      topSuppliers,
+      redFlags,
+      suspiciousPatterns
     };
   }
 
   /**
-   * Analisa uma promessa específica contra os gastos
+   * Analisa uma promessa específica contra os gastos - VERSÃO INCISIVA
    */
   private async analyzePromiseVsExpenses(
     promise: PromiseInput,
@@ -182,47 +240,98 @@ export class CoherenceExpenseAgent {
 
     try {
       const prompt = `
-VOCÊ É UM ANALISTA FINANCEIRO DO SETH VII.
+═══════════════════════════════════════════════════════════════════════════════
+ANÁLISE FORENSE DE GASTOS PARLAMENTARES - SETH VII v2.0
+═══════════════════════════════════════════════════════════════════════════════
 
-POLÍTICO: ${politicianName}
+VOCÊ É UM AUDITOR FINANCEIRO ESPECIALIZADO EM GASTOS PÚBLICOS.
+SUA MISSÃO: Identificar INCOERÊNCIAS entre o que o político PROMETE e como ele GASTA dinheiro público.
+
+═══════════════════════════════════════════════════════════════════════════════
+POLÍTICO ALVO: ${politicianName}
+═══════════════════════════════════════════════════════════════════════════════
 
 PROMESSA ANALISADA:
-- Texto: "${promise.text}"
-- Categoria: ${promise.category}
-- Fonte: ${promise.source}
-${promise.quote ? `- Citação: "${promise.quote}"` : ''}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Texto: "${promise.text}"
+Categoria: ${promise.category}
+Fonte: ${promise.source}
+${promise.quote ? `Citação direta: "${promise.quote}"` : ''}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-PERFIL DE GASTOS DO POLÍTICO:
-- Total gasto: R$ ${profile.totalExpenses.toFixed(2)}
-- Top 5 categorias:
-${profile.topCategories.map((c, i) => `  ${i+1}. ${c.category}: R$ ${c.total.toFixed(2)} (${c.percentage}%)`).join('\n')}
+PERFIL FINANCEIRO DO POLÍTICO:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Total de Gastos: R$ ${profile.totalExpenses.toFixed(2)}
 
-RED FLAGS DETECTADAS:
-${profile.redFlags.length > 0 ? profile.redFlags.map(r => `- ${r}`).join('\n') : '- Nenhuma'}
+TOP 5 CATEGORIAS DE GASTOS:
+${profile.topCategories.map((c, i) => `${i+1}. ${c.category}: R$ ${c.total.toFixed(2)} (${c.percentage}%)`).join('\n')}
+
+TOP 10 FORNECEDORES:
+${profile.topSuppliers.map((s, i) => `${i+1}. ${s.name}: R$ ${s.total.toFixed(2)} (${s.count} pagamentos)`).join('\n')}
+
+RED FLAGS JÁ IDENTIFICADAS:
+${profile.redFlags.map(r => `⚠️ ${r}`).join('\n')}
+
+PADRÕES SUSPEITOS:
+${profile.suspiciousPatterns.map(p => `🚨 [${p.severity}] ${p.type}: ${p.description} | ${p.evidence}`).join('\n')}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 AMOSTRA DE DESPESAS (últimas 20):
-${expenses.slice(0, 20).map((e, i) => `${i+1}. [${e.date}] ${e.description}: R$ ${e.value?.toFixed(2) || 'N/A'}`).join('\n')}
+${expenses.slice(0, 20).map((e, i) => `
+[${i+1}] ${e.date || 'N/A'} | ${e.description}
+    Fonte: ${e.source}
+    Valor: R$ ${e.value?.toFixed(2) || 'N/A'}
+`).join('')}
 
-INSTRUÇÕES:
-1. Analise se os GASTOS estão ALINHADOS com a PROMESSA
-2. Uma promessa de "investir em educação" deveria ter gastos relacionados a educação
-3. Uma promessa de "reduzir gastos" deveria mostrar contenção de despesas
-4. Identifique CONTRADIÇÕES entre promessa e padrão de gastos
-5. Considere os red flags na análise
+═══════════════════════════════════════════════════════════════════════════════
+INSTRUÇÕES DE ANÁLISE FORENSE:
+═══════════════════════════════════════════════════════════════════════════════
 
-RESPONDA APENAS JSON:
+1. ALINHAMENTO PROMESSA vs GASTO:
+   - Os gastos estão ALINHADOS com a promessa?
+   - Se promete "investir em educação", há gastos relacionados a educação?
+   - Se promete "austeridade", os gastos são compatíveis?
+
+2. ANÁLISE DE FORNECEDORES:
+   - Quem são os principais fornecedores?
+   - Há concentração suspeita em poucos fornecedores?
+   - Há possível conexão com o político ou aliados?
+
+3. PADRÕES SUSPEITOS:
+   - Há fracionamento de despesas (valores repetidos)?
+   - Há gastos próximos ao limite para evitar fiscalização?
+
+4. COMPARATIVO:
+   - Como esses gastos se comparam com outros deputados?
+   - Está acima ou abaixo da média?
+
+5. IMPACTO NO CIDADÃO:
+   - Esses gastos beneficiam o cidadão?
+   - O dinheiro público está sendo bem utilizado?
+
+═══════════════════════════════════════════════════════════════════════════════
+RESPONDA APENAS JSON (seja INCISIVO e aponte TODAS as irregularidades):
+═══════════════════════════════════════════════════════════════════════════════
+
 {
   "relatedExpenses": [
     {
-      "expenseIndex": 1,
+      "expenseIndex": número,
       "relation": "ALINHADO|CONTRADITORIO|NEUTRO",
-      "explanation": "explicação"
+      "explanation": "explicação detalhada"
     }
   ],
   "coherenceScore": 0-100,
   "verdict": "COERENTE|PARCIALMENTE_COERENTE|INCOERENTE|SEM_DADOS",
-  "summary": "resumo da análise em 2-3 frases",
-  "additionalRedFlags": ["flag1", "flag2"]
+  "summary": "resumo INCISIVO da análise em 3-4 frases",
+  "additionalRedFlags": ["flag1", "flag2"],
+  "deepAnalysis": {
+    "alignmentWithPromise": "análise detalhada do alinhamento entre gastos e promessa",
+    "spendingPriorities": "quais são as reais prioridades de gasto do político",
+    "supplierAnalysis": "análise crítica dos fornecedores - há algo suspeito?",
+    "comparisonWithPeers": "como se compara com outros políticos do mesmo cargo",
+    "citizenImpact": "como esses gastos afetam o cidadão comum"
+  }
 }`;
 
       const response = await aiResilienceNexus.chat(prompt);
@@ -235,7 +344,6 @@ RESPONDA APENAS JSON:
 
       const parsed = JSON.parse(jsonMatch[0]);
 
-      // Mapear índices para despesas reais
       const relatedExpenses: ExpenseAnalysis[] = (parsed.relatedExpenses || [])
         .filter((re: any) => re.expenseIndex && re.expenseIndex <= expenses.length)
         .map((re: any) => ({
@@ -244,12 +352,10 @@ RESPONDA APENAS JSON:
           explanation: re.explanation || ''
         }));
 
-      // Calcular valor total relacionado
       const totalRelatedValue = relatedExpenses
         .filter(re => re.relation !== 'NEUTRO')
         .reduce((sum, re) => sum + (re.expense.value || 0), 0);
 
-      // Combinar red flags
       const allRedFlags = [
         ...profile.redFlags,
         ...(parsed.additionalRedFlags || [])
@@ -262,7 +368,14 @@ RESPONDA APENAS JSON:
         coherenceScore: parsed.coherenceScore || 50,
         verdict: parsed.verdict || 'SEM_DADOS',
         summary: parsed.summary || 'Análise não disponível.',
-        redFlags: allRedFlags
+        redFlags: allRedFlags,
+        deepAnalysis: parsed.deepAnalysis || {
+          alignmentWithPromise: 'N/A',
+          spendingPriorities: 'N/A',
+          supplierAnalysis: 'N/A',
+          comparisonWithPeers: 'N/A',
+          citizenImpact: 'N/A'
+        }
       };
 
     } catch (error: any) {
@@ -271,9 +384,6 @@ RESPONDA APENAS JSON:
     }
   }
 
-  /**
-   * Cria resultado vazio
-   */
   private createEmptyResult(promise: PromiseInput, reason: string): ExpenseCoherenceResult {
     return {
       promise,
@@ -282,36 +392,45 @@ RESPONDA APENAS JSON:
       coherenceScore: 50,
       verdict: 'SEM_DADOS',
       summary: reason,
-      redFlags: []
+      redFlags: [],
+      deepAnalysis: {
+        alignmentWithPromise: 'N/A',
+        spendingPriorities: 'N/A',
+        supplierAnalysis: 'N/A',
+        comparisonWithPeers: 'N/A',
+        citizenImpact: 'N/A'
+      }
     };
   }
 
-  /**
-   * Cria perfil vazio
-   */
   private createEmptyProfile(): ExpenseProfile {
     return {
       totalExpenses: 0,
       byCategory: {},
       topCategories: [],
-      redFlags: []
+      topSuppliers: [],
+      redFlags: [],
+      suspiciousPatterns: []
     };
   }
 
-  /**
-   * Gera relatório consolidado
-   */
   generateReport(results: ExpenseCoherenceResult[], profile: ExpenseProfile): string {
     let report = `
-## ANÁLISE DE COERÊNCIA: PROMESSAS vs GASTOS
+## ANÁLISE FORENSE DE GASTOS PARLAMENTARES
 
 ### Perfil Financeiro
 - **Total de Gastos:** R$ ${profile.totalExpenses.toFixed(2)}
 - **Principais Categorias:**
 ${profile.topCategories.map((c, i) => `  ${i+1}. ${c.category}: R$ ${c.total.toFixed(2)} (${c.percentage}%)`).join('\n')}
 
+### Top Fornecedores
+${profile.topSuppliers.slice(0, 5).map((s, i) => `  ${i+1}. ${s.name}: R$ ${s.total.toFixed(2)} (${s.count} pagamentos)`).join('\n')}
+
 ### Red Flags Detectadas
 ${profile.redFlags.length > 0 ? profile.redFlags.map(r => `- ⚠️ ${r}`).join('\n') : '- Nenhuma red flag detectada'}
+
+### Padrões Suspeitos
+${profile.suspiciousPatterns.length > 0 ? profile.suspiciousPatterns.map(p => `- 🚨 [${p.severity}] ${p.type}: ${p.description}`).join('\n') : '- Nenhum padrão suspeito detectado'}
 
 ### Análise por Promessa
 `;
@@ -326,6 +445,12 @@ ${profile.redFlags.length > 0 ? profile.redFlags.map(r => `- ⚠️ ${r}`).join(
 - **Score:** ${result.coherenceScore}%
 - **Veredito:** ${result.verdict}
 - **Análise:** ${result.summary}
+
+**Análise Profunda:**
+- Alinhamento: ${result.deepAnalysis.alignmentWithPromise}
+- Prioridades: ${result.deepAnalysis.spendingPriorities}
+- Fornecedores: ${result.deepAnalysis.supplierAnalysis}
+- Impacto: ${result.deepAnalysis.citizenImpact}
 `;
 
       if (result.redFlags.length > 0) {
