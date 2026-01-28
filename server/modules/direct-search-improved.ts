@@ -9,6 +9,8 @@ export interface DirectSearchResult {
   snippet: string;
   source: string;
   publishedAt: string;
+  description?: string;
+  content?: string;
 }
 
 export class DirectSearchImproved {
@@ -23,112 +25,195 @@ export class DirectSearchImproved {
   }
 
   /**
-   * Busca via DuckDuckGo HTML (Scraping gratuito e sem API key)
+   * Resolve redirecionamentos do Google News usando requisição HTTP com follow
    */
-  async searchDuckDuckGoHTML(query: string): Promise<DirectSearchResult[]> {
-    logInfo(`[DirectSearchImproved] Buscando via DuckDuckGo HTML: ${query}`);
+  private async resolveGoogleNewsUrl(googleNewsUrl: string): Promise<string> {
     try {
-      const url = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`;
+      if (!googleNewsUrl.includes('news.google.com/rss/articles')) {
+        return googleNewsUrl;
+      }
+
+      // Fazer requisição seguindo redirecionamentos
+      const response = await axios.get(googleNewsUrl, {
+        headers: { 
+          'User-Agent': this.getRandomUserAgent(),
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'Accept-Language': 'pt-BR,pt;q=0.9,en;q=0.8'
+        },
+        timeout: 8000,
+        maxRedirects: 10,
+        validateStatus: () => true
+      });
+
+      // A URL final após redirecionamentos
+      if (response.request?.res?.responseUrl) {
+        const finalUrl = response.request.res.responseUrl;
+        if (!finalUrl.includes('google.com')) {
+          return finalUrl;
+        }
+      }
+
+      // Tentar extrair do HTML se houver meta refresh ou JavaScript redirect
+      if (response.data && typeof response.data === 'string') {
+        const $ = cheerio.load(response.data);
+        
+        // Procurar por links no HTML
+        const links = $('a[href^="http"]').map((i, el) => $(el).attr('href')).get();
+        const externalLink = links.find(l => l && !l.includes('google.com'));
+        if (externalLink) {
+          return externalLink;
+        }
+
+        // Procurar por meta refresh
+        const metaRefresh = $('meta[http-equiv="refresh"]').attr('content');
+        if (metaRefresh) {
+          const urlMatch = metaRefresh.match(/url=(.+)/i);
+          if (urlMatch && !urlMatch[1].includes('google.com')) {
+            return urlMatch[1];
+          }
+        }
+      }
+
+      return googleNewsUrl;
+    } catch (error) {
+      logWarn(`[DirectSearchImproved] Falha ao resolver URL: ${googleNewsUrl.substring(0, 50)}...`);
+      return googleNewsUrl;
+    }
+  }
+
+  /**
+   * Busca via Google News RSS com resolução de URLs
+   */
+  async searchGoogleNews(query: string): Promise<DirectSearchResult[]> {
+    logInfo(`[DirectSearchImproved] Buscando via Google News RSS: ${query}`);
+    try {
+      const url = `https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=pt-BR&gl=BR&ceid=BR:pt-419`;
+      const response = await axios.get(url, { 
+        timeout: 10000,
+        headers: { 'User-Agent': this.getRandomUserAgent() }
+      });
+      const xml = response.data;
+      const results: DirectSearchResult[] = [];
+      const items = xml.match(/<item>[\s\S]*?<\/item>/g) || [];
+      
+      // Processar itens em paralelo (limitado a 6)
+      const itemsToProcess = items.slice(0, 6);
+      
+      const resolvedResults = await Promise.all(itemsToProcess.map(async (item: string) => {
+        const title = (item.match(/<title>(.*?)<\/title>/))?.[1] || 'Sem título';
+        const link = (item.match(/<link>(.*?)<\/link>/))?.[1] || '';
+        const source = (item.match(/<source[^>]*>(.*?)<\/source>/))?.[1] || 'Google News';
+        const pubDate = (item.match(/<pubDate>(.*?)<\/pubDate>/))?.[1] || '';
+        
+        // Resolver a URL real
+        const realUrl = await this.resolveGoogleNewsUrl(link);
+        
+        return {
+          title: title.replace(/&amp;/g, '&').replace(/<!\[CDATA\[|\]\]>/g, ''),
+          url: realUrl,
+          snippet: title,
+          description: title,
+          source: source,
+          publishedAt: pubDate || new Date().toISOString(),
+          isResolved: !realUrl.includes('news.google.com')
+        };
+      }));
+      
+      // Manter todas as notícias, mesmo as não resolvidas (usaremos o título como conteúdo)
+      for (const r of resolvedResults) {
+        results.push({
+          title: r.title,
+          url: r.url,
+          snippet: r.description || r.title,
+          description: r.description,
+          source: r.source,
+          publishedAt: r.publishedAt,
+          content: r.title // Usar título como conteúdo mínimo
+        });
+      }
+      
+      logInfo(`[DirectSearchImproved] Google News: ${results.length} resultados`);
+      return results;
+    } catch (error) {
+      logWarn(`[DirectSearchImproved] Falha no Google News RSS`, error as Error);
+      return [];
+    }
+  }
+
+  /**
+   * Busca via Bing usando scraping
+   */
+  async searchBing(query: string): Promise<DirectSearchResult[]> {
+    logInfo(`[DirectSearchImproved] Buscando via Bing: ${query}`);
+    try {
+      const url = `https://www.bing.com/search?q=${encodeURIComponent(query)}&setlang=pt-BR`;
       const response = await axios.get(url, {
-        headers: { 'User-Agent': this.getRandomUserAgent() },
+        headers: { 
+          'User-Agent': this.getRandomUserAgent(),
+          'Accept-Language': 'pt-BR,pt;q=0.9'
+        },
         timeout: 10000
       });
       
       const $ = cheerio.load(response.data);
       const results: DirectSearchResult[] = [];
       
-      $('.result').each((i, el) => {
-        const titleEl = $(el).find('.result__a');
+      // Extrair resultados do Bing
+      $('li.b_algo').each((i, el) => {
+        const titleEl = $(el).find('h2 a');
         const title = titleEl.text().trim();
         const link = titleEl.attr('href');
-        const snippet = $(el).find('.result__snippet').text().trim();
+        const snippet = $(el).find('.b_caption p').text().trim();
         
-        if (title && link) {
-          // Extrair URL real se for um link de redirecionamento do DDG
-          let realLink = link;
-          if (link.includes('uddg=')) {
-            const match = link.match(/uddg=([^&]+)/);
-            if (match) realLink = decodeURIComponent(match[1]);
-          }
-
+        if (title && link && link.startsWith('http')) {
           results.push({
             title,
-            url: realLink,
+            url: link,
             snippet,
-            source: this.extractDomain(realLink),
-            publishedAt: new Date().toISOString()
+            description: snippet,
+            source: this.extractDomain(link),
+            publishedAt: new Date().toISOString(),
+            content: snippet
           });
         }
       });
       
+      logInfo(`[DirectSearchImproved] Bing: ${results.length} resultados`);
       return results;
     } catch (error) {
-      logWarn(`[DirectSearchImproved] Falha no DuckDuckGo HTML`, error as Error);
+      logWarn(`[DirectSearchImproved] Falha no Bing`, error as Error);
       return [];
     }
   }
 
   /**
-   * Busca usando a API pública do DuckDuckGo (JSON)
+   * Busca via Wikipedia API (sempre funciona, sem bloqueio)
    */
-  async searchDuckDuckGoAPI(query: string): Promise<DirectSearchResult[]> {
-    logInfo(`[DirectSearchImproved] Buscando via DuckDuckGo API: ${query}`);
+  async searchWikipedia(query: string): Promise<DirectSearchResult[]> {
+    logInfo(`[DirectSearchImproved] Buscando via Wikipedia: ${query}`);
     try {
-      const response = await axios.get('https://api.duckduckgo.com/', {
-        params: { q: query, format: 'json', no_redirect: 1, no_html: 1, skip_disambig: 1 },
-        headers: { 'User-Agent': this.getRandomUserAgent() },
-        timeout: 10000
-      });
-
-      const results: DirectSearchResult[] = [];
-      if (response.data?.RelatedTopics) {
-        response.data.RelatedTopics.forEach((topic: any) => {
-          if (topic.FirstURL && topic.Text) {
-            results.push({
-              title: topic.Text.substring(0, 100),
-              url: topic.FirstURL,
-              snippet: topic.Text,
-              source: this.extractDomain(topic.FirstURL),
-              publishedAt: new Date().toISOString()
-            });
-          }
-        });
-      }
-      return results;
-    } catch (error) {
-      logWarn(`[DirectSearchImproved] Falha na API DuckDuckGo`, error as Error);
-      return [];
-    }
-  }
-
-  /**
-   * Busca via Google News RSS
-   */
-  async searchGoogleNews(query: string): Promise<DirectSearchResult[]> {
-    logInfo(`[DirectSearchImproved] Buscando via Google News RSS: ${query}`);
-    try {
-      const url = `https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=pt-BR&gl=BR&ceid=BR:pt-419`;
+      const url = `https://pt.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query)}&format=json&utf8=1&srlimit=5`;
       const response = await axios.get(url, { timeout: 10000 });
-      const xml = response.data;
-      const results: DirectSearchResult[] = [];
-      const items = xml.match(/<item>[\s\S]*?<\/item>/g) || [];
       
-      for (const item of items.slice(0, 10)) {
-        const title = (item.match(/<title>(.*?)<\/title>/))?.[1] || 'Sem título';
-        const link = (item.match(/<link>(.*?)<\/link>/))?.[1] || '';
-        const source = (item.match(/<source[^>]*>(.*?)<\/source>/))?.[1] || 'Google News';
-        
-        results.push({
-          title: title.replace(/&amp;/g, '&'),
-          url: link,
-          snippet: title,
-          source: source,
-          publishedAt: new Date().toISOString()
-        });
+      const results: DirectSearchResult[] = [];
+      if (response.data?.query?.search) {
+        for (const item of response.data.query.search) {
+          results.push({
+            title: item.title,
+            url: `https://pt.wikipedia.org/wiki/${encodeURIComponent(item.title.replace(/ /g, '_'))}`,
+            snippet: item.snippet.replace(/<[^>]*>/g, ''),
+            description: item.snippet.replace(/<[^>]*>/g, ''),
+            source: 'Wikipedia',
+            publishedAt: new Date().toISOString(),
+            content: item.snippet.replace(/<[^>]*>/g, '')
+          });
+        }
       }
+      
+      logInfo(`[DirectSearchImproved] Wikipedia: ${results.length} resultados`);
       return results;
     } catch (error) {
-      logWarn(`[DirectSearchImproved] Falha no Google News RSS`, error as Error);
+      logWarn(`[DirectSearchImproved] Falha na Wikipedia`, error as Error);
       return [];
     }
   }
@@ -143,18 +228,28 @@ export class DirectSearchImproved {
   }
 
   async search(query: string): Promise<DirectSearchResult[]> {
-    // Orquestração de busca gratuita
-    const [news, html, api] = await Promise.all([
+    // Orquestração de busca gratuita com múltiplas fontes confiáveis
+    const [news, bing, wiki] = await Promise.all([
       this.searchGoogleNews(query),
-      this.searchDuckDuckGoHTML(query),
-      this.searchDuckDuckGoAPI(query)
+      this.searchBing(query),
+      this.searchWikipedia(query)
     ]);
     
-    const results = [...news, ...html, ...api];
+    const results = [...news, ...bing, ...wiki];
     const uniqueResults = Array.from(new Map(results.map(item => [item.url, item])).values());
     
-    logInfo(`[DirectSearchImproved] Busca finalizada. Total único: ${uniqueResults.length}`);
-    return uniqueResults;
+    // Filtrar URLs inválidas
+    const validResults = uniqueResults.filter(r => {
+      try {
+        const parsed = new URL(r.url);
+        return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+      } catch {
+        return false;
+      }
+    });
+    
+    logInfo(`[DirectSearchImproved] Busca finalizada. Total único válido: ${validResults.length}`);
+    return validResults;
   }
 }
 
