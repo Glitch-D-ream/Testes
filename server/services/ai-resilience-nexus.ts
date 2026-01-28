@@ -8,17 +8,22 @@ export interface NexusResponse {
 }
 
 /**
- * Nexo de Resiliência de IA v3.0
+ * Nexo de Resiliência de IA v4.0
  * 
- * Atualizado em 28/01/2026 para usar provedores sem filtros de conteúdo político.
- * Prioriza modelos open-source "uncensored" que não bloqueiam análises políticas.
+ * RESTAURADO em 28/01/2026:
+ * - Provedores sem chave (Pollinations) como fallback final
+ * - Seleção forçada de modelo via USE_MODEL
+ * - Ordem de prioridade otimizada
  * 
  * Ordem de fallback:
- * 1. Groq (Llama 3.3 70B) - Rápido, modelos open-source
- * 2. OpenRouter (Dolphin Mistral) - Explicitamente uncensored
- * 3. DeepSeek - Modelo chinês, menos filtros ocidentais
- * 4. Cerebras - Backup com limites generosos
- * 5. Pollinations - Último recurso
+ * 1. Groq (Llama 3.3 70B) - Rápido, modelos open-source [REQUER CHAVE]
+ * 2. OpenRouter (Dolphin Mistral) - Uncensored [REQUER CHAVE]
+ * 3. OpenRouter (Qwen, DeepSeek) - Gratuitos [REQUER CHAVE]
+ * 4. DeepSeek - Modelo chinês [REQUER CHAVE]
+ * 5. Cerebras - Backup [REQUER CHAVE]
+ * 6. Gemini - Google AI Studio [REQUER CHAVE]
+ * 7. Pollinations (Llama, Mistral, Qwen) - SEM CHAVE [RESTAURADO]
+ * 8. Pollinations (DeepSeek R1) - SEM CHAVE [RESTAURADO]
  */
 export class AIResilienceNexus {
   private requestQueue: Promise<any> = Promise.resolve();
@@ -30,6 +35,7 @@ export class AIResilienceNexus {
     {
       name: 'Groq-Llama',
       models: ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant'],
+      requiresKey: true,
       handler: async (prompt: string, model: string) => {
         const apiKey = process.env.GROQ_API_KEY;
         if (!apiKey) throw new Error('GROQ_API_KEY não configurada');
@@ -54,6 +60,7 @@ export class AIResilienceNexus {
     {
       name: 'OpenRouter-Dolphin',
       models: ['cognitivecomputations/dolphin-mistral-24b-venice-edition:free'],
+      requiresKey: true,
       handler: async (prompt: string, model: string) => {
         const apiKey = process.env.OPENROUTER_API_KEY;
         if (!apiKey) throw new Error('OPENROUTER_API_KEY não configurada');
@@ -79,6 +86,7 @@ export class AIResilienceNexus {
     {
       name: 'OpenRouter-Free',
       models: ['qwen/qwen3-4b:free', 'deepseek/deepseek-r1-0528:free'],
+      requiresKey: true,
       handler: async (prompt: string, model: string) => {
         const apiKey = process.env.OPENROUTER_API_KEY;
         if (!apiKey) throw new Error('OPENROUTER_API_KEY não configurada');
@@ -102,6 +110,7 @@ export class AIResilienceNexus {
     {
       name: 'DeepSeek',
       models: ['deepseek-chat'],
+      requiresKey: true,
       handler: async (prompt: string, model: string) => {
         const apiKey = process.env.DEEPSEEK_API_KEY;
         if (!apiKey) throw new Error('DEEPSEEK_API_KEY não configurada');
@@ -126,6 +135,7 @@ export class AIResilienceNexus {
     {
       name: 'Cerebras',
       models: ['llama-3.3-70b'],
+      requiresKey: true,
       handler: async (prompt: string, model: string) => {
         const apiKey = process.env.CEREBRAS_API_KEY;
         if (!apiKey) throw new Error('CEREBRAS_API_KEY não configurada');
@@ -149,6 +159,7 @@ export class AIResilienceNexus {
     {
       name: 'Gemini',
       models: ['gemini-2.0-flash'],
+      requiresKey: true,
       handler: async (prompt: string, model: string) => {
         const apiKey = process.env.GOOGLE_AI_API_KEY || process.env.GEMINI_API_KEY;
         if (!apiKey) throw new Error('GOOGLE_AI_API_KEY não configurada');
@@ -168,19 +179,40 @@ export class AIResilienceNexus {
       }
     },
     
-    // 7. Pollinations - Último recurso (pode ter filtros)
+    // ═══════════════════════════════════════════════════════════════════════════
+    // PROVEDORES SEM CHAVE (RESTAURADOS)
+    // ═══════════════════════════════════════════════════════════════════════════
+    
+    // 7. Pollinations - Nova API (SEM CHAVE)
+    // Documentação: https://enter.pollinations.ai
     {
-      name: 'Pollinations-Mistral',
-      models: ['mistral'],
+      name: 'Pollinations-Text',
+      models: ['openai', 'mistral-large', 'llama-scaleway'],
+      requiresKey: false,
       handler: async (prompt: string, model: string) => {
         // Reformular prompt para ser mais neutro e evitar filtros
         const safePrompt = this.reformulatePrompt(prompt);
         
-        const response = await axios.post('https://text.pollinations.ai/', {
-          messages: [{ role: 'user', content: safePrompt }],
-          model: 'mistral',
-          seed: Math.floor(Math.random() * 1000000)
-        }, { timeout: 25000 });
+        // Nova API do Pollinations usa GET com query params
+        const encodedPrompt = encodeURIComponent(safePrompt);
+        const url = `https://text.pollinations.ai/${encodedPrompt}?model=${model}&seed=${Math.floor(Math.random() * 1000000)}`;
+        
+        const response = await axios.get(url, { timeout: 30000 });
+        return response.data;
+      }
+    },
+    
+    // 8. Pollinations - Modelos alternativos (SEM CHAVE)
+    {
+      name: 'Pollinations-Alt',
+      models: ['command-r', 'unity'],
+      requiresKey: false,
+      handler: async (prompt: string, model: string) => {
+        const safePrompt = this.reformulatePrompt(prompt);
+        const encodedPrompt = encodeURIComponent(safePrompt);
+        const url = `https://text.pollinations.ai/${encodedPrompt}?model=${model}&seed=${Math.floor(Math.random() * 1000000)}`;
+        
+        const response = await axios.get(url, { timeout: 35000 });
         return response.data;
       }
     }
@@ -201,6 +233,18 @@ export class AIResilienceNexus {
       .replace(/investigue/gi, 'pesquise informações sobre');
     
     return safePrompt;
+  }
+
+  /**
+   * Detecta se o prompt solicita um modelo específico via USE_MODEL
+   * RESTAURADO: Permite forçar modelo específico para Consensus Validator
+   */
+  private detectForcedModel(prompt: string): string | null {
+    const match = prompt.match(/USE_MODEL:\s*(\w+)/i);
+    if (match) {
+      return match[1].toLowerCase();
+    }
+    return null;
   }
 
   /**
@@ -243,9 +287,20 @@ export class AIResilienceNexus {
     
     let lastError: any;
     const maxRetries = 2;
+    
+    // RESTAURADO: Detectar modelo forçado via USE_MODEL
+    const forcedModel = this.detectForcedModel(prompt);
+    if (forcedModel) {
+      logInfo(`[ResilienceNexus] Modelo forçado detectado: ${forcedModel}`);
+    }
 
     for (const provider of this.providers) {
       for (const model of provider.models) {
+        // RESTAURADO: Se houver modelo forçado, pular modelos que não correspondem
+        if (forcedModel && !model.toLowerCase().includes(forcedModel)) {
+          continue;
+        }
+        
         for (let attempt = 0; attempt <= maxRetries; attempt++) {
           try {
             await this.throttle();
@@ -318,7 +373,7 @@ export class AIResilienceNexus {
         error: true,
         message: 'Sistema de IA temporariamente indisponível. Tente novamente em alguns minutos.',
         lastError: lastError?.message || 'Erro desconhecido',
-        suggestion: 'Verifique se as chaves de API estão configuradas: GROQ_API_KEY, OPENROUTER_API_KEY, DEEPSEEK_API_KEY'
+        suggestion: 'O sistema tentou todos os provedores disponíveis, incluindo os gratuitos sem chave.'
       }),
       model: 'fallback',
       provider: 'none'
