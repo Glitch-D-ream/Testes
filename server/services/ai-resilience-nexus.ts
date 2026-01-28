@@ -11,39 +11,25 @@ export interface NexusResponse {
 export class AIResilienceNexus {
   private providers = [
     {
-      name: 'Pollinations',
-      models: ['deepseek-r1', 'qwen-qwq', 'llama-3.3-70b', 'mistral-large'],
+      name: 'Pollinations-Primary',
+      models: ['llama', 'mistral', 'qwen'], // Modelos mais estáveis e rápidos
       handler: async (prompt: string, model: string) => {
         const response = await axios.post('https://text.pollinations.ai/', {
           messages: [{ role: 'user', content: prompt }],
           model: model,
-          seed: Math.floor(Math.random() * 1000000) // Evitar cache agressivo
-        }, { timeout: 30000 });
+          seed: Math.floor(Math.random() * 1000000)
+        }, { timeout: 12000 }); // Timeout reduzido para falhar rápido e tentar o próximo
         return response.data;
       }
     },
     {
-      name: 'Poli-Bridge-Alt',
-      models: ['openai-fast', 'search-gpt'],
+      name: 'Pollinations-Deep',
+      models: ['deepseek-r1'],
       handler: async (prompt: string, model: string) => {
-        const encodedPrompt = encodeURIComponent(prompt);
-        const response = await axios.get(`https://text.pollinations.ai/${encodedPrompt}?model=${model}`, { timeout: 20000 });
-        return response.data;
-      }
-    },
-    {
-      name: 'DuckDuckGo-Proxy',
-      models: ['gpt-4o-mini', 'claude-3-haiku', 'llama-3.1-70b'],
-      handler: async (prompt: string, model: string) => {
-        // Simulação de acesso via proxy que não exige chave
-        // Em um ambiente real, usaríamos o scraper ou um endpoint de reverse proxy
-        const response = await axios.post('https://duckduckgo.com/duckchat/v1/chat', {
-          query: prompt,
+        const response = await axios.post('https://text.pollinations.ai/', {
+          messages: [{ role: 'user', content: prompt }],
           model: model
-        }, { 
-          headers: { 'x-vqd-4': 'true' }, // Header simulado para bypass inicial
-          timeout: 15000 
-        });
+        }, { timeout: 25000 }); // DeepSeek demora mais, timeout maior
         return response.data;
       }
     }

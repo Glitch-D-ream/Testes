@@ -122,21 +122,17 @@ ${text}`;
     const groqKey = process.env.GROQ_API_KEY;
     const geminiKey = process.env.GEMINI_API_KEY;
 
-    // 1. Tentar Gemini Service (Motor Principal v3.2 com Fallbacks Internos)
+    // 1. Tentar Gemini Service (Motor Principal v3.2)
+    // Reduzimos o tempo de espera para o Gemini para não travar o frontend
     try {
-      return await geminiService.analyzeText(text, this.promptTemplate.bind(this));
+      const geminiPromise = geminiService.analyzeText(text, this.promptTemplate.bind(this));
+      const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Gemini Timeout')), 15000));
+      return await Promise.race([geminiPromise, timeoutPromise]) as AIAnalysisResult;
     } catch (e) { 
-      logWarn(`[AI] Gemini Service falhou completamente. Tentando outros provedores...`); 
+      logWarn(`[AI] Gemini Service falhou ou demorou demais. Tentando fallbacks rápidos...`); 
     }
 
-    // 2. Tentar DeepSeek (OpenRouter)
-    if (openRouterKey && !openRouterKey.includes('your-')) {
-      try {
-        return await deepSeekService.analyzeText(text, openRouterKey);
-      } catch (e) { logWarn(`[AI] DeepSeek falhou...`); }
-    }
-
-    // 3. Tentar Groq
+    // 2. Tentar Groq (Alta Velocidade)
     if (groqKey && !groqKey.includes('your-')) {
       try {
         const completion = await groqService.generateCompletion('Auditor forense. JSON apenas.', this.promptTemplate(text));
@@ -144,8 +140,8 @@ ${text}`;
       } catch (e) { logWarn(`[AI] Groq falhou...`); }
     }
 
-    // 4. Fallback: Nexo de Resiliência Gratuita (Multi-Provedor)
-    logInfo(`[AI] Ativando Nexo de Resiliência Gratuita...`);
+    // 3. Fallback Final: Nexo de Resiliência Otimizado
+    logInfo(`[AI] Ativando Nexo de Resiliência Otimizado...`);
     const { aiResilienceNexus } = await import('./ai-resilience-nexus.ts');
     return await aiResilienceNexus.chatJSON<AIAnalysisResult>(text);
   }

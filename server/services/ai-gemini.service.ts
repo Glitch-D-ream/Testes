@@ -37,30 +37,14 @@ export class GeminiService {
       }
     }
 
-    // Fallback 1: Pollinations Gemini-Flash (Zero-Key)
+    // Fallback: Pollinations Llama (O mais estável para evitar sobrecarga)
     try {
-      logInfo('[Gemini] Usando Bridge Pollinations (Gemini Flash)...');
-      const response = await axios.post('https://text.pollinations.ai/', {
-        messages: [{ role: 'user', content: promptTemplate(text) }],
-        model: 'gemini', // Pollinations mapeia 'gemini' para o flash mais recente
-        jsonMode: true,
-        seed: Math.floor(Math.random() * 1000000) // Evitar cache de erro
-      }, { timeout: 50000 });
-      
-      const content = typeof response.data === 'string' ? response.data : JSON.stringify(response.data);
-      return normalizationService.normalizeAIOutput(content);
-    } catch (error: any) {
-      logWarn(`[Gemini] Bridge Pollinations falhou: ${error.message}. Tentando Fallback Final...`);
-    }
-
-    // Fallback 2: Pollinations Llama-3.3 (Extremamente estável)
-    try {
-      logInfo('[Gemini] Usando Fallback Final (Llama 3.3)...');
+      logInfo('[Gemini] Usando Fallback Estável (Llama)...');
       const response = await axios.post('https://text.pollinations.ai/', {
         messages: [{ role: 'user', content: promptTemplate(text) }],
         model: 'llama',
         jsonMode: true
-      }, { timeout: 50000 });
+      }, { timeout: 15000 }); // Timeout curto para não travar o frontend
       
       const content = typeof response.data === 'string' ? response.data : JSON.stringify(response.data);
       return normalizationService.normalizeAIOutput(content);

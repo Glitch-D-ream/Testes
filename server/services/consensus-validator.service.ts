@@ -26,27 +26,28 @@ export class ConsensusValidatorService {
     let model2 = 'Modelo2';
 
     try {
-      // Primeira IA
-      logInfo(`[ConsensusValidator] Gerando veredito via Modelo 1...`);
-      const response1 = await aiResilienceNexus.chat(prompt);
-      model1 = `${response1.provider}/${response1.model}`;
+      // Executar as duas IAs em paralelo com timeout global para evitar travamento
+      logInfo(`[ConsensusValidator] Gerando vereditos paralelos para validação cruzada...`);
       
-      try {
-        verdict1 = JSON.parse(response1.content);
-      } catch {
-        verdict1 = { raw: response1.content };
-      }
+      const [response1, response2] = await Promise.all([
+        aiResilienceNexus.chat(prompt).catch(e => ({ content: '{}', provider: 'Error', model: 'Fallback' })),
+        aiResilienceNexus.chat(prompt + " (Análise alternativa)").catch(e => ({ content: '{}', provider: 'Error', model: 'Fallback' }))
+      ]);
 
-      // Segunda IA (tenta um modelo diferente)
-      logInfo(`[ConsensusValidator] Gerando veredito via Modelo 2...`);
-      const response2 = await aiResilienceNexus.chat(prompt);
+      model1 = `${response1.provider}/${response1.model}`;
       model2 = `${response2.provider}/${response2.model}`;
       
-      try {
-        verdict2 = JSON.parse(response2.content);
-      } catch {
-        verdict2 = { raw: response2.content };
-      }
+      const parseSafe = (content: string) => {
+        try {
+          const jsonMatch = content.match(/\{[\s\S]*\}/);
+          return JSON.parse(jsonMatch ? jsonMatch[0] : content);
+        } catch {
+          return { raw: content };
+        }
+      };
+
+      verdict1 = parseSafe(response1.content);
+      verdict2 = parseSafe(response2.content);
 
       // Comparar vereditos
       const consensusScore = this.calculateConsensusScore(verdict1, verdict2);
