@@ -242,6 +242,32 @@ export class BrainAgent {
       // Gerar prompt técnico para validação
       const technicalPrompt = this.buildForensicPrompt(cleanName, combinedContext);
       
+      // ═══════════════════════════════════════════════════════════════════════
+      // DOUBLE-PASS AI VEREDICT (RESTAURADO)
+      // Passagem 1: Gera parecer técnico completo
+      // Passagem 2: Extrai promessas estruturadas do parecer
+      // ═══════════════════════════════════════════════════════════════════════
+      logInfo(`[Brain v6] [Double-Pass] Iniciando VerdictEngine para ${cleanName}...`);
+      
+      const { 
+        finalReport: doublePassReport, 
+        finalPromises: extractedPromisesFromAI,
+        structuredVerdict 
+      } = await this.generateDoublePassAIVeredict(cleanName, combinedContext, filteredSources, rawSources, regionContext);
+      
+      // Adicionar promessas extraídas do parecer às promessas existentes
+      if (extractedPromisesFromAI.length > 0) {
+        logInfo(`[Brain v6] [Double-Pass] Extraídas ${extractedPromisesFromAI.length} promessas do parecer`);
+        allPromises.push(...extractedPromisesFromAI.map((p: any) => ({
+          text: p.text || p.promise,
+          category: p.category || 'EXTRAIDO_PARECER',
+          source: 'Parecer Técnico Seth VII',
+          confidence: p.confidence || 70,
+          status: p.status || 'pendente',
+          date: new Date().toISOString().split('T')[0]
+        })));
+      }
+      
       // Validação cruzada com múltiplas IAs
       let consensusValidation: ValidationResult | null = null;
       try {
@@ -251,7 +277,9 @@ export class BrainAgent {
         logWarn(`[Brain v6] Validação cruzada falhou, usando análise única`);
       }
 
+      // Usar o parecer do Double-Pass como base, enriquecido pelo Consensus Validator
       const technicalReport = consensusValidation?.finalVerdict?.reasoning || 
+                             doublePassReport || 
                              await aiService.generateReport(technicalPrompt);
 
       // ═══════════════════════════════════════════════════════════════════════
@@ -625,6 +653,175 @@ RESPONDA EM JSON:
       overallScore,
       verdict,
       redFlags: [...new Set(redFlags)].slice(0, 10)
+    };
+  }
+
+  /**
+   * DOUBLE-PASS AI VEREDICT (RESTAURADO)
+   * Passagem 1: Gera parecer técnico completo com tom de agência de inteligência
+   * Passagem 2: Extrai promessas estruturadas do parecer gerado
+   */
+  private async generateDoublePassAIVeredict(
+    cleanName: string, 
+    combinedContext: any, 
+    filteredSources: any[], 
+    rawSources: any[], 
+    region: any
+  ): Promise<{ finalReport: string; finalPromises: any[]; structuredVerdict: any }> {
+    logInfo(`[Brain v6] [Double-Pass] Iniciando VerdictEngine para ${cleanName} em ${region.state}...`);
+    
+    let aiAnalysis = "";
+    let extractedPromisesFromAI: any[] = [];
+    let structuredVerdict: any = null;
+    
+    try {
+      // ═══════════════════════════════════════════════════════════════════════
+      // PASSAGEM 1: PARECER TÉCNICO FORENSE (TOM DE AGÊNCIA DE INTELIGÊNCIA)
+      // ═══════════════════════════════════════════════════════════════════════
+      const strictPrompt = `
+DOSSIÊ DE INTELIGÊNCIA FORENSE - SETH VII v6.0 (IRONCLAD DEEP)
+═══════════════════════════════════════════════════════════════════════════════
+
+ALVO: ${cleanName}
+IDENTIDADE: ${combinedContext.officialProfile?.politician?.office || 'Político'} (${combinedContext.officialProfile?.politician?.party || 'Partido'})
+REGIÃO: ${region.state} / ${region.city}
+
+═══════════════════════════════════════════════════════════════════════════════
+DADOS BRUTOS PARA CORRELAÇÃO
+═══════════════════════════════════════════════════════════════════════════════
+
+📋 PERFIL OFICIAL:
+${JSON.stringify(combinedContext.officialProfile, null, 2)}
+
+📊 ANÁLISE DE COERÊNCIA:
+- Score Geral: ${combinedContext.coherenceAnalysis?.overallScore || 'N/A'}%
+- Veredito: ${combinedContext.coherenceAnalysis?.verdict || 'N/A'}
+- Red Flags: ${combinedContext.coherenceAnalysis?.redFlags?.join(', ') || 'Nenhuma'}
+
+🗳️ PROMESSA vs VOTO:
+${JSON.stringify(combinedContext.coherenceAnalysis?.voteAnalysis?.slice(0, 3) || [], null, 2)}
+
+💰 PROMESSA vs GASTO:
+${JSON.stringify(combinedContext.coherenceAnalysis?.expenseAnalysis || {}, null, 2)}
+
+⏱️ CONTRADIÇÕES TEMPORAIS:
+${JSON.stringify(combinedContext.coherenceAnalysis?.temporalAnalysis || {}, null, 2)}
+
+📱 EVIDÊNCIAS SOCIAIS:
+${JSON.stringify(combinedContext.social?.slice(0, 5) || [], null, 2)}
+
+⚖️ REGISTROS JURÍDICOS:
+${JSON.stringify(combinedContext.legal?.slice(0, 5) || [], null, 2)}
+
+🗃️ HISTÓRICO TSE:
+${JSON.stringify(combinedContext.tse || {}, null, 2)}
+
+📰 FONTES PRIMÁRIAS (CITE-AS):
+${combinedContext.sources?.slice(0, 5).map((s: any) => `- ${s.title}: ${s.content?.substring(0, 200)}...`).join('\n') || 'Nenhuma fonte'}
+
+═══════════════════════════════════════════════════════════════════════════════
+INSTRUÇÕES MANDATÓRIAS
+═══════════════════════════════════════════════════════════════════════════════
+
+1. SEJA INCISIVO: Não use "pode ser", use "os dados indicam". Conecte o dinheiro (emendas) com os votos e discursos.
+
+2. CITAÇÃO DIRETA: Você DEVE citar nomes de projetos, valores em Reais (R$) e títulos de notícias/documentos presentes nas fontes.
+
+3. ANÁLISE DE IMPACTO: Explique O QUE a ausência ou vulnerabilidade significa para o cidadão.
+
+4. ESTRUTURA DE ALTO NÍVEL:
+   - QUADRO EXECUTIVO: Fatos de impacto imediato.
+   - CORRELAÇÃO DE DADOS: Onde o dinheiro e o poder se encontram (conecte as fontes).
+   - VETORES DE RISCO: Vulnerabilidades e inconsistências detectadas com evidências.
+   - CONTRADIÇÕES: Liste cada contradição entre promessa e prática.
+   - VEREDITO FORENSE: Parecer final baseado na densidade de dados.
+
+5. Se os dados forem mínimos, não invente, mas explore ao máximo as conexões entre o pouco que existe.
+
+6. NÃO use tom de biografia. Use tom de relatório de agência de inteligência.
+
+═══════════════════════════════════════════════════════════════════════════════
+PARECER TÉCNICO (RESPONDA ABAIXO):
+═══════════════════════════════════════════════════════════════════════════════
+`;
+
+      aiAnalysis = await aiService.generateReport(strictPrompt);
+      logInfo(`[Brain v6] [Double-Pass] Passagem 1 concluída: ${aiAnalysis.length} caracteres`);
+
+      // ═══════════════════════════════════════════════════════════════════════
+      // PASSAGEM 2: EXTRAÇÃO ESTRUTURADA DE PROMESSAS E VEREDITO
+      // ═══════════════════════════════════════════════════════════════════════
+      const extractionPrompt = `
+Com base no parecer técnico abaixo, extraia as informações em formato JSON estruturado.
+
+PARECER:
+${aiAnalysis}
+
+RESPONDA APENAS COM JSON VÁLIDO:
+{
+  "promises": [
+    {
+      "text": "texto da promessa identificada",
+      "category": "ECONOMIA|SAUDE|EDUCACAO|SEGURANCA|INFRAESTRUTURA|SOCIAL|POLITICA|OUTRO",
+      "status": "cumprida|parcialmente_cumprida|nao_cumprida|pendente|contraditoria",
+      "evidence": "evidência que suporta o status",
+      "confidence": 0-100
+    }
+  ],
+  "contradictions": [
+    {
+      "statement1": "o que disse/prometeu",
+      "statement2": "o que fez/votou",
+      "severity": "LOW|MEDIUM|HIGH|CRITICAL",
+      "explanation": "explicação da contradição"
+    }
+  ],
+  "riskFactors": [
+    {
+      "factor": "descrição do fator de risco",
+      "severity": "LOW|MEDIUM|HIGH|CRITICAL",
+      "evidence": "evidência"
+    }
+  ],
+  "credibilityScore": 0-100,
+  "finalVerdict": "veredito final em uma frase"
+}
+`;
+
+      try {
+        const structuredResult = await aiService.analyzeText(extractionPrompt);
+        
+        if (structuredResult?.promises && Array.isArray(structuredResult.promises)) {
+          extractedPromisesFromAI = structuredResult.promises;
+          logInfo(`[Brain v6] [Double-Pass] Passagem 2: ${extractedPromisesFromAI.length} promessas extraídas`);
+        }
+        
+        structuredVerdict = {
+          credibilityScore: structuredResult?.credibilityScore || 50,
+          contradictions: structuredResult?.contradictions || [],
+          riskFactors: structuredResult?.riskFactors || [],
+          finalVerdict: structuredResult?.finalVerdict || 'Análise inconclusiva'
+        };
+        
+        logInfo(`[Brain v6] [Double-Pass] Credibilidade extraída: ${structuredVerdict.credibilityScore}%`);
+      } catch (extractError) {
+        logWarn(`[Brain v6] [Double-Pass] Falha na extração estruturada: ${extractError}`);
+      }
+
+    } catch (error) {
+      logWarn(`[Brain v6] [Double-Pass] Falha no fluxo de IA, usando fallbacks...`);
+      aiAnalysis = `Parecer técnico atualizado sobre ${cleanName} em ${region.state}. Análise baseada em dados oficiais disponíveis.`;
+    }
+    
+    return { 
+      finalReport: aiAnalysis, 
+      finalPromises: extractedPromisesFromAI,
+      structuredVerdict: structuredVerdict || {
+        credibilityScore: 50,
+        contradictions: [],
+        riskFactors: [],
+        finalVerdict: 'Análise em andamento'
+      }
     };
   }
 
