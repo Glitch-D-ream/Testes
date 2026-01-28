@@ -2,6 +2,7 @@
 import { getSupabase } from '../core/database.ts';
 import { logInfo, logError, logWarn } from '../core/logger.ts';
 import { scoutHybrid } from './scout-hybrid.ts';
+import { scoutCaseMiner } from './scout-case-miner.ts';
 import { filterAgent, FilteredSource } from './filter.ts';
 import { aiService } from '../services/ai.service.ts';
 import { getProposicoesDeputado } from '../integrations/camara.ts';
@@ -30,10 +31,16 @@ export class BrainAgent {
         city: profile.city || this.detectRegion(cleanName).city
       };
 
-      // 2. Coleta e Filtragem Baseada no Perfil Descoberto
+      // 2. Coleta Multidimensional (Scout + CaseMiner)
       const searchQuery = `${profile.office} ${profile.name} ${profile.party} ${regionContext.state}`;
-      const rawSources = await scoutHybrid.search(searchQuery, true);
-      logInfo(`[Brain] Scout coletou ${rawSources.length} fontes brutas.`);
+      
+      logInfo(`[Brain] Iniciando Coleta Multidimensional para: ${profile.name}`);
+      const [rawSources, caseEvidences] = await Promise.all([
+        scoutHybrid.search(searchQuery, true),
+        scoutCaseMiner.mine(profile.name)
+      ]);
+      
+      logInfo(`[Brain] Scout coletou ${rawSources.length} fontes. CaseMiner coletou ${caseEvidences.length} evidências profundas.`);
       
       const filteredSources = await filterAgent.filter(rawSources, true);
       logInfo(`[Brain] Filter manteve ${filteredSources.length} fontes relevantes.`);
@@ -92,7 +99,8 @@ export class BrainAgent {
           benchmarking: 'Baseado em dados do Supabase e APIs Oficiais',
           budget: 'SICONFI Snapshot',
           regional: `Portal Transparência ${regionContext.state}`,
-          legislative: 'API Câmara/Senado'
+          legislative: 'API Câmara/Senado',
+          cases: 'Navegação profunda via Scout Case Miner v3.2'
         },
         // Garantir que as métricas de consenso apareçam no frontend
         consensusMetrics: {
@@ -134,6 +142,7 @@ DADOS BRUTOS PARA CORRELAÇÃO:
 - AUDITORIA DE AUSÊNCIA: ${JSON.stringify(combinedContext.absence)}
 - VULNERABILIDADES TÉCNICAS: ${JSON.stringify(combinedContext.vulnerability)}
 - CORRELAÇÕES DETECTADAS: ${JSON.stringify(combinedContext.correlations)}
+- EVIDÊNCIAS DE CASOS/ENTREVISTAS: ${JSON.stringify(combinedContext.caseEvidences)}
 - FONTES PRIMÁRIAS (CITE-AS): ${JSON.stringify(combinedContext.sources)}
 
 INSTRUÇÕES MANDATÓRIAS:
@@ -221,6 +230,7 @@ PARECER TÉCNICO:`;
           absenceReport: finalResult.absenceReport,
           vulnerabilityReport: finalResult.vulnerabilityReport,
           benchmarkResult: finalResult.benchmarkResult,
+          caseEvidences: finalResult.caseEvidences,
           dataLineage: finalResult.dataLineage,
           evidences: finalResult.evidences
         })

@@ -2,6 +2,38 @@
 import { logInfo, logWarn, logError } from '../core/logger.ts';
 import { savePublicDataCache, getPublicDataCache } from '../core/database.ts';
 import { createHash } from 'crypto';
+import { z } from 'zod';
+import { AIAnalysisResult } from './ai.service.ts';
+
+/**
+ * Schema rigoroso para validação do output da IA
+ * Garante que o frontend e o banco de dados recebam dados íntegros
+ */
+const AIAnalysisSchema = z.object({
+  promises: z.array(z.object({
+    text: z.string().min(5),
+    category: z.enum(['Saúde', 'Educação', 'Economia', 'Segurança', 'Infraestrutura', 'Geral']).default('Geral'),
+    confidence: z.number().min(0).max(1).default(0.5),
+    negated: z.boolean().default(false),
+    conditional: z.boolean().default(false),
+    reasoning: z.string().optional().default('Análise em processamento'),
+    risks: z.array(z.string()).default([]),
+    source_url: z.string().optional().or(z.literal('')),
+    quote: z.string().optional()
+  })).default([]),
+  contradictions: z.array(z.object({
+    topic: z.string(),
+    discourse: z.any(),
+    reality: z.any(),
+    gapAnalysis: z.string()
+  })).default([]),
+  overallSentiment: z.string().default('Analítico'),
+  credibilityScore: z.number().min(0).max(100).default(50),
+  verdict: z.object({
+    facts: z.array(z.string()).default([]),
+    skepticism: z.array(z.string()).default([])
+  }).default({ facts: [], skepticism: [] })
+});
 
 export interface NormalizedData {
   date?: string; // ISO format
@@ -86,6 +118,39 @@ export class NormalizationService {
     }
 
     return Array.from(entities);
+  }
+
+  /**
+   * Limpa e valida o output bruto da IA
+   */
+  normalizeAIOutput(rawOutput: any): AIAnalysisResult {
+    logInfo('[Normalization] Iniciando limpeza e validação de dados da IA...');
+    
+    try {
+      // 1. Tentar extrair JSON se for string (comum em modelos que não suportam jsonMode nativo)
+      let data = rawOutput;
+      if (typeof rawOutput === 'string') {
+        const jsonMatch = rawOutput.match(/\{[\s\S]*\}/);
+        data = JSON.parse(jsonMatch ? jsonMatch[0] : rawOutput);
+      }
+
+      // 2. Validar contra o Schema Zod
+      const validatedData = AIAnalysisSchema.parse(data);
+      
+      logInfo(`[Normalization] Validação concluída. ${validatedData.promises.length} promessas normalizadas.`);
+      return validatedData as AIAnalysisResult;
+    } catch (error: any) {
+      logError(`[Normalization] Falha crítica na normalização: ${error.message}`);
+      
+      // Fallback: Retornar estrutura mínima válida para não quebrar o sistema
+      return {
+        promises: [],
+        contradictions: [],
+        overallSentiment: 'Erro na Normalização',
+        credibilityScore: 0,
+        verdict: { facts: [], skepticism: ['O sistema não conseguiu validar os dados da IA.'] }
+      };
+    }
   }
 
   /**

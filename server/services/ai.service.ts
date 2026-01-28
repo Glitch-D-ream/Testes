@@ -3,6 +3,8 @@ import axios from 'axios';
 import { logInfo, logError, logWarn } from '../core/logger.ts';
 import { groqService } from './ai-groq.service.ts';
 import { deepSeekService } from './ai-deepseek.service.ts';
+import { geminiService } from './ai-gemini.service.ts';
+import { normalizationService } from './normalization.service.ts';
 import { CircuitBreaker } from '../core/circuit-breaker.ts';
 
 export interface AIAnalysisResult {
@@ -118,26 +120,45 @@ ${text}`;
   async analyzeText(text: string): Promise<AIAnalysisResult> {
     const openRouterKey = process.env.OPENROUTER_API_KEY;
     const groqKey = process.env.GROQ_API_KEY;
+    const geminiKey = process.env.GEMINI_API_KEY;
 
+    // 1. Tentar Gemini Free (Novo Provedor Principal v3.2)
+    if (geminiKey && !geminiKey.includes('your-')) {
+      try {
+        return await geminiService.analyzeText(text, this.promptTemplate.bind(this));
+      } catch (e) { logWarn(`[AI] Gemini falhou...`); }
+    }
+
+    // 2. Tentar DeepSeek (OpenRouter)
     if (openRouterKey && !openRouterKey.includes('your-')) {
       try {
         return await deepSeekService.analyzeText(text, openRouterKey);
       } catch (e) { logWarn(`[AI] DeepSeek falhou...`); }
     }
 
+    // 3. Tentar Groq
     if (groqKey && !groqKey.includes('your-')) {
       try {
         const completion = await groqService.generateCompletion('Auditor forense. JSON apenas.', this.promptTemplate(text));
-        const jsonMatch = completion.match(/\{[\s\S]*\}/);
-        if (jsonMatch) return JSON.parse(jsonMatch[0]) as AIAnalysisResult;
+        return normalizationService.normalizeAIOutput(completion);
       } catch (e) { logWarn(`[AI] Groq falhou...`); }
     }
 
+    // 4. Fallback: Camada de Resiliência Gratuita (Poli IA)
     logInfo(`[AI] Usando Camada de Resiliência Gratuita (Poli IA)`);
     return await this.analyzeWithOpenSource(text);
   }
 
   async generateReport(prompt: string): Promise<string> {
+    // 1. Tentar Gemini para relatórios
+    const geminiKey = process.env.GEMINI_API_KEY;
+    if (geminiKey && !geminiKey.includes('your-')) {
+      try {
+        return await geminiService.generateCompletion(prompt);
+      } catch (e) { logWarn(`[AI] Gemini falhou no relatório...`); }
+    }
+
+    // 2. Fallback para Pollinations
     const models = ['deepseek-r1', 'qwen-qwq', 'mistral-large'];
     for (const model of models) {
       try {
