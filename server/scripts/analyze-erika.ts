@@ -11,12 +11,12 @@ async function runAnalysis() {
 
   try {
     const result = await brainAgent.analyze(name, "Nacional");
-    console.log("\n--- RESULTADO DA AUDITORIA ---");
-    console.log(`ID: ${result.id}`);
-    console.log(`Político: ${result.author}`);
-    console.log(`Score de Viabilidade: ${result.probabilityScore}%`);
-    console.log(`Promessas Extraídas: ${result.promisesCount}`);
-    console.log("------------------------------\n");
+    logInfo("--- RESULTADO DA AUDITORIA ---");
+    logInfo(`ID: ${result.id}`);
+    logInfo(`Político: ${result.author}`);
+    logInfo(`Score de Viabilidade: ${result.probabilityScore}%`);
+    logInfo(`Promessas Extraídas: ${result.promisesCount}`);
+    logInfo("------------------------------");
     process.exit(0);
   } catch (error) {
     logError("Erro fatal na análise:", error as Error);

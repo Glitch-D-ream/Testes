@@ -1,3 +1,5 @@
+import { logInfo, logWarn, logError } from './logger.ts';
+
 export enum CircuitState {
   CLOSED, // Funcionando normalmente
   OPEN,   // Falhando, bloqueando requisições
@@ -28,7 +30,7 @@ export class CircuitBreaker {
     this.updateState();
 
     if (this.state === CircuitState.OPEN) {
-      console.warn('🚨 [CircuitBreaker] Circuito ABERTO. Usando fallback.');
+      logWarn('[CircuitBreaker] Circuito ABERTO. Usando fallback.');
       return fallback();
     }
 
@@ -38,7 +40,7 @@ export class CircuitBreaker {
       return result;
     } catch (error) {
       this.onFailure();
-      console.error('❌ [CircuitBreaker] Falha na execução. Circuito:', CircuitState[this.state]);
+      logError(`[CircuitBreaker] Falha na execução. Circuito: ${CircuitState[this.state]}`);
       return fallback();
     }
   }
@@ -48,19 +50,24 @@ export class CircuitBreaker {
       const now = Date.now();
       if (now - this.lastFailureTime > this.resetTimeout) {
         this.state = CircuitState.HALF_OPEN;
-        console.log('🔄 [CircuitBreaker] Circuito MEIO-ABERTO. Testando...');
+        logInfo('[CircuitBreaker] Circuito MEIO-ABERTO. Testando...');
       }
     }
   }
 
   private onSuccess(): void {
-    this.failureCount = 0;
+    if (this.state === CircuitState.CLOSED) {
+      // Decay gradual de falhas em estado normal
+      this.failureCount = Math.max(0, this.failureCount - 1);
+    } else {
+      this.failureCount = 0;
+    }
     if (this.state === CircuitState.HALF_OPEN) {
       this.successCount++;
       if (this.successCount >= this.successThreshold) {
         this.state = CircuitState.CLOSED;
         this.successCount = 0;
-        console.log('✅ [CircuitBreaker] Circuito FECHADO. Operação normal restabelecida.');
+        logInfo('[CircuitBreaker] Circuito FECHADO. Operação normal restabelecida.');
       }
     }
   }
@@ -72,7 +79,7 @@ export class CircuitBreaker {
 
     if (this.state === CircuitState.CLOSED && this.failureCount >= this.failureThreshold) {
       this.state = CircuitState.OPEN;
-      console.error('🚨 [CircuitBreaker] Circuito ABERTO devido a múltiplas falhas.');
+      logError('[CircuitBreaker] Circuito ABERTO devido a múltiplas falhas.');
     }
   }
 

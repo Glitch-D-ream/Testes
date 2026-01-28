@@ -1,6 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { createHash } from 'crypto';
+import { logError } from './logger.ts';
 
 export class LocalCache {
   private cacheDir: string;
@@ -37,7 +38,7 @@ export class LocalCache {
       const content = fs.readFileSync(filePath, 'utf8');
       return JSON.parse(content);
     } catch (error) {
-      console.error('❌ [LocalCache] Erro ao ler cache local:', error);
+      logError('[LocalCache] Erro ao ler cache local:', error as Error);
       return null;
     }
   }
@@ -47,7 +48,7 @@ export class LocalCache {
     try {
       fs.writeFileSync(filePath, JSON.stringify(value), 'utf8');
     } catch (error) {
-      console.error('❌ [LocalCache] Erro ao salvar cache local:', error);
+      logError('[LocalCache] Erro ao salvar cache local:', error as Error);
     }
   }
 
@@ -58,7 +59,7 @@ export class LocalCache {
         fs.unlinkSync(path.join(this.cacheDir, file));
       }
     } catch (error) {
-      console.error('❌ [LocalCache] Erro ao limpar cache local:', error);
+      logError('[LocalCache] Erro ao limpar cache local:', error as Error);
     }
   }
 }

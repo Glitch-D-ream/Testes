@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import rateLimit from 'express-rate-limit';
 import compression from 'compression';
 import { extractTokenFromHeader, verifyJWT } from './auth.ts';
+import { logInfo, logError } from './logger.ts';
 
 /**
  * Middleware de autenticação obrigatória
@@ -24,8 +25,8 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction) 
     });
   }
 
-  (req as any).user = payload;
-  (req as any).userId = payload.userId;
+  req.user = payload;
+  req.userId = payload.userId;
   next();
 }
 
@@ -38,8 +39,8 @@ export function optionalAuthMiddleware(req: Request, res: Response, next: NextFu
   if (token) {
     const payload = verifyJWT(token);
     if (payload) {
-      (req as any).user = payload;
-      (req as any).userId = payload.userId;
+      req.user = payload;
+      req.userId = payload.userId;
     }
   }
 
@@ -50,7 +51,7 @@ export function optionalAuthMiddleware(req: Request, res: Response, next: NextFu
  * Middleware para verificar se o usuário é admin
  */
 export function adminMiddleware(req: Request, res: Response, next: NextFunction) {
-  const user = (req as any).user;
+  const user = req.user;
   if (!user || user.role !== 'admin') {
     return res.status(403).json({
       error: 'Forbidden',
@@ -65,7 +66,7 @@ export function adminMiddleware(req: Request, res: Response, next: NextFunction)
  * Middleware para verificar se o usuário é analyst ou admin
  */
 export function analystMiddleware(req: Request, res: Response, next: NextFunction) {
-  const user = (req as any).user;
+  const user = req.user;
   if (!user || (user.role !== 'analyst' && user.role !== 'admin')) {
     return res.status(403).json({
       error: 'Forbidden',
@@ -85,7 +86,7 @@ export function errorHandler(
   res: Response,
   next: NextFunction
 ) {
-  console.error('[Error]', err);
+  logError('[Middleware] Erro não tratado:', err);
 
   // Erro de validação
   if (err.name === 'ValidationError') {
@@ -128,9 +129,7 @@ export function requestLoggerMiddleware(req: Request, res: Response, next: NextF
 
   res.on('finish', () => {
     const duration = Date.now() - start;
-    console.log(
-      `[${req.method}] ${req.path} - ${res.statusCode} - ${duration}ms - ${(req as any).user?.userId || 'anonymous'}`
-    );
+    logInfo(`[Request] ${req.method} ${req.path} - ${res.statusCode} [${duration}ms] - User: ${req.user?.userId || 'anonymous'}`);
   });
 
   next();
@@ -150,7 +149,7 @@ export const scoutRateLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   keyGenerator: (req) => {
-    return (req as any).userId || req.ip;
+    return req.userId || req.ip || 'unknown';
   },
 });
 

@@ -35,3 +35,16 @@ analysisQueue.on('failed', (job, err) => {
 });
 
 logInfo('Sistema de Filas (Bull) inicializado com sucesso.');
+
+// Importar os workers
+import scrapingWorker from '../workers/scraping.worker.ts';
+import processingWorker from '../workers/processing.worker.ts';
+import analysisWorker from '../workers/analysis.worker.ts';
+
+// Registrar os workers nas filas
+if (process.env.RUN_WORKERS === 'true') {
+  scrapingQueue.process(scrapingWorker);
+  processingQueue.process(processingWorker);
+  analysisQueue.process(analysisWorker);
+  logInfo('Workers das filas registrados e prontos para processar jobs.');
+}

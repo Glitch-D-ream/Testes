@@ -3,6 +3,7 @@ import { createHash } from 'crypto';
 import { supabase } from '../core/database.ts';
 import { supabaseCircuitBreaker } from '../core/circuitBreaker.ts';
 import { localCache } from '../core/localCache.ts';
+import { logInfo, logWarn, logError } from '../core/logger.ts';
 import { 
   scoutSourceLatency, 
   scoutSourceErrors, 
@@ -71,7 +72,7 @@ export class SmartScout {
       cacheMisses.inc({ cache_name: 'supabase' });
     }
 
-    console.log(`🔍 [SmartScout] Buscando dados para: ${politicianName}`);
+    logInfo(`[SmartScout] Buscando dados para: ${politicianName}`);
     
     const allResults: SearchResult[] = [];
     
@@ -99,16 +100,16 @@ export class SmartScout {
         await this.storeInCache(cacheKey, sortedResults);
       }
       
-      console.log(`✅ [SmartScout] Encontrados ${sortedResults.length} resultados para ${politicianName}`);
+      logInfo(`[SmartScout] Encontrados ${sortedResults.length} resultados para ${politicianName}`);
       return sortedResults;
       
     } catch (error: any) {
-      console.error(`❌ [SmartScout] Erro na busca por ${politicianName}:`, error);
+      logError(`[SmartScout] Erro na busca por ${politicianName}:`, error);
       
       // Fallback para cache expirado
       const staleCache = await this.getFromCache(cacheKey, true);
       if (staleCache) {
-        console.log(`⚠️ [SmartScout] Retornando cache expirado como fallback`);
+        logWarn(`[SmartScout] Retornando cache expirado como fallback`);
         return staleCache;
       }
       
@@ -170,10 +171,9 @@ export class SmartScout {
           
           if (validPoliticians.length > 0) {
             officialName = validPoliticians[0].nome;
-            console.log(`🎯 [SmartScout] Identidade validada: ${politicianName} -> ${officialName}`);
+            logInfo(`[SmartScout] Identidade validada: ${politicianName} -> ${officialName}`);
           } else if (searchData.dados.length > 1) {
-            console.warn(`⚠️ [SmartScout] Ambiguidade detectada para "${politicianName}". Resultados podem ser imprecisos.`);
-          }
+            logWarn(`[SmartScout] Ambiguidade detectada para \"${politicianName}\". Resultados podem ser imprecisos.`);         }
         }
       }
 
@@ -204,7 +204,7 @@ export class SmartScout {
         }
       }
     } catch (error: any) {
-      console.warn('⚠️ [SmartScout] API Câmara indisponível ou timeout');
+      logWarn('[SmartScout] API Câmara indisponível ou timeout');
     } finally {
       clearTimeout(timeoutId);
     }
@@ -295,7 +295,7 @@ export class SmartScout {
         return null;
       },
       async () => {
-        console.log('🔄 [SmartScout] Usando cache local como fallback');
+        logInfo('[SmartScout] Usando cache local como fallback');
         return localCache.get(cacheKey);
       }
     );
@@ -313,7 +313,7 @@ export class SmartScout {
       },
       async () => {
         // Se Supabase falhar, salva apenas localmente
-        console.log('💾 [SmartScout] Salvando apenas no cache local');
+        logInfo('[SmartScout] Salvando apenas no cache local');
       }
     );
 

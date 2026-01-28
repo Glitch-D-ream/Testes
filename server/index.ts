@@ -4,7 +4,8 @@ import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import { initializeDatabase } from './core/database.ts';
 import { setupRoutes } from './core/routes.ts';
-import { compressionMiddleware } from './core/middleware.ts';;
+import { compressionMiddleware } from './core/middleware.ts';
+import { logInfo, logError } from './core/logger.ts';
 
 // __filename e __dirname para compatibilidade com ES Modules em dev/prod
 const __filename = fileURLToPath(import.meta.url);
@@ -60,19 +61,19 @@ app.use(express.static(clientBuildPath));
 
 // Inicializar aplicação
 (async () => {
-  console.log('[Seth VII] Iniciando processo de inicialização...');
-  console.log(`[Seth VII] NODE_ENV: ${process.env.NODE_ENV}`);
-  console.log(`[Seth VII] PORT: ${PORT}`);
-  console.log(`[Seth VII] Client Build Path: ${clientBuildPath}`);
+  logInfo('[Seth VII] Iniciando processo de inicialização...');
+  logInfo(`[Seth VII] NODE_ENV: ${process.env.NODE_ENV}`);
+  logInfo(`[Seth VII] PORT: ${PORT}`);
+  logInfo(`[Seth VII] Client Build Path: ${clientBuildPath}`);
 
   try {
     // Inicializar banco de dados
-    console.log('[Seth VII] Inicializando banco de dados...');
+    logInfo('[Seth VII] Inicializando banco de dados...');
     await initializeDatabase();
-    console.log('[Seth VII] Banco de dados inicializado.');
+    logInfo('[Seth VII] Banco de dados inicializado.');
 
     // Configurar rotas da API
-    console.log('[Seth VII] Configurando rotas...');
+    logInfo('[Seth VII] Configurando rotas...');
     setupRoutes(app);
 
     // Rota de teste direto para verificar se o Express responde
@@ -89,23 +90,23 @@ app.use(express.static(clientBuildPath));
 
     // Iniciar servidor - Forçando 0.0.0.0 para garantir que o Railway consiga rotear o tráfego
     const server = app.listen(Number(PORT), '0.0.0.0', () => {
-      console.log(`[Seth VII] Servidor ouvindo em 0.0.0.0:${PORT}`);
+      logInfo(`[Seth VII] Servidor ouvindo em 0.0.0.0:${PORT}`);
       
       // Configurar webhook do Telegram se as variáveis estiverem definidas
       if (process.env.TELEGRAM_BOT_TOKEN && process.env.WEBHOOK_DOMAIN) {
-        console.log('[Seth VII] Configurando webhook do Telegram...');
+        logInfo('[Seth VII] Configurando webhook do Telegram...');
         telegramWebhookService.setWebhook().catch(err => 
-          console.error('Erro ao configurar webhook do Telegram:', err)
+          logError('Erro ao configurar webhook do Telegram:', err as Error)
         );
       }
     });
 
     server.on('error', (err) => {
-      console.error('[Seth VII] Erro no servidor HTTP:', err);
+      logError('[Seth VII] Erro no servidor HTTP:', err);
     });
 
   } catch (error) {
-    console.error('[Seth VII] Erro FATAL ao inicializar:', error);
+    logError('[Seth VII] Erro FATAL ao inicializar:', error as Error);
     process.exit(1);
   }
 })();

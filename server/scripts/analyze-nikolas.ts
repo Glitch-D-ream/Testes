@@ -18,9 +18,9 @@ async function runAnalysis() {
     const result = await brain.analyze('Nikolas Ferreira');
 
     logInfo('✅ Análise concluída com sucesso!');
-    console.log('\n--- RESULTADO DA ANÁLISE ---');
-    console.log(JSON.stringify(result, null, 2));
-    console.log('---------------------------\n');
+    logInfo('--- RESULTADO DA ANÁLISE ---');
+    logInfo(JSON.stringify(result, null, 2));
+    logInfo('---------------------------');
 
     process.exit(0);
   } catch (error) {

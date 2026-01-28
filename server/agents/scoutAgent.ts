@@ -1,5 +1,6 @@
 import { SmartScout } from './smartScout.ts';
 import { getSupabase } from '../core/database.ts';
+import { logInfo, logWarn } from '../core/logger.ts';
 
 export class ScoutAgent {
   private scout: SmartScout;
@@ -16,13 +17,13 @@ export class ScoutAgent {
   }
   
   async execute(query: string): Promise<any> {
-    console.log(`🚀 ScoutAgent iniciando busca para: ${query}`);
+    logInfo(`[ScoutAgent] Iniciando busca para: ${query}`);
     
     // PASSO 1: Validação Canônica (Operação Tapa-Buraco)
     const canonicalPolitician = await this.validateCanonical(query);
     
     if (!canonicalPolitician) {
-      console.warn(`⚠️ Político não identificado com clareza na tabela canônica: ${query}`);
+      logWarn(`[ScoutAgent] Político não identificado com clareza na tabela canônica: ${query}`);
       return {
         error: "Político não identificado com clareza. Tente o nome completo (ex: Luiz Inácio Lula da Silva).",
         status: "FAILED_IDENTIFICATION",
@@ -30,12 +31,12 @@ export class ScoutAgent {
       };
     }
 
-    console.log(`✅ Político validado: ${canonicalPolitician.full_name} (${canonicalPolitician.id})`);
+    logInfo(`[ScoutAgent] Político validado: ${canonicalPolitician.full_name} (${canonicalPolitician.id})`);
     
     // Verifica cache em memória (5 minutos)
     const memoryCache = this.politicianCache.get(canonicalPolitician.id);
     if (memoryCache && Date.now() - memoryCache.timestamp < 300000) {
-      console.log(`⚡ Cache memória hit para: ${canonicalPolitician.id}`);
+      logInfo(`[ScoutAgent] Cache de memória hit para: ${canonicalPolitician.id}`);
       return memoryCache.data;
     }
     
