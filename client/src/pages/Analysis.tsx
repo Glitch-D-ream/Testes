@@ -15,8 +15,7 @@ export default function AnalysisNew() {
     const fetchAnalysis = async () => {
       if (!id) return;
       try {
-        const apiUrl = import.meta.env.VITE_API_URL || '';
-        const response = await fetch(`${apiUrl}/api/analyze/${id}`);
+        const response = await fetch(`/api/analyze/${id}`);
         if (response.ok) {
           const data = await response.json();
           setAnalysisData({
@@ -60,6 +59,25 @@ export default function AnalysisNew() {
           <p className="text-slate-600 dark:text-slate-400 font-medium">
             Analisando dados...
           </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!analysisData) {
+    return (
+      <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-4">
+        <div className="bg-slate-800 border border-red-500/50 p-8 rounded-lg max-w-md text-center shadow-2xl">
+          <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-4">
+            <span className="text-red-500 text-3xl">⚠️</span>
+          </div>
+          <h2 className="text-xl font-bold text-white mb-2">Falha na Auditoria</h2>
+          <p className="text-slate-400 mb-6">
+            Não foi possível carregar os dados desta análise. O dossiê pode estar corrompido ou ainda em processamento.
+          </p>
+          <Button onClick={() => navigate('/')} className="w-full">
+            Voltar para o Início
+          </Button>
         </div>
       </div>
     );
