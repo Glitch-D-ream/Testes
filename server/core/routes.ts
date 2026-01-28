@@ -42,7 +42,8 @@ export function setupRoutes(app: Express): void {
   // Middleware global de logs
   app.use(requestLoggerMiddleware);
   
-  app.use(csrfProtection);
+  // Proteção CSRF desabilitada temporariamente - frontend precisa ser ajustado para enviar o token
+  // app.use(csrfProtection);
   
   // Rota para obter token CSRF
   app.get('/api/csrf-token', csrfTokenRoute);
