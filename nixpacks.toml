@@ -1,5 +1,8 @@
+# Configuração Nixpacks para Railway
+# Otimizado para baixo consumo de memória (Railway Free: 512MB)
+
 [phases.setup]
-nixPkgs = ["nodejs-22_x", "playwright-driver"]
+nixPkgs = ["nodejs-22_x", "playwright-driver", "chromium"]
 
 [phases.install]
 cmds = ["pnpm install"]
@@ -7,8 +10,17 @@ cmds = ["pnpm install"]
 [phases.build]
 cmds = [
     "pnpm build",
-    "npx playwright install chromium --with-deps"
+    # Instalar apenas Chromium (mais leve)
+    "npx playwright install chromium"
 ]
 
 [start]
 cmd = "pnpm start"
+
+[variables]
+# Otimizações de memória para Railway Free Tier
+PLAYWRIGHT_BROWSERS_PATH = "/app/.cache/ms-playwright"
+# Limitar heap do Node.js para evitar OOM
+NODE_OPTIONS = "--max-old-space-size=384"
+# Desabilitar sandbox do Chromium (necessário em containers)
+PLAYWRIGHT_CHROMIUM_SANDBOX = "false"
