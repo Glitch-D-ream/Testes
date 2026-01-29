@@ -1,7 +1,8 @@
 
 import axios from 'axios';
 import { logInfo, logWarn, logError } from '../core/logger.ts';
-import { contentScraper } from '../modules/content-scraper.ts';
+import { ingestionService } from '../services/ingestion.service.ts';
+import { directSearchImproved } from '../modules/direct-search-improved.ts';
 
 export interface LegalRecord {
   title: string;
@@ -9,50 +10,55 @@ export interface LegalRecord {
   excerpt: string;
   source: string;
   date?: string;
+  content?: string;
 }
 
 export class JusBrasilAlternative {
   /**
-   * Busca processos e registros jurídicos usando busca pública e scraping
-   * Como a API oficial é restrita, usamos o Scout para encontrar links do JusBrasil e ConJur
+   * Busca processos e registros jurídicos usando busca pública real
    */
   async searchLegalRecords(politicianName: string): Promise<LegalRecord[]> {
-    logInfo(`[LegalSearch] Buscando registros jurídicos para: ${politicianName}`);
+    logInfo(`[LegalSearch] Buscando registros jurídicos REAIS para: ${politicianName}`);
     
     const queries = [
       `site:jusbrasil.com.br "${politicianName}"`,
-      `site:conjur.com.br "${politicianName}"`,
+      `site:escavador.com "${politicianName}"`,
       `"${politicianName}" processo judicial`,
-      `"${politicianName}" STF`
+      `"${politicianName}" diário oficial`
     ];
 
     const records: LegalRecord[] = [];
 
-    // Para o protótipo, vamos simular a busca via Google News RSS que é o que temos funcional agora
-    // No futuro, isso usaria o DirectSearchImproved com as queries acima
     try {
-      for (const query of queries) {
-        const url = `https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=pt-BR&gl=BR&ceid=BR:pt-419`;
-        const response = await axios.get(url, { timeout: 8000 });
-        const xml = response.data;
-        
-        const items = xml.match(/<item>[\s\S]*?<\/item>/g) || [];
-        
-        for (const item of items.slice(0, 3)) {
-          const title = (item.match(/<title>(.*?)<\/title>/))?.[1] || 'Registro Jurídico';
-          const link = (item.match(/<link>(.*?)<\/link>/))?.[1] || '';
-          const source = (item.match(/<source[^>]*>(.*?)<\/source>/))?.[1] || 'Justiça';
-          
-          records.push({
-            title: title.replace(/&amp;/g, '&'),
-            url: link,
-            excerpt: title,
-            source: source
-          });
+      // 1. Buscar links reais via DirectSearchImproved (DuckDuckGo/Bing)
+      const searchPromises = queries.map(q => directSearchImproved.search(q).catch(() => []));
+      const searchResults = await Promise.all(searchPromises);
+      const flatResults = searchResults.flat().slice(0, 8);
+
+      // 2. Ingerir conteúdo dos links encontrados para extrair dados reais
+      const ingestionPromises = flatResults.map(async (r) => {
+        try {
+          const ingestion = await ingestionService.ingest(r.url, { keywords: [politicianName, 'processo', 'decisão', 'acusação'] });
+          if (ingestion && ingestion.content.length > 200) {
+            return {
+              title: r.title,
+              url: r.url,
+              excerpt: ingestion.content.substring(0, 300) + "...",
+              source: r.source || 'Justiça',
+              content: ingestion.content
+            };
+          }
+        } catch (e) {
+          return null;
         }
-      }
+        return null;
+      });
+
+      const realRecords = await Promise.all(ingestionPromises);
+      records.push(...(realRecords.filter(r => r !== null) as LegalRecord[]));
+
     } catch (error) {
-      logWarn(`[LegalSearch] Falha na busca de registros jurídicos`, error as Error);
+      logWarn(`[LegalSearch] Falha na busca de registros jurídicos reais`, error as Error);
     }
 
     return records;
@@ -60,24 +66,43 @@ export class JusBrasilAlternative {
 
   /**
    * Integração com Querido Diário (Open Knowledge Brasil)
-   * Busca em diários oficiais de diversos municípios
+   * Busca em diários oficiais de diversos municípios de forma real
    */
   async searchQueridoDiario(politicianName: string): Promise<LegalRecord[]> {
-    logInfo(`[QueridoDiario] Buscando em diários oficiais para: ${politicianName}`);
+    logInfo(`[QueridoDiario] Buscando em diários oficiais REAIS para: ${politicianName}`);
     
     try {
-      // API do Querido Diário
+      // API do Querido Diário - Coleta Real
       const url = `https://queridodiario.ok.org.br/api/gazettes?keyword=${encodeURIComponent(politicianName)}`;
-      const response = await axios.get(url, { timeout: 10000 });
+      const response = await axios.get(url, { timeout: 12000 });
       
       if (response.data?.gazettes && Array.isArray(response.data.gazettes)) {
-        return response.data.gazettes.slice(0, 5).map((g: any) => ({
-          title: `Diário Oficial: ${g.territory_name} (${g.state_code})`,
-          url: g.url,
-          excerpt: `Publicação em ${g.date}. Edição ${g.edition_number}.`,
-          source: 'Querido Diário',
-          date: g.date
+        const gazettes = response.data.gazettes.slice(0, 5);
+        
+        // Tentar ingerir o conteúdo dos PDFs dos diários oficiais encontrados
+        const ingestedGazettes = await Promise.all(gazettes.map(async (g: any) => {
+          try {
+            const ingestion = await ingestionService.ingest(g.url, { keywords: [politicianName] });
+            return {
+              title: `Diário Oficial: ${g.territory_name} (${g.state_code})`,
+              url: g.url,
+              excerpt: ingestion ? ingestion.content.substring(0, 300) + "..." : `Publicação em ${g.date}. Edição ${g.edition_number}.`,
+              source: 'Querido Diário',
+              date: g.date,
+              content: ingestion?.content
+            };
+          } catch {
+            return {
+              title: `Diário Oficial: ${g.territory_name} (${g.state_code})`,
+              url: g.url,
+              excerpt: `Publicação em ${g.date}. Edição ${g.edition_number}.`,
+              source: 'Querido Diário',
+              date: g.date
+            };
+          }
         }));
+
+        return ingestedGazettes;
       }
     } catch (error) {
       logWarn(`[QueridoDiario] Falha ao consultar API do Querido Diário`, error as Error);
