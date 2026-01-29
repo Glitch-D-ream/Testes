@@ -65,7 +65,7 @@ export class ScoutHybrid {
           sources.push({
             title: `Discursos Oficiais - Câmara dos Deputados`,
             url: `https://www.camara.leg.br/deputados/${camaraId}`,
-            content: discursos.slice(0, 5).map(d => `[${d.dataHoraInicio}] ${d.transcricao}`).join('\n\n'),
+            content: discursos.slice(0, 20).map(d => `[${d.dataHoraInicio}] ${d.transcricao}`).join('\n\n'), // AUMENTADO de 5 para 20
             source: 'Câmara dos Deputados',
             type: 'official',
             confidence: 'high',
@@ -74,7 +74,7 @@ export class ScoutHybrid {
         }
 
         if (despesas.length > 0) {
-          const resumoDespesas = despesas.slice(0, 10).map(d => `${d.tipoDespesa}: R$ ${d.valorLiquido} (${d.dataDocumento})`).join('\n');
+          const resumoDespesas = despesas.slice(0, 50).map(d => `${d.tipoDespesa}: R$ ${d.valorLiquido} (${d.dataDocumento})`).join('\n'); // AUMENTADO de 10 para 50
           sources.push({
             title: `Gastos Parlamentares Recentes`,
             url: `https://www.camara.leg.br/deputados/${camaraId}`,
@@ -100,7 +100,7 @@ export class ScoutHybrid {
         ];
 
         const docResults = await Promise.all(docQueries.map(q => directSearchImproved.search(q).catch(() => [])));
-        const flatDocs = docResults.flat().slice(0, 5);
+        const flatDocs = docResults.flat().slice(0, 15); // AUMENTADO de 5 para 15
 
         logInfo(`[ScoutHybrid] Ingerindo ${flatDocs.length} documentos/PDFs encontrados diretamente...`);
         const docsIngested = await Promise.all(flatDocs.map(async (r) => {
@@ -122,7 +122,7 @@ export class ScoutHybrid {
       })));
 
       // Processar Notícias
-      const newsToIngest = newsResults.slice(0, 5);
+      const newsToIngest = newsResults.slice(0, 15); // AUMENTADO de 5 para 15
       const newsIngested = await Promise.all(newsToIngest.map(async (r) => {
         try {
           const content = await ingestionService.ingest(r.url);

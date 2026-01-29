@@ -12,6 +12,9 @@ import { getSupabase } from '../core/database.ts';
 import { logInfo, logError, logWarn } from '../core/logger.ts';
 import { scoutHybrid } from './scout-hybrid.ts';
 import { scoutCaseMiner } from './scout-case-miner.ts';
+// Agentes REINTEGRADOS da v3.2
+import { MultiScoutAgent } from './multi-scout.ts';
+import { ScoutRegional } from './scout-regional.ts';
 import { filterAgent, FilteredSource } from './filter.ts';
 import { aiService } from '../services/ai.service.ts';
 import { getProposicoesDeputado } from '../integrations/camara.ts';
@@ -327,7 +330,7 @@ export class BrainAgent {
           government: governmentPromises.length,
           interviews: interviewPromises.length,
           speeches: speechPromises.length,
-          items: allPromises.slice(0, 15)
+          items: allPromises // SEM LIMITE - todas as promessas
         },
         socialEvidences,
         legalRecords: allLegalRecords,
@@ -436,13 +439,13 @@ export class BrainAgent {
         redFlags: coherenceAnalysis.redFlags
       },
       // NOVOS - Reintegrados
-      social: socialEvidences.slice(0, 10).map(s => ({
+      social: socialEvidences.slice(0, 50).map(s => ({ // AUMENTADO de 10 para 50
         platform: s.platform,
-        content: s.content.substring(0, 500),
+        content: s.content.substring(0, 800), // AUMENTADO de 500 para 800
         url: s.url,
         relevance: s.relevance
       })),
-      legal: legalRecords.slice(0, 10).map(l => ({
+      legal: legalRecords.slice(0, 30).map(l => ({ // AUMENTADO de 10 para 30
         title: l.title,
         source: l.source,
         excerpt: l.excerpt,
@@ -476,14 +479,14 @@ SCORE GERAL DE COERÊNCIA: ${context.coherenceAnalysis.overallScore}%
 VEREDITO: ${context.coherenceAnalysis.verdict}
 
 PROMESSAS COLETADAS (${context.promises.all.length} total):
-${context.promises.all.slice(0, 5).map((p: any, i: number) => `
+${context.promises.all.slice(0, 20).map((p: any, i: number) => ` // AUMENTADO de 5 para 20
 ${i+1}. [${p.category}] "${p.text}"
    Fonte: ${p.source}
    ${p.quote ? `Citação: "${p.quote}"` : ''}
 `).join('')}
 
 ANÁLISE PROMESSA vs VOTO:
-${context.coherenceAnalysis.voteAnalysis.slice(0, 3).map((v: any) => `
+${context.coherenceAnalysis.voteAnalysis.slice(0, 10).map((v: any) => ` // AUMENTADO de 3 para 10
 - Promessa: "${v.promise.substring(0, 60)}..."
   Score: ${v.score}% | Veredito: ${v.verdict}
   ${v.summary}
@@ -496,7 +499,7 @@ Perfil Financeiro:
 - Top categorias: ${context.coherenceAnalysis.expenseAnalysis.profile.topCategories?.slice(0, 3).map((c: any) => `${c.category} (${c.percentage}%)`).join(', ') || 'N/A'}
 - Top fornecedores: ${context.coherenceAnalysis.expenseAnalysis.profile.topSuppliers?.slice(0, 3).map((s: any) => `${s.name} (R$ ${s.total?.toFixed(2)})`).join(', ') || 'N/A'}
 
-${context.coherenceAnalysis.expenseAnalysis.results.slice(0, 3).map((e: any) => `
+${context.coherenceAnalysis.expenseAnalysis.results.slice(0, 10).map((e: any) => ` // AUMENTADO de 3 para 10
 - Promessa: "${e.promise.substring(0, 60)}..."
   Score: ${e.score}% | Veredito: ${e.verdict}
   ${e.summary}
@@ -505,13 +508,13 @@ ${context.coherenceAnalysis.expenseAnalysis.results.slice(0, 3).map((e: any) => 
 
 CONTRADIÇÕES TEMPORAIS:
 Score de Consistência: ${context.coherenceAnalysis.temporalAnalysis.score}%
-${context.coherenceAnalysis.temporalAnalysis.contradictions.slice(0, 3).map((c: any) => `
+${context.coherenceAnalysis.temporalAnalysis.contradictions.slice(0, 10).map((c: any) => ` // AUMENTADO de 3 para 10
 - ${c.type} (${c.severity}): ${c.explanation}
   Diferença temporal: ${c.timeDifference}
 `).join('')}
 
 RED FLAGS:
-${context.coherenceAnalysis.redFlags.slice(0, 5).map((r: string) => `⚠️ ${r}`).join('\n')}
+${context.coherenceAnalysis.redFlags.slice(0, 20).map((r: string) => `⚠️ ${r}`).join('\n')} // AUMENTADO de 5 para 20
 
 ═══════════════════════════════════════════════════════════════════════════════
 SEÇÃO 2: EVIDÊNCIAS SOCIAIS (REDES SOCIAIS E BLOGS)
@@ -652,7 +655,7 @@ RESPONDA EM JSON:
       temporalAnalysis,
       overallScore,
       verdict,
-      redFlags: [...new Set(redFlags)].slice(0, 10)
+      redFlags: [...new Set(redFlags)] // SEM LIMITE - todas as red flags
     };
   }
 
@@ -699,7 +702,7 @@ ${JSON.stringify(combinedContext.officialProfile, null, 2)}
 - Red Flags: ${combinedContext.coherenceAnalysis?.redFlags?.join(', ') || 'Nenhuma'}
 
 🗳️ PROMESSA vs VOTO:
-${JSON.stringify(combinedContext.coherenceAnalysis?.voteAnalysis?.slice(0, 3) || [], null, 2)}
+${JSON.stringify(combinedContext.coherenceAnalysis?.voteAnalysis?.slice(0, 10) || [], null, 2)} // AUMENTADO de 3 para 10
 
 💰 PROMESSA vs GASTO:
 ${JSON.stringify(combinedContext.coherenceAnalysis?.expenseAnalysis || {}, null, 2)}
@@ -708,16 +711,16 @@ ${JSON.stringify(combinedContext.coherenceAnalysis?.expenseAnalysis || {}, null,
 ${JSON.stringify(combinedContext.coherenceAnalysis?.temporalAnalysis || {}, null, 2)}
 
 📱 EVIDÊNCIAS SOCIAIS:
-${JSON.stringify(combinedContext.social?.slice(0, 5) || [], null, 2)}
+${JSON.stringify(combinedContext.social?.slice(0, 20) || [], null, 2)} // AUMENTADO de 5 para 20
 
 ⚖️ REGISTROS JURÍDICOS:
-${JSON.stringify(combinedContext.legal?.slice(0, 5) || [], null, 2)}
+${JSON.stringify(combinedContext.legal?.slice(0, 15) || [], null, 2)} // AUMENTADO de 5 para 15
 
 🗃️ HISTÓRICO TSE:
 ${JSON.stringify(combinedContext.tse || {}, null, 2)}
 
 📰 FONTES PRIMÁRIAS (CITE-AS):
-${combinedContext.sources?.slice(0, 5).map((s: any) => `- ${s.title}: ${s.content?.substring(0, 200)}...`).join('\n') || 'Nenhuma fonte'}
+${combinedContext.sources?.slice(0, 15).map((s: any) => `- ${s.title}: ${s.content?.substring(0, 400)}...`).join('\n') || 'Nenhuma fonte'} // AUMENTADO de 5 para 15, conteúdo de 200 para 400
 
 ═══════════════════════════════════════════════════════════════════════════════
 INSTRUÇÕES MANDATÓRIAS
@@ -841,7 +844,7 @@ RESPONDA APENAS COM JSON VÁLIDO:
 
   private async runVulnerabilityAudit(cleanName: string, rawSources: any[], filteredSources: any[]) {
     try {
-      const evidences = await evidenceMiner.mine(cleanName, filteredSources.length > 0 ? filteredSources : rawSources.slice(0, 10));
+      const evidences = await evidenceMiner.mine(cleanName, filteredSources.length > 0 ? filteredSources : rawSources.slice(0, 30)); // AUMENTADO de 10 para 30
       const vulnerabilityReport = await vulnerabilityAuditor.audit(cleanName, evidences);
       return { ...vulnerabilityReport, evidences };
     } catch (e) { return { evidences: [] }; }

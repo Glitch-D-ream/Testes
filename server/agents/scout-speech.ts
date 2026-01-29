@@ -137,7 +137,7 @@ export class ScoutSpeechAgent {
 
           const items = xml.match(/<item>[\s\S]*?<\/item>/g) || [];
 
-          for (const item of items.slice(0, 3)) {
+          for (const item of items.slice(0, 10)) { // AUMENTADO de 3 para 10
             const title = (item.match(/<title><!\[CDATA\[(.*?)\]\]><\/title>/))?.[1] || 
                          (item.match(/<title>(.*?)<\/title>/))?.[1] || '';
             const link = (item.match(/<link>(.*?)<\/link>/))?.[1] || '';
@@ -288,8 +288,8 @@ SE NÃO HOUVER PROMESSAS CLARAS, RETORNE: {"promises": []}`;
 
     logInfo(`[ScoutSpeech] Processando ${speeches.length} discursos/declarações...`);
 
-    // Processar até 5 discursos
-    for (const speech of speeches.slice(0, 5)) {
+    // Processar até 20 discursos - AUMENTADO de 5 para 20
+    for (const speech of speeches.slice(0, 20)) {
       // PASSO 1: Fazer scraping se necessário
       const content = await this.scrapeContent(speech);
       

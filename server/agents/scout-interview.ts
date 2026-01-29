@@ -87,7 +87,7 @@ export class ScoutInterviewAgent {
 
           const items = xml.match(/<item>[\s\S]*?<\/item>/g) || [];
 
-          for (const item of items.slice(0, 3)) {
+          for (const item of items.slice(0, 10)) { // AUMENTADO de 3 para 10
             const title = (item.match(/<title><!\[CDATA\[(.*?)\]\]><\/title>/))?.[1] || 
                          (item.match(/<title>(.*?)<\/title>/))?.[1] || '';
             const link = (item.match(/<link>(.*?)<\/link>/))?.[1] || '';
@@ -136,7 +136,7 @@ export class ScoutInterviewAgent {
 
           const items = xml.match(/<item>[\s\S]*?<\/item>/g) || [];
 
-          for (const item of items.slice(0, 2)) {
+          for (const item of items.slice(0, 8)) { // AUMENTADO de 2 para 8
             const title = (item.match(/<title><!\[CDATA\[(.*?)\]\]><\/title>/))?.[1] || 
                          (item.match(/<title>(.*?)<\/title>/))?.[1] || '';
             const link = (item.match(/<link>(.*?)<\/link>/))?.[1] || '';
@@ -335,7 +335,7 @@ SE NÃO HOUVER PROMESSAS CLARAS, RETORNE: {"promises": [], "overallAssessment": 
 
     logInfo(`[ScoutInterview] ${textInterviews.length} entrevistas com texto disponível`);
 
-    for (const interview of textInterviews.slice(0, 5)) {
+    for (const interview of textInterviews.slice(0, 15)) { // AUMENTADO de 5 para 15
       const content = await this.scrapeContent(interview);
       
       if (content) {
