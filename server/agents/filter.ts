@@ -26,8 +26,9 @@ export class FilterAgent {
       const title = source.title || '';
       const layer = source.credibilityLayer || 'B';
       
-      // Heurística simples para pré-filtragem (passando título também)
-      if (this.simpleHeuristic(content, flexibleMode, title)) {
+      // Heurística simples para pré-filtragem (passando título e nome do alvo se disponível)
+      const targetName = (source as any).politicianName || '';
+      if (this.simpleHeuristic(content, flexibleMode, title, targetName)) {
         // Determinar força da promessa baseada na camada e conteúdo
         let strength: 'strong' | 'medium' | 'weak' = 'medium';
         if (layer === 'A') strength = 'strong';
@@ -79,16 +80,24 @@ export class FilterAgent {
     return filtered;
   }
 
-  private simpleHeuristic(content: string, flexibleMode: boolean = false, title: string = ''): boolean {
+  private simpleHeuristic(content: string, flexibleMode: boolean = false, title: string = '', targetName: string = ''): boolean {
     const contentLower = content.toLowerCase();
     const titleLower = title.toLowerCase();
     const combinedText = (titleLower + ' ' + contentLower).trim();
+    
+    // 0. Validação de Contexto (O político alvo deve ser mencionado)
+    if (targetName) {
+      const nameParts = targetName.toLowerCase().split(' ').filter(p => p.length > 2);
+      const hasName = nameParts.some(part => combinedText.includes(part));
+      if (!hasName) return false;
+    }
 
     // 1. Bloqueio de Ruído Óbvio (Blacklist)
     const noiseKeywords = [
       'cookies', 'privacidade', 'todos os direitos', 'clique aqui', 
       'assine já', 'newsletter', 'erro 404', 'página não encontrada',
-      'just a moment', 'enable javascript'
+      'just a moment', 'enable javascript', 'big brother brasil', 'bbb24', 'bbb25',
+      'reality show', 'entretenimento', 'fofoca', 'celebridades'
     ];
     if (noiseKeywords.some(kw => combinedText.includes(kw))) return false;
     
@@ -105,8 +114,8 @@ export class FilterAgent {
     
     if (isStaticProfile && !hasAction) return false;
 
-    // 3. Critério de Tamanho Mínimo (Reduzido conforme DeepSeek)
-    if (combinedText.length < 30) return false;
+    // 3. Critério de Tamanho Mínimo (Aumentado para evitar snippets inúteis)
+    if (combinedText.length < 150) return false;
 
     // 4. Critério de Relevância Política Básica (Expandido conforme DeepSeek)
     const politicalKeywords = [

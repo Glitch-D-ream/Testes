@@ -125,7 +125,8 @@ export class ScoutHybrid {
         const newsIngested = await Promise.all(newsToIngest.map(r => 
           ingestionService.ingest(r.url).then(content => content ? {
             title: r.title, url: r.url, content: content.content, source: r.source, type: 'news' as const, 
-            confidence: 'medium' as const, credibilityLayer: 'B' as const
+            confidence: 'medium' as const, credibilityLayer: 'B' as const,
+            politicianName: query // Passando o nome para o filtro
           } : null).catch(() => null)
         ));
         sources.push(...(newsIngested.filter(s => s !== null) as RawSource[]));

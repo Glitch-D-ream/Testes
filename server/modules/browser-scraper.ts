@@ -131,8 +131,24 @@ export class BrowserScraper {
       await page.waitForTimeout(2000);
 
       const content = await page.evaluate(() => {
-        const toRemove = ['script', 'style', 'nav', 'footer', 'header', 'aside', '.ads', '.paywall'];
+        // 1. Remover elementos ruidosos conhecidos
+        const toRemove = [
+          'script', 'style', 'nav', 'footer', 'header', 'aside', 'iframe', 'noscript',
+          '.ads', '.sidebar', '.menu', '.nav', '.footer', '.header', '.comments', 
+          '.related', '.social-share', '.newsletter', '.popup', '.modal', '.paywall'
+        ];
         toRemove.forEach(s => document.querySelectorAll(s).forEach(el => el.remove()));
+
+        // 2. Tentar encontrar o container principal de conteúdo
+        const mainSelectors = ['article', 'main', '[role="main"]', '.content', '.post-content', '.article-body', '#main-content', '.texto-materia'];
+        for (const selector of mainSelectors) {
+          const element = document.querySelector(selector);
+          if (element && element.innerText.length > 500) {
+            return element.innerText;
+          }
+        }
+
+        // 3. Fallback para o body se nenhum container principal for encontrado ou for muito curto
         return document.body.innerText;
       });
 

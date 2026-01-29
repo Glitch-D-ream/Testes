@@ -72,13 +72,16 @@ export class IngestionService {
               
               const text = $('body').text().replace(/\s+/g, ' ').trim();
               
-              if (text.length > 200) {
+              // Validação de Densidade: Aumentado para 400 chars para garantir conteúdo real
+              if (text.length > 400) {
                 logInfo(`[IngestionService] Sucesso via Axios (${text.length} chars).`);
                 result = { 
                   content: text, 
                   format: 'html', 
                   metadata: { sourceUrl: url, title: $('title').text() } 
                 };
+              } else {
+                logWarn(`[IngestionService] Conteúdo via Axios muito curto (${text.length} chars). Tentando Scraper Pesado...`);
               }
             }
           } catch (e) {
@@ -106,7 +109,10 @@ export class IngestionService {
           }
         }
 
-        if (!result || !result.content || result.content.length < 50) return null;
+        if (!result || !result.content || result.content.length < 300) {
+          logWarn(`[IngestionService] Conteúdo final insuficiente (${result?.content?.length || 0} chars). Rejeitando fonte.`);
+          return null;
+        }
 
         // Limitar tamanho do conteúdo para não estourar memória/tokens
         if (result.content.length > 15000) {
