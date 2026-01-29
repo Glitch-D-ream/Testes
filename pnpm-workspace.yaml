@@ -1,3 +1,13 @@
 packages:
-  - 'client'
-  - 'server'
+  - client
+  - server
+
+onlyBuiltDependencies:
+  - core-js
+  - esbuild
+  - msgpackr-extract
+  - puppeteer
+  - sharp
+  - supabase
+  - tesseract.js
+  - workerd

@@ -1,7 +1,7 @@
 
 /**
- * Scout Agent Híbrido v2.6 - IRONCLAD + DOCUMENT FALLBACK + FEDERAL TRANSPARENCY
- * Foco em resiliência extrema: se as APIs falham, ele busca documentos diretos.
+ * Scout Agent Híbrido v2.7 - PERFORMANCE OPTIMIZED
+ * Foco em resiliência extrema e PARALELISMO REAL.
  */
 
 import { logInfo, logError, logWarn } from '../core/logger.ts';
@@ -36,106 +36,140 @@ export class ScoutHybrid {
       // FASE 1: Busca Paralela (Regional + Federal + Notícias)
       const isRegionalPE = query.toLowerCase().includes('jones manoel') || query.toLowerCase().includes('pernambuco');
       const isRegionalSP = query.toLowerCase().includes('erika hilton') || query.toLowerCase().includes('são paulo');
-
-      // Queries expandidas para capturar atos oficiais e transparência
       const federalQuery = `${query} "Portal da Transparência" OR "Diário Oficial"`;
       
+      logInfo(`[ScoutHybrid] Executando Fase 1: Busca Multidimensional Paralela...`);
       const fastResults = await Promise.all([
         officialSourcesSearch.search(query).catch((e) => { apiFailures.push('Oficial'); return []; }),
         directSearchImproved.search(query).catch((e) => { apiFailures.push('Notícias'); return []; }),
         transparenciaFederalService.searchServidor(query).catch(() => { apiFailures.push('Federal'); return []; }),
-        directSearchImproved.search(federalQuery).catch(() => []), // Busca extra por transparência
+        directSearchImproved.search(federalQuery).catch(() => []),
         isRegionalSP ? transparenciaSPService.search(query).catch(() => { apiFailures.push('SP'); return []; }) : Promise.resolve([]),
-        isRegionalPE ? transparenciaPEService.search(query).catch(() => { apiFailures.push('PE'); return []; }) : Promise.resolve([])
+        isRegionalPE ? transparenciaPEService.search(query).catch(() => { apiFailures.push('PE'); return []; }) : Promise.resolve([]),
+        camaraApiService.findDeputadoId(query).catch(() => null)
       ]);
 
-      const [officialResults, newsResults, federalResults, extraFederalResults, spResults, peResults] = fastResults;
+      const [officialResults, newsResults, federalResults, extraFederalResults, spResults, peResults, camaraId] = fastResults;
       
-      // FASE 1.5: Busca em APIs Oficiais (Câmara)
-      const camaraId = await camaraApiService.findDeputadoId(query);
+      // FASE 2: Processamento de APIs Oficiais e Documentos em Paralelo
+      logInfo(`[ScoutHybrid] Executando Fase 2: Ingestão e APIs Especializadas...`);
+      
+      const parallelTasks: Promise<void>[] = [];
+
+      // Task: Câmara dos Deputados
       if (camaraId) {
-        logInfo(`[ScoutHybrid] Deputado Federal detectado. Coletando dados oficiais da Câmara...`);
-        const [discursos, despesas, proposicoes] = await Promise.all([
-          camaraApiService.getDiscursos(camaraId),
-          camaraApiService.getDespesas(camaraId),
-          camaraApiService.getProposicoes(camaraId)
-        ]);
+        parallelTasks.push((async () => {
+          logInfo(`[ScoutHybrid] Coletando dados oficiais da Câmara (ID: ${camaraId})...`);
+          const [discursos, despesas] = await Promise.all([
+            camaraApiService.getDiscursos(camaraId).catch(() => []),
+            camaraApiService.getDespesas(camaraId).catch(() => [])
+          ]);
 
-        if (discursos.length > 0) {
-          sources.push({
-            title: `Discursos Oficiais - Câmara dos Deputados`,
-            url: `https://www.camara.leg.br/deputados/${camaraId}`,
-            content: discursos.slice(0, 20).map(d => `[${d.dataHoraInicio}] ${d.transcricao}`).join('\n\n'), // AUMENTADO de 5 para 20
-            source: 'Câmara dos Deputados',
-            type: 'official',
-            confidence: 'high',
-            credibilityLayer: 'A'
-          });
-        }
+          if (discursos.length > 0) {
+            sources.push({
+              title: `Discursos Oficiais - Câmara dos Deputados`,
+              url: `https://www.camara.leg.br/deputados/${camaraId}`,
+              content: discursos.slice(0, 20).map(d => `[${d.dataHoraInicio}] ${d.transcricao}`).join('\n\n'),
+              source: 'Câmara dos Deputados',
+              type: 'official',
+              confidence: 'high',
+              credibilityLayer: 'A'
+            });
+          }
 
-        if (despesas.length > 0) {
-          const resumoDespesas = despesas.slice(0, 50).map(d => `${d.tipoDespesa}: R$ ${d.valorLiquido} (${d.dataDocumento})`).join('\n'); // AUMENTADO de 10 para 50
-          sources.push({
-            title: `Gastos Parlamentares Recentes`,
-            url: `https://www.camara.leg.br/deputados/${camaraId}`,
-            content: `RESUMO DE GASTOS:\n${resumoDespesas}`,
-            source: 'Cota Parlamentar',
-            type: 'official',
-            confidence: 'high',
-            credibilityLayer: 'A'
-          });
-        }
+          if (despesas.length > 0) {
+            const resumoDespesas = despesas.slice(0, 50).map(d => `${d.tipoDespesa}: R$ ${d.valorLiquido} (${d.dataDocumento})`).join('\n');
+            sources.push({
+              title: `Gastos Parlamentares Recentes`,
+              url: `https://www.camara.leg.br/deputados/${camaraId}`,
+              content: `RESUMO DE GASTOS:\n${resumoDespesas}`,
+              source: 'Cota Parlamentar',
+              type: 'official',
+              confidence: 'high',
+              credibilityLayer: 'A'
+            });
+          }
+        })());
       }
 
-      // Combinar resultados federais extras
-      newsResults.push(...extraFederalResults);
-
-      // Se detectarmos falhas em APIs críticas, ativamos o Fallback de Documentos
+      // Task: Ingestão de Documentos (se necessário)
+      const allNews = [...newsResults, ...extraFederalResults];
       if (apiFailures.length > 0 || deepSearch) {
-        logWarn(`[ScoutHybrid] Detectadas falhas ou modo Deep. Ativando busca direta por Documentos/PDFs...`);
-        const docQueries = [
-          `${query} filetype:pdf`,
-          `${query} "diário oficial"`,
-          `${query} contrato OR empenho OR licitação`
-        ];
+        parallelTasks.push((async () => {
+          logWarn(`[ScoutHybrid] Ativando busca paralela por Documentos/PDFs...`);
+          const docQueries = [
+            `${query} filetype:pdf`,
+            `${query} "diário oficial"`,
+            `${query} contrato OR empenho OR licitação`
+          ];
 
-        const docResults = await Promise.all(docQueries.map(q => directSearchImproved.search(q).catch(() => [])));
-        const flatDocs = docResults.flat().slice(0, 15); // AUMENTADO de 5 para 15
+          const docSearchResults = await Promise.all(docQueries.map(q => directSearchImproved.search(q).catch(() => [])));
+          const flatDocs = docSearchResults.flat().slice(0, 15);
 
-        logInfo(`[ScoutHybrid] Ingerindo ${flatDocs.length} documentos/PDFs encontrados diretamente...`);
-        const docsIngested = await Promise.all(flatDocs.map(async (r) => {
-          try {
-            const result = await ingestionService.ingest(r.url, { keywords: [query] });
-            return result ? {
+          logInfo(`[ScoutHybrid] Ingerindo ${flatDocs.length} documentos em paralelo...`);
+          const docsIngested = await Promise.all(flatDocs.map(r => 
+            ingestionService.ingest(r.url, { keywords: [query] }).then(result => result ? {
               title: r.title, url: r.url, content: result.content, source: 'Documento Público', 
               type: 'document' as const, confidence: 'high' as const, credibilityLayer: 'A' as const
-            } : null;
-          } catch { return null; }
-        }));
-        sources.push(...(docsIngested.filter(s => s !== null) as RawSource[]));
+            } : null).catch(() => null)
+          ));
+          sources.push(...(docsIngested.filter(s => s !== null) as RawSource[]));
+        })());
       }
 
-      // Adicionar Resultados Oficiais
+      // Task: Ingestão de Notícias Principal
+      parallelTasks.push((async () => {
+        const newsToIngest = allNews.slice(0, 15);
+        logInfo(`[ScoutHybrid] Ingerindo ${newsToIngest.length} notícias em paralelo...`);
+        const newsIngested = await Promise.all(newsToIngest.map(r => 
+          ingestionService.ingest(r.url).then(content => content ? {
+            title: r.title, url: r.url, content: content.content, source: r.source, type: 'news' as const, 
+            confidence: 'medium' as const, credibilityLayer: 'B' as const
+          } : null).catch(() => null)
+        ));
+        sources.push(...(newsIngested.filter(s => s !== null) as RawSource[]));
+      })());
+
+      // Adicionar resultados regionais e oficiais que já temos
       sources.push(...officialResults.map(r => ({
         title: r.title, url: r.url, content: (r as any).content || r.description, source: (r as any).source || 'Portal Oficial', 
         type: 'official' as const, confidence: 'high' as const, credibilityLayer: 'A' as const
       })));
+      sources.push(...spResults.map(r => ({ ...r, type: 'official' as const, credibilityLayer: 'A' as const })));
+      sources.push(...peResults.map(r => ({ ...r, type: 'official' as const, credibilityLayer: 'A' as const })));
 
-      // Processar Notícias
-      const newsToIngest = newsResults.slice(0, 15); // AUMENTADO de 5 para 15
-      const newsIngested = await Promise.all(newsToIngest.map(async (r) => {
-        try {
-          const content = await ingestionService.ingest(r.url);
-          return content ? {
-            title: r.title, url: r.url, content: content.content, source: r.source, type: 'news' as const, 
-            confidence: 'medium' as const, credibilityLayer: 'B' as const
-          } : null;
-        } catch { return null; }
-      }));
-      sources.push(...(newsIngested.filter(s => s !== null) as RawSource[]));
+      // Aguardar todas as tarefas paralelas
+      await Promise.all(parallelTasks);
 
+      logInfo(`[ScoutHybrid] Busca finalizada. Total de fontes: ${sources.length}`);
       return sources.filter(s => this.isValidUrl(s.url));
     });
+  }
+
+  /**
+   * Busca especializada em ausência (licitações, editais, diários oficiais)
+   */
+  async searchAbsence(query: string, category: string): Promise<RawSource[]> {
+    logInfo(`[ScoutHybrid] Buscando ausência técnica para: ${query} [${category}]`);
+    const searchQueries = [
+      `${query} "licitação" OR "edital" OR "contrato"`,
+      `${query} "diário oficial" OR "portal da transparência"`,
+      `${query} "projeto executivo" OR "empenho"`
+    ];
+
+    const results = await Promise.all(
+      searchQueries.map(q => directSearchImproved.search(q).catch(() => []))
+    );
+
+    const flatResults = results.flat().slice(0, 10);
+    const ingested = await Promise.all(
+      flatResults.map(r => ingestionService.ingest(r.url).then(res => res ? {
+        title: r.title, url: r.url, content: res.content, source: r.source,
+        type: 'official' as const, confidence: 'high' as const, credibilityLayer: 'A' as const
+      } : null).catch(() => null))
+    );
+
+    return ingested.filter(s => s !== null) as RawSource[];
   }
 
   private isValidUrl(url: string): boolean {

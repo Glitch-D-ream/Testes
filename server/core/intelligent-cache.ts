@@ -4,7 +4,7 @@ import { getSupabase } from './database.ts';
 
 /**
  * IntelligentCache - Sistema de cache em camadas (L1: Memória, L3: Supabase)
- * Otimiza o tempo de resposta e reduz chamadas a APIs externas.
+ * v2.8 - Adicionado suporte para Content Extraction Cache
  */
 export class IntelligentCache {
   // L1: Cache em memória (TTL curto)
@@ -24,24 +24,27 @@ export class IntelligentCache {
       return cachedL1.data as T;
     }
 
-    // 2. Tentar L3 (Supabase - Tabela de Cache)
+    // 2. Tentar L3 (Supabase)
     try {
       const supabase = getSupabase();
-      // Tentar data_snapshots primeiro
+      
+      // Chave de cache no Supabase
+      const cacheKey = key.length > 200 ? `hash:${this.hashKey(key)}` : key;
+
       const { data: cachedL3, error } = await supabase
         .from('data_snapshots')
         .select('payload, created_at')
-        .eq('data_source', `cache:${key}`)
+        .eq('data_source', `cache:${cacheKey}`)
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle();
 
       if (cachedL3 && !error) {
         const createdAt = new Date(cachedL3.created_at).getTime();
-        const ttl = ttlOverride || 24 * 60 * 60 * 1000; 
+        const ttl = ttlOverride || 24 * 60 * 60 * 1000; // Default 24h
 
         if (now - createdAt < ttl) {
-          logInfo(`[Cache] L3 Hit (data_snapshots): ${key}`);
+          logInfo(`[Cache] L3 Hit: ${key.substring(0, 50)}...`);
           this.l1.set(key, { data: cachedL3.payload, expires: now + this.L1_TTL });
           return cachedL3.payload as T;
         }
@@ -49,15 +52,16 @@ export class IntelligentCache {
 
       // Fallback para scout_history se for uma busca de político
       if (key.startsWith('search:')) {
+        const politicianName = key.split(':').pop();
         const { data: scoutData, error: scoutError } = await supabase
           .from('scout_history')
           .select('title, url, content, source, published_at')
-          .ilike('politician_name', `%${key.split(':').pop()}%`)
+          .ilike('politician_name', `%${politicianName}%`)
           .order('created_at', { ascending: false })
-          .limit(10);
+          .limit(15);
 
         if (scoutData && scoutData.length > 0 && !scoutError) {
-          logInfo(`[Cache] L3 Hit (scout_history): ${key}`);
+          logInfo(`[Cache] L3 Hit (scout_history): ${politicianName}`);
           const formattedData = scoutData.map(d => ({
             title: d.title,
             url: d.url,
@@ -77,11 +81,13 @@ export class IntelligentCache {
     }
 
     // 3. Cache Miss: Executar função original
-    logInfo(`[Cache] Miss: ${key}. Buscando dados frescos...`);
+    logInfo(`[Cache] Miss: ${key.substring(0, 50)}... Buscando dados frescos...`);
     const freshData = await fetchFn();
 
     // 4. Salvar em L1 e L3
-    this.set(key, freshData);
+    if (freshData) {
+      this.set(key, freshData);
+    }
 
     return freshData;
   }
@@ -91,33 +97,35 @@ export class IntelligentCache {
    */
   static async set(key: string, data: any): Promise<void> {
     const now = Date.now();
-
-    // Salvar em L1
     this.l1.set(key, { data, expires: now + this.L1_TTL });
 
-    // Salvar em L3 (Supabase) de forma assíncrona (fire and forget)
     try {
       const supabase = getSupabase();
-      // Tentar persistir em data_snapshots silenciosamente
+      const cacheKey = key.length > 200 ? `hash:${this.hashKey(key)}` : key;
+
       supabase.from('data_snapshots').insert({
-        data_source: `cache:${key}`,
+        data_source: `cache:${cacheKey}`,
         data_type: 'CACHE',
         payload: data,
         version: 1
       }).then(({ error }) => {
-        // Silenciar erro de tabela inexistente para não poluir logs
         if (error && !error.message.includes('data_snapshots')) {
           logWarn(`[Cache] Erro ao persistir em L3: ${error.message}`);
         }
       });
-    } catch (e) {
-      // Silenciar erros de inicialização
-    }
+    } catch (e) {}
   }
 
-  /**
-   * Limpa o cache L1
-   */
+  private static hashKey(key: string): string {
+    let hash = 0;
+    for (let i = 0; i < key.length; i++) {
+      const char = key.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash;
+    }
+    return Math.abs(hash).toString(16);
+  }
+
   static clearL1(): void {
     this.l1.clear();
     logInfo('[Cache] L1 limpo com sucesso.');
