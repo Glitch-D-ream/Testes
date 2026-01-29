@@ -15,104 +15,85 @@ export interface LegalRecord {
 
 export class JusBrasilAlternative {
   /**
-   * Busca registros via Wikipedia Search API (Livre de bloqueios e retorna links externos)
+   * Busca registros via Google News RSS (Estável e Rápido)
    */
-  private async searchWikipediaExternal(query: string): Promise<LegalRecord[]> {
-    logInfo(`[WikiSearch] Buscando links externos para: ${query}`);
+  private async searchRSS(query: string, label: string): Promise<LegalRecord[]> {
+    logInfo(`[LegalRSS] Buscando ${label} para: ${query}`);
     try {
-      const url = `https://pt.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query)}&format=json&utf8=1&srlimit=5`;
-      const response = await axios.get(url, { timeout: 5000 });
-      const searchResults = response.data?.query?.search || [];
+      const url = `https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=pt-BR&gl=BR&ceid=BR:pt-419`;
+      const response = await axios.get(url, { timeout: 8000 });
+      const xml = response.data;
       
-      const records: LegalRecord[] = [];
-      for (const result of searchResults) {
-        // Para cada resultado, vamos considerar o snippet como uma pista jurídica
-        records.push({
-          title: result.title,
-          url: `https://pt.wikipedia.org/wiki/${encodeURIComponent(result.title)}`,
-          excerpt: result.snippet.replace(/<[^>]+>/g, ''),
-          source: 'Wikipedia/Registros Públicos'
-        });
-      }
-      return records;
+      const items = xml.match(/<item>[\s\S]*?<\/item>/g) || [];
+      return items.slice(0, 5).map((item: string) => {
+        const title = (item.match(/<title>(.*?)<\/title>/))?.[1] || 'Registro';
+        const link = (item.match(/<link>(.*?)<\/link>/))?.[1] || '';
+        const date = (item.match(/<pubDate>(.*?)<\/pubDate>/))?.[1] || '';
+        const source = (item.match(/<source[^>]*>(.*?)<\/source>/))?.[1] || label;
+        
+        return {
+          title: title.replace(/&amp;/g, '&'),
+          url: link,
+          excerpt: `Registro detectado em ${date}. Fonte original: ${source}`,
+          source: label,
+          date: date
+        };
+      });
     } catch (error) {
-      logWarn(`[WikiSearch] Falha na busca Wikipedia`, error as Error);
+      logWarn(`[LegalRSS] Falha na busca RSS ${label}`, error as Error);
       return [];
     }
+  }
+
+  /**
+   * Busca no Jusbrasil Público via DuckDuckGo (Links Diretos)
+   */
+  private async searchJusbrasilLinks(politicianName: string): Promise<LegalRecord[]> {
+    logInfo(`[JusSearch] Buscando links Jusbrasil para: ${politicianName}`);
+    try {
+      const query = `site:jusbrasil.com.br/processos "${politicianName}"`;
+      const searchUrl = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`;
+      const html = await browserScraper.scrape(searchUrl);
+      
+      if (!html) return [];
+
+      const records: LegalRecord[] = [];
+      const matches = html.matchAll(/href="([^"]+)"/g);
+      
+      for (const match of matches) {
+        let url = match[1];
+        if (url.includes('uddg=')) url = decodeURIComponent(url.split('uddg=')[1].split('&')[0]);
+        
+        if (url.includes('jusbrasil.com.br/processos') && !url.includes('duckduckgo')) {
+          records.push({
+            title: `Processo Judicial - Jusbrasil`,
+            url: url,
+            excerpt: 'Página de processos localizada no Jusbrasil.',
+            source: 'Justiça / Jusbrasil'
+          });
+        }
+        if (records.length >= 3) break;
+      }
+      return records;
+    } catch { return []; }
   }
 
   /**
    * Busca processos e registros jurídicos usando busca pública real
    */
   async searchLegalRecords(politicianName: string): Promise<LegalRecord[]> {
-    logInfo(`[LegalSearch] Buscando registros jurídicos REAIS para: ${politicianName}`);
-    
-    // Tentar busca via Wikipedia como proxy para eventos jurídicos notáveis
-    const results = await this.searchWikipediaExternal(`${politicianName} processo judicial`);
-    
-    const records: LegalRecord[] = [];
-
-    const ingestionPromises = results.map(async (r) => {
-      try {
-        const ingestion = await ingestionService.ingest(r.url, { keywords: [politicianName, 'processo', 'decisão'] });
-        if (ingestion) {
-          return {
-            ...r,
-            excerpt: ingestion.content.substring(0, 300) + "...",
-            content: ingestion.content
-          };
-        }
-      } catch (e) { return null; }
-      return null;
-    });
-
-    const realRecords = await Promise.all(ingestionPromises);
-    records.push(...(realRecords.filter(r => r !== null) as LegalRecord[]));
-    
-    return records;
+    const [rssResults, jusLinks] = await Promise.all([
+      this.searchRSS(`"${politicianName}" (processo OR judicial OR liminar OR condenação)`, 'Justiça / Processos'),
+      this.searchJusbrasilLinks(politicianName)
+    ]);
+    return [...jusLinks, ...rssResults];
   }
 
   /**
    * Busca em Diários Oficiais via busca pública resiliente
    */
   async searchQueridoDiario(politicianName: string): Promise<LegalRecord[]> {
-    logInfo(`[QueridoDiario] Buscando diários oficiais para: ${politicianName}`);
-    
-    // Fallback para o Querido Diário via Axios direto (tentando novamente com headers mínimos)
-    try {
-      const url = `https://queridodiario.ok.org.br/api/gazettes?keyword=${encodeURIComponent(politicianName)}`;
-      const response = await axios.get(url, { 
-        timeout: 5000,
-        headers: { 'Accept': 'application/json' }
-      });
-      
-      if (response.data?.gazettes) {
-        return response.data.gazettes.slice(0, 5).map((g: any) => ({
-          title: `Diário Oficial: ${g.territory_name}`,
-          url: g.url,
-          excerpt: `Publicação em ${g.date}.`,
-          source: 'Querido Diário',
-          date: g.date
-        }));
-      }
-    } catch {
-      logWarn(`[QueridoDiario] API Direta falhou. Usando busca de notícias como proxy.`);
-      // Usar Google News RSS como proxy para menções em Diários Oficiais citadas na mídia
-      const query = `"${politicianName}" "diário oficial"`;
-      const rssUrl = `https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=pt-BR&gl=BR&ceid=BR:pt-419`;
-      try {
-        const res = await axios.get(rssUrl);
-        const items = res.data.match(/<item>[\s\S]*?<\/item>/g) || [];
-        return items.slice(0, 3).map((item: string) => ({
-          title: (item.match(/<title>(.*?)<\/title>/))?.[1] || 'Menção em Diário Oficial',
-          url: (item.match(/<link>(.*?)<\/link>/))?.[1] || '',
-          excerpt: 'Menção detectada em fonte de notícias.',
-          source: 'Diário Oficial (via Notícias)'
-        }));
-      } catch { return []; }
-    }
-    
-    return [];
+    return this.searchRSS(`"${politicianName}" "diário oficial"`, 'Diário Oficial');
   }
 }
 
