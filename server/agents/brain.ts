@@ -92,9 +92,21 @@ export class BrainAgent {
     logInfo(`[Brain v6] 🧠 Iniciando análise COMPLETA para: ${cleanName}`);
 
     try {
+      const supabase = getSupabase();
+      const updateProgress = async (progress: number, statusText?: string) => {
+        if (existingId) {
+          await supabase.from('analyses').update({ 
+            progress, 
+            text: statusText || undefined,
+            updated_at: new Date().toISOString() 
+          }).eq('id', existingId);
+        }
+      };
+
       // ═══════════════════════════════════════════════════════════════════════
       // ETAPA 0: Descoberta de Identidade
       // ═══════════════════════════════════════════════════════════════════════
+      await updateProgress(5, `Identificando perfil oficial de ${cleanName}...`);
       const profile = await targetDiscoveryService.discover(cleanName);
       logInfo(`[Brain v6] Alvo: ${profile.office} ${profile.name} (${profile.party})`);
 
@@ -107,6 +119,7 @@ export class BrainAgent {
       // FASE 1: COLETA MULTIDIMENSIONAL (EXPANDIDA)
       // ═══════════════════════════════════════════════════════════════════════
       logInfo(`[Brain v6] === FASE 1: COLETA MULTIDIMENSIONAL ===`);
+      await updateProgress(15, `Minerando portais oficiais, diários e redes sociais...`);
       
       const searchQuery = `${profile.office} ${profile.name} ${profile.party} ${regionContext.state}`;
       
@@ -185,6 +198,7 @@ export class BrainAgent {
       // FASE 2: CRUZAMENTOS E ANÁLISE DE COERÊNCIA
       // ═══════════════════════════════════════════════════════════════════════
       logInfo(`[Brain v6] === FASE 2: CRUZAMENTOS E ANÁLISE DE COERÊNCIA ===`);
+      await updateProgress(40, `Cruzando promessas com votações e gastos reais...`);
       
       const isLegislative = profile.office.toLowerCase().includes('deputado') || profile.office.toLowerCase().includes('senador');
 
@@ -234,6 +248,7 @@ export class BrainAgent {
       // FASE 3: VALIDAÇÃO CRUZADA (CONSENSUS VALIDATOR) - REINTEGRADO
       // ═══════════════════════════════════════════════════════════════════════
       logInfo(`[Brain v6] === FASE 3: VALIDAÇÃO CRUZADA ===`);
+      await updateProgress(70, `Validando veredito com rede de consenso de IAs...`);
 
       const combinedContext = this.buildCombinedContext(
         dataSources, absenceReport, vulnerabilityReport, benchmarkResult, 
@@ -289,6 +304,7 @@ export class BrainAgent {
       // FASE 4: HUMANIZAÇÃO DO RELATÓRIO - REINTEGRADO
       // ═══════════════════════════════════════════════════════════════════════
       logInfo(`[Brain v6] === FASE 4: HUMANIZAÇÃO DO RELATÓRIO ===`);
+      await updateProgress(90, `Finalizando dossiê humanizado...`);
 
       let humanizedReport = '';
       try {

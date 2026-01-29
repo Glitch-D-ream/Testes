@@ -99,51 +99,32 @@ export class SearchService {
       status: 'processing'
     }]);
 
-    // 3. Execução Assíncrona (Não bloqueia o retorno da API)
+    // 3. Despachar para a Fila (BullMQ)
+    const { analysisQueue } = await import('../queues/index.ts');
+    
+    try {
+      logInfo(`[Orchestrator] Despachando análise de ${politicianName} para a fila.`);
+      await analysisQueue.add({
+        politicianName,
+        userId,
+        analysisId,
+        timestamp: new Date().toISOString()
+      }, {
+        attempts: 2,
+        backoff: { type: 'exponential', delay: 10000 },
+        timeout: 600000 // 10 minutos de timeout para análises profundas
+      });
+    } catch (queueError) {
+      logError(`[Orchestrator] Erro ao adicionar à fila, usando fallback setImmediate`, queueError as Error);
+      // Fallback de segurança se o Redis estiver offline
       setImmediate(async () => {
-        const timeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Tempo limite de processamento excedido (300s)')), 300000)
-        );
-
         try {
-          logInfo(`[Orchestrator] [Job:${analysisId}] Iniciando Tríade Completa para: ${politicianName}`);
-          
-          await Promise.race([
-            (async () => {
-              // FASE 1: Scout - Busca de notícias e dados
-              const rawSources = await scoutAgent.search(politicianName, true);
-              logInfo(`[Orchestrator] [Job:${analysisId}] Scout encontrou ${rawSources.length} fontes.`);
-              
-              // FASE 2: Filter - Filtragem de promessas e compromissos
-              const useFlexibleMode = rawSources.length < 5;
-              const filteredSources = await filterAgent.filter(rawSources, useFlexibleMode);
-              logInfo(`[Orchestrator] [Job:${analysisId}] Filter selecionou ${filteredSources.length} fontes relevantes.`);
-              
-              // FASE 3: Brain - Consolidação com Dados Oficiais
-              logInfo(`[Orchestrator] [Job:${analysisId}] Chamando Brain para análise consolidada...`);
-              await brainAgent.analyze(politicianName, userId, analysisId);
-            })(),
-            timeoutPromise
-          ]);
-          
-          logInfo(`[Orchestrator] [Job:${analysisId}] Análise concluída com sucesso.`);
-        } catch (error: any) {
-        const errorMessage = error.message || 'Erro técnico durante a auditoria';
-        logError(`[Orchestrator] [Job:${analysisId}] Falha na Auditoria Real: ${errorMessage}`);
-        
-        try {
-          await supabase.from('analyses').update({
-            status: 'failed',
-            error_message: `Auditoria Interrompida: ${errorMessage}. O Seth VII não utiliza dados estimados; por favor, tente novamente quando os serviços oficiais estiverem estáveis.`,
-            text: `Falha na integridade dos dados: ${errorMessage}`,
-            updated_at: new Date().toISOString()
-          }).eq('id', analysisId);
-          logInfo(`[Orchestrator] [Job:${analysisId}] Falha de integridade registrada.`);
-        } catch (dbErr: any) {
-          logError(`[Orchestrator] Erro ao registrar falha: ${dbErr.message}`);
+          await brainAgent.analyze(politicianName, userId, analysisId);
+        } catch (err) {
+          logError(`[Orchestrator] Fallback falhou para ${politicianName}`, err as Error);
         }
-      }
-    });
+      });
+    }
 
     return { id: analysisId, status: 'processing' };
   }

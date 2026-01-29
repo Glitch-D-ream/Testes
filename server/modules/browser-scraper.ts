@@ -18,7 +18,15 @@ let playwrightAvailable = false;
   }
 })();
 
+/**
+ * BrowserScraper v3.1 - RESOURCE PROTECTED
+ * Implementa semáforo de concorrência para evitar estouro de RAM no Railway.
+ */
 export class BrowserScraper {
+  private activeBrowsers = 0;
+  private readonly MAX_CONCURRENT_BROWSERS = 2; // Limite rigoroso para Railway (512MB-1GB RAM)
+  private queue: Array<() => void> = [];
+
   private userAgents = [
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
     'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36'
@@ -29,14 +37,14 @@ export class BrowserScraper {
   }
 
   async scrape(url: string): Promise<string | null> {
-    logInfo(`[BrowserScraper] Iniciando extração: ${url}`);
+    logInfo(`[BrowserScraper] Iniciando extração: ${url.substring(0, 60)}...`);
     
     let targetUrl = url;
     if (url.includes('news.google.com/rss/articles')) {
       targetUrl = await this.resolveGoogleNewsLink(url);
     }
 
-    // 1. Tentar extração estática (Axios)
+    // 1. Tentar extração estática (Axios) - Já otimizado no IngestionService, mas mantemos aqui como redundância
     const staticContent = await this.scrapeStatic(targetUrl);
     const isBlocked = staticContent?.includes('Access Denied') || staticContent?.includes('403 Forbidden') || (staticContent && staticContent.length < 600);
     
@@ -45,14 +53,30 @@ export class BrowserScraper {
       return staticContent;
     }
 
-    // 2. Tentar Playwright com estratégia de evasão
+    // 2. Tentar Playwright com controle de concorrência
     if (playwrightAvailable && chromium) {
-      logWarn(`[BrowserScraper] Tentando Playwright para superar bloqueio de rede...`);
-      const dynamicContent = await this.scrapeDynamic(targetUrl);
-      if (dynamicContent) return dynamicContent;
+      return await this.enqueueDynamicScrape(targetUrl);
     }
 
     return staticContent || null;
+  }
+
+  private async enqueueDynamicScrape(url: string): Promise<string | null> {
+    if (this.activeBrowsers >= this.MAX_CONCURRENT_BROWSERS) {
+      logWarn(`[BrowserScraper] Limite de concorrência atingido (${this.activeBrowsers}). Aguardando vaga...`);
+      await new Promise<void>(resolve => this.queue.push(resolve));
+    }
+
+    this.activeBrowsers++;
+    try {
+      return await this.scrapeDynamic(url);
+    } finally {
+      this.activeBrowsers--;
+      if (this.queue.length > 0) {
+        const next = this.queue.shift();
+        if (next) next();
+      }
+    }
   }
 
   private async resolveGoogleNewsLink(url: string): Promise<string> {
@@ -71,8 +95,7 @@ export class BrowserScraper {
       const response = await axios.get(url, {
         headers: { 
           'User-Agent': this.getRandomUserAgent(),
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-          'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7'
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8'
         },
         timeout: 10000,
         validateStatus: () => true
@@ -80,8 +103,8 @@ export class BrowserScraper {
       if (response.status === 403) return "Access Denied (403)";
       
       const $ = cheerio.load(response.data);
-      $('script, style, nav, footer, header').remove();
-      const content = $('article, main, .content').text().trim() || $('body').text().trim();
+      $('script, style, nav, footer, header, iframe').remove();
+      const content = $('article, main, .content, .texto-materia').text().trim() || $('body').text().trim();
       return content.substring(0, 10000);
     } catch { return null; }
   }
@@ -90,58 +113,33 @@ export class BrowserScraper {
     if (!playwrightAvailable) return null;
     let browser;
     try {
+      logInfo(`[BrowserScraper] Lançando Chromium (Ativos: ${this.activeBrowsers})...`);
       browser = await chromium.launch({ 
         headless: true, 
-        args: [
-          '--no-sandbox', 
-          '--disable-setuid-sandbox',
-          '--disable-blink-features=AutomationControlled'
-        ] 
+        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'] 
       });
+      
       const context = await browser.newContext({ 
         userAgent: this.getRandomUserAgent(),
-        viewport: { width: 1280, height: 1000 },
-        extraHTTPHeaders: {
-          'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7'
-        }
+        viewport: { width: 1280, height: 800 }
       });
       
       const page = await context.newPage();
+      await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
       
-      // Injetar script para esconder automação
-      await page.addInitScript(() => {
-        Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
-      });
-
-      logInfo(`[BrowserScraper] Navegando via Playwright (Evasão) para: ${url.substring(0, 60)}...`);
-      
-      const response = await page.goto(url, { waitUntil: 'networkidle', timeout: 60000 });
-      
-      if (response && response.status() === 403) {
-        logWarn(`[BrowserScraper] Recebido 403 via Playwright. Tentando scroll...`);
-        await page.mouse.wheel(0, 500);
-        await page.waitForTimeout(2000);
-      }
-
-      // Esperar por seletores de conteúdo real
-      await page.waitForSelector('article, main, .content, .texto-materia, body', { timeout: 10000 }).catch(() => {});
+      // Esperar um pouco para SPAs carregarem
+      await page.waitForTimeout(2000);
 
       const content = await page.evaluate(() => {
-        const toRemove = ['script', 'style', 'nav', 'footer', 'header', 'aside', '.ads', '.comments', '.paywall'];
+        const toRemove = ['script', 'style', 'nav', 'footer', 'header', 'aside', '.ads', '.paywall'];
         toRemove.forEach(s => document.querySelectorAll(s).forEach(el => el.remove()));
-        
-        const main = document.querySelector('article') || document.querySelector('main') || document.querySelector('.content') || document.body;
-        return (main as HTMLElement).innerText;
+        return document.body.innerText;
       });
 
       await browser.close();
-      
-      if (content && content.length > 300 && !content.includes('Access Denied')) {
-        return this.clean(content.substring(0, 15000));
-      }
-      
-      return content; // Retornar mesmo se for erro para debug
+      return this.clean(content.substring(0, 15000));
     } catch (e: any) {
+      logError(`[BrowserScraper] Erro no Playwright: ${e.message}`);
       if (browser) await browser.close();
       return null;
     }

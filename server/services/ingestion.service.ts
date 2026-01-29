@@ -3,6 +3,7 @@ import axios from 'axios';
 import { PDFParse } from 'pdf-parse';
 import * as mammoth from 'mammoth';
 import * as XLSX from 'xlsx';
+import * as cheerio from 'cheerio';
 import { logInfo, logError, logWarn } from '../core/logger.ts';
 import { browserScraper } from '../modules/browser-scraper.ts';
 import { chunkingService } from './chunking.service.ts';
@@ -26,9 +27,13 @@ export interface IngestionResult {
   };
 }
 
+/**
+ * IngestionService v3.0 - PERFORMANCE OPTIMIZED
+ * Estratégia "Lite-First": Tenta Axios/Cheerio antes de recorrer ao Playwright.
+ */
 export class IngestionService {
-  private readonly AXIOS_TIMEOUT = 8000; 
-  private readonly SCRAPER_TIMEOUT = 15000;
+  private readonly AXIOS_TIMEOUT = 10000; 
+  private readonly SCRAPER_TIMEOUT = 20000;
 
   private detectFormat(url: string): IngestionFormat {
     const ext = url.split('.').pop()?.toLowerCase().split('?')[0];
@@ -40,63 +45,88 @@ export class IngestionService {
   }
 
   async ingest(url: string, options: { keywords?: string[] } = {}): Promise<IngestionResult | null> {
-    // Implementação de Cache para evitar re-scraping da mesma URL
     return IntelligentCache.get(`ingest:${url}`, async () => {
       const format = this.detectFormat(url);
-      logInfo(`[IngestionService] Ingerindo nova URL: ${url.substring(0, 50)}...`);
+      logInfo(`[IngestionService] Analisando URL: ${url.substring(0, 60)}...`);
       
       try {
         let result: IngestionResult | null = null;
-        
-        const fetchWithFallback = async (targetUrl: string) => {
-          try {
-            return await axios.get(targetUrl, { 
-              responseType: 'arraybuffer',
-              timeout: this.AXIOS_TIMEOUT,
-              headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' }
-            });
-          } catch (e) {
-            logWarn(`[IngestionService] Axios falhou para ${targetUrl.substring(0, 40)}... Tentando via Scraper...`);
-            const scraperPromise = browserScraper.scrape(targetUrl);
-            const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), this.SCRAPER_TIMEOUT));
-            
-            const content = await Promise.race([scraperPromise, timeoutPromise]);
-            if (content) return { data: Buffer.from(content), status: 200 };
-            throw e;
-          }
-        };
 
-        switch (format) {
-          case 'pdf':
-            const pdfRes = await fetchWithFallback(url);
-            result = await this.processPDFBuffer(Buffer.from(pdfRes.data), url);
-            break;
-          case 'html':
-          default:
-            const htmlContent = await browserScraper.scrape(url);
-            result = htmlContent ? { content: htmlContent, format: 'html', metadata: { sourceUrl: url } } : null;
-            break;
+        // Estratégia para HTML: Tentar Axios primeiro (Muito mais leve que Playwright)
+        if (format === 'html') {
+          try {
+            logInfo(`[IngestionService] Tentativa Lite (Axios) para HTML...`);
+            const response = await axios.get(url, {
+              timeout: this.AXIOS_TIMEOUT,
+              headers: { 
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8'
+              }
+            });
+
+            if (response.status === 200 && typeof response.data === 'string') {
+              const $ = cheerio.load(response.data);
+              
+              // Remover elementos ruidosos
+              $('script, style, nav, footer, header, iframe, noscript').remove();
+              
+              const text = $('body').text().replace(/\s+/g, ' ').trim();
+              
+              if (text.length > 200) {
+                logInfo(`[IngestionService] Sucesso via Axios (${text.length} chars).`);
+                result = { 
+                  content: text, 
+                  format: 'html', 
+                  metadata: { sourceUrl: url, title: $('title').text() } 
+                };
+              }
+            }
+          } catch (e) {
+            logWarn(`[IngestionService] Axios falhou ou bloqueado. Recorrendo ao Playwright...`);
+          }
+        }
+
+        // Se falhou no Axios ou é outro formato, segue o fluxo normal
+        if (!result) {
+          switch (format) {
+            case 'pdf':
+              const pdfRes = await axios.get(url, { 
+                responseType: 'arraybuffer',
+                timeout: this.AXIOS_TIMEOUT,
+                headers: { 'User-Agent': 'Mozilla/5.0' }
+              });
+              result = await this.processPDFBuffer(Buffer.from(pdfRes.data), url);
+              break;
+            case 'html':
+            default:
+              logInfo(`[IngestionService] Iniciando Scraper Pesado (Playwright)...`);
+              const htmlContent = await browserScraper.scrape(url);
+              result = htmlContent ? { content: htmlContent, format: 'html', metadata: { sourceUrl: url } } : null;
+              break;
+          }
         }
 
         if (!result || !result.content || result.content.length < 50) return null;
 
-        if (result.content.length > 12000) {
+        // Limitar tamanho do conteúdo para não estourar memória/tokens
+        if (result.content.length > 15000) {
           const chunks = chunkingService.chunkText(result.content);
           if (options.keywords && options.keywords.length > 0) {
             const relevantChunks = chunkingService.filterRelevantChunks(chunks, options.keywords);
             result.content = relevantChunks.length > 0 
               ? relevantChunks.map(c => c.content).join('\n\n[...]\n\n')
-              : result.content.substring(0, 12000);
+              : result.content.substring(0, 15000);
           } else {
-            result.content = result.content.substring(0, 12000);
+            result.content = result.content.substring(0, 15000);
           }
         }
 
         return result;
       } catch (error: any) {
+        logError(`[IngestionService] Erro fatal ao ingerir ${url}:`, error.message);
         return null;
       }
-    }, 7 * 24 * 60 * 60 * 1000); // Cache de conteúdo por 7 dias
+    }, 7 * 24 * 60 * 60 * 1000); // Cache de 7 dias
   }
 
   private async processPDFBuffer(buffer: Buffer, url: string): Promise<IngestionResult> {
@@ -109,7 +139,7 @@ export class IngestionService {
       let ocrUsed = false;
 
       if (content.trim().length < 100 && buffer.length > 10000) {
-        logWarn(`[IngestionService] PDF suspeito de ser imagem. Ativando OCR...`);
+        logWarn(`[IngestionService] PDF suspeito de imagem. Ativando OCR...`);
         content = await ocrService.recognize(buffer);
         ocrUsed = true;
       }
@@ -120,7 +150,7 @@ export class IngestionService {
         metadata: { title: infoResult.info?.Title, sourceUrl: url, pages: infoResult.total, ocrUsed }
       };
     } catch (err: any) {
-      return { content: buffer.toString('utf8').replace(/[^\x20-\x7E\n]/g, '').substring(0, 5000), format: 'pdf', metadata: { sourceUrl: url } };
+      return { content: "Erro ao processar PDF", format: 'pdf', metadata: { sourceUrl: url } };
     }
   }
 }
