@@ -15,9 +15,10 @@ export interface DirectSearchResult {
 
 export class DirectSearchImproved {
   private readonly userAgents = [
-    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
-    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36',
-    'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36'
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+    'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+    'Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Mobile/15E148 Safari/604.1'
   ];
 
   private getRandomUserAgent(): string {
@@ -159,13 +160,21 @@ export class DirectSearchImproved {
       const results: DirectSearchResult[] = [];
       
       // Extrair resultados do Bing
-      $('li.b_algo').each((i, el) => {
-        const titleEl = $(el).find('h2 a');
-        const title = titleEl.text().trim();
-        const link = titleEl.attr('href');
-        const snippet = $(el).find('.b_caption p').text().trim();
+      $('li.b_algo, .b_algo h2 a').each((i, el) => {
+        let title, link, snippet;
         
-        if (title && link && link.startsWith('http')) {
+        if ($(el).hasClass('b_algo')) {
+          const titleEl = $(el).find('h2 a');
+          title = titleEl.text().trim();
+          link = titleEl.attr('href');
+          snippet = $(el).find('.b_caption p, .b_snippet').text().trim();
+        } else {
+          title = $(el).text().trim();
+          link = $(el).attr('href');
+          snippet = title;
+        }
+        
+        if (title && link && link.startsWith('http') && !link.includes('bing.com')) {
           results.push({
             title,
             url: link,
@@ -193,7 +202,10 @@ export class DirectSearchImproved {
     logInfo(`[DirectSearchImproved] Buscando via Wikipedia: ${query}`);
     try {
       const url = `https://pt.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query)}&format=json&utf8=1&srlimit=5`;
-      const response = await axios.get(url, { timeout: 10000 });
+      const response = await axios.get(url, { 
+        timeout: 10000,
+        headers: { 'User-Agent': this.getRandomUserAgent() }
+      });
       
       const results: DirectSearchResult[] = [];
       if (response.data?.query?.search) {

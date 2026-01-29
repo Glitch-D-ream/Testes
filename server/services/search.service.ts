@@ -102,7 +102,7 @@ export class SearchService {
     // 3. Execução Assíncrona (Não bloqueia o retorno da API)
       setImmediate(async () => {
         const timeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Tempo limite de processamento excedido (180s)')), 180000)
+          setTimeout(() => reject(new Error('Tempo limite de processamento excedido (300s)')), 300000)
         );
 
         try {

@@ -46,10 +46,11 @@ export class ScoutHybrid {
         directSearchImproved.search(federalQuery).catch(() => []),
         isRegionalSP ? transparenciaSPService.search(query).catch(() => { apiFailures.push('SP'); return []; }) : Promise.resolve([]),
         isRegionalPE ? transparenciaPEService.search(query).catch(() => { apiFailures.push('PE'); return []; }) : Promise.resolve([]),
-        camaraApiService.findDeputadoId(query).catch(() => null)
+        camaraApiService.findDeputadoId(query).catch(() => null),
+        directSearchImproved.searchWikipedia(query).catch(() => [])
       ]);
 
-      const [officialResults, newsResults, federalResults, extraFederalResults, spResults, peResults, camaraId] = fastResults;
+      const [officialResults, newsResults, federalResults, extraFederalResults, spResults, peResults, camaraId, wikiResults] = fastResults;
       
       // FASE 2: Processamento de APIs Oficiais e Documentos em Paralelo
       logInfo(`[ScoutHybrid] Executando Fase 2: Ingestão e APIs Especializadas...`);
@@ -137,6 +138,10 @@ export class ScoutHybrid {
       })));
       sources.push(...spResults.map(r => ({ ...r, type: 'official' as const, credibilityLayer: 'A' as const })));
       sources.push(...peResults.map(r => ({ ...r, type: 'official' as const, credibilityLayer: 'A' as const })));
+      sources.push(...wikiResults.map(r => ({
+        title: r.title, url: r.url, content: r.content || r.snippet, source: 'Wikipedia',
+        type: 'news' as const, confidence: 'medium' as const, credibilityLayer: 'B' as const
+      })));
 
       // Aguardar todas as tarefas paralelas
       await Promise.all(parallelTasks);
