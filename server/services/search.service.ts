@@ -86,8 +86,34 @@ export class SearchService {
     const supabase = getSupabase();
     const { nanoid } = await import('nanoid');
     
-    // Cache L1 desativado para garantir que a lógica mais recente seja aplicada
-    logInfo(`[Orchestrator] Ignorando cache para garantir análise com lógica atualizada: ${politicianName}`);
+    // 1. Trava de Idempotência: Verificar se já existe uma análise em andamento ou concluída recentemente
+    const { data: existing } = await supabase
+      .from('analyses')
+      .select('id, status, created_at')
+      .eq('author', politicianName)
+      .in('status', ['processing', 'completed'])
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single();
+
+    if (existing) {
+      const createdAt = new Date(existing.created_at);
+      const now = new Date();
+      const diffMinutes = (now.getTime() - createdAt.getTime()) / (1000 * 60);
+
+      // Se estiver processando há menos de 15 minutos, ou concluída há menos de 60 minutos, retornar a existente
+      if (existing.status === 'processing' && diffMinutes < 15) {
+        logInfo(`[Orchestrator] Análise já em andamento para ${politicianName} (ID: ${existing.id})`);
+        return { id: existing.id, status: 'processing', reused: true };
+      }
+      
+      if (existing.status === 'completed' && diffMinutes < 60) {
+        logInfo(`[Orchestrator] Retornando análise concluída recentemente para ${politicianName} (ID: ${existing.id})`);
+        return { id: existing.id, status: 'completed', reused: true };
+      }
+    }
+
+    logInfo(`[Orchestrator] Iniciando nova análise para: ${politicianName}`);
 
     // 2. Criar Job de Análise (Pendente/Processando)
     const analysisId = nanoid();
