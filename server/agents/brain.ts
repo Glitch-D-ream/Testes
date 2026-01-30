@@ -191,8 +191,8 @@ export class BrainAgent {
         politician: { office: profile.office, party: profile.party, state: profile.state } 
       };
       
-      const supabase = getSupabase();
-      let { data: canonical } = await supabase.from('canonical_politicians').select('*').ilike('name', `%${cleanName}%`).maybeSingle();
+      const supabaseCanonical = getSupabase();
+      let { data: canonical } = await supabaseCanonical.from('canonical_politicians').select('*').ilike('name', `%${cleanName}%`).maybeSingle();
 
       // ═══════════════════════════════════════════════════════════════════════
       // FASE 2: CRUZAMENTOS E ANÁLISE DE COERÊNCIA
