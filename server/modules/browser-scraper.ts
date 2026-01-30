@@ -163,13 +163,29 @@ export class BrowserScraper {
           '.entry-content' // Blogs WordPress
         ];
         for (const selector of mainSelectors) {
-          const element = document.querySelector(selector);
+          const element = document.querySelector(selector) as HTMLElement;
           if (element && element.innerText.length > 500) {
+            // Captura profunda: pegar todos os parágrafos para garantir o texto completo
+            const paragraphs = Array.from(element.querySelectorAll('p'))
+              .map(p => p.innerText.trim())
+              .filter(t => t.length > 20);
+            
+            if (paragraphs.length > 2) {
+              return paragraphs.join('\n\n');
+            }
             return element.innerText;
           }
         }
 
-        // 3. Fallback para o body se nenhum container principal for encontrado ou for muito curto
+        // 3. Fallback para o body (apenas parágrafos longos para evitar ruído de menus)
+        const bodyParagraphs = Array.from(document.querySelectorAll('p'))
+          .map(p => p.innerText.trim())
+          .filter(t => t.length > 30);
+        
+        if (bodyParagraphs.length > 3) {
+          return bodyParagraphs.join('\n\n');
+        }
+
         return document.body.innerText;
       });
 

@@ -81,11 +81,37 @@ export class IngestionService {
                 // Remover elementos ruidosos
                 $('script, style, nav, footer, header, iframe, noscript, aside, .ads, .sidebar').remove();
                 
-                // Tentar focar no conteúdo principal primeiro
-                const mainContent = $('article, main, .content, .post-content, .article-body, #main-content, .texto-materia').text().replace(/\s+/g, ' ').trim();
+                // Tentar focar no conteúdo principal primeiro (Captura Integral)
+                const mainSelectors = [
+                  'article', 'main', '[role="main"]', 
+                  '.content', '.post-content', '.article-body', '#main-content', 
+                  '.texto-materia', '.materia-conteudo', '.conteudo-materia',
+                  '.content-text__container', // G1
+                  '.c-news__body', // Folha
+                  '.n--noticia__content', // Estadão
+                  '.article__content' // CNN
+                ];
+                
+                let mainContent = '';
+                for (const selector of mainSelectors) {
+                  const element = $(selector);
+                  if (element.length > 0) {
+                    // Pegar todos os parágrafos dentro do container para garantir integridade
+                    const paragraphs = element.find('p').map((_, el) => $(el).text()).get();
+                    if (paragraphs.length > 0) {
+                      mainContent = paragraphs.join('\n\n');
+                      break;
+                    } else {
+                      // Fallback para o texto bruto do elemento se não houver <p>
+                      mainContent = element.text();
+                      break;
+                    }
+                  }
+                }
+
                 const text = mainContent.length > 400 ? mainContent : $('body').text().replace(/\s+/g, ' ').trim();
                 
-                // Validação de Densidade: Aumentado para 500 chars para garantir conteúdo real
+                // Validação de Densidade: 500 chars para garantir conteúdo real e completo
                 if (text.length > 500) {
                   logInfo(`[IngestionService] Sucesso via Axios (${text.length} chars).`);
                   result = { 
