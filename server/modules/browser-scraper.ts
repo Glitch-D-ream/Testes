@@ -134,13 +134,13 @@ export class BrowserScraper {
       
       const page = await context.newPage();
       
-      // Bloquear recursos pesados para economizar banda e RAM
-      await page.route('**/*.{png,jpg,jpeg,gif,webp,svg,mp4,webm,woff,woff2,ttf,otf,css}', route => route.abort());
+      // Bloquear recursos pesados para economizar banda e RAM (Mantendo CSS para renderização correta)
+      await page.route('**/*.{png,jpg,jpeg,gif,webp,svg,mp4,webm,woff,woff2,ttf,otf}', route => route.abort());
 
       await page.goto(url, { waitUntil: 'domcontentloaded', timeout: this.GLOBAL_TIMEOUT });
       
       // Esperar um pouco para SPAs carregarem
-      await page.waitForTimeout(2000);
+      await page.waitForTimeout(5000);
 
       const content = await page.evaluate(() => {
         // 1. Remover elementos ruidosos conhecidos
@@ -165,27 +165,31 @@ export class BrowserScraper {
         for (const selector of mainSelectors) {
           const element = document.querySelector(selector) as HTMLElement;
           if (element && element.innerText.length > 500) {
-            // Captura profunda: pegar todos os parágrafos para garantir o texto completo
+            // Captura profunda: tentar parágrafos primeiro para manter estrutura
             const paragraphs = Array.from(element.querySelectorAll('p'))
               .map(p => p.innerText.trim())
               .filter(t => t.length > 20);
             
-            if (paragraphs.length > 2) {
+            // Se os parágrafos capturados forem significativos, usamos eles
+            if (paragraphs.length > 3 && paragraphs.join('').length > 500) {
               return paragraphs.join('\n\n');
             }
+            
+            // Caso contrário, pegamos o innerText completo do elemento principal
             return element.innerText;
           }
         }
 
-        // 3. Fallback para o body (apenas parágrafos longos para evitar ruído de menus)
+        // 3. Fallback para o body (tentar parágrafos primeiro)
         const bodyParagraphs = Array.from(document.querySelectorAll('p'))
           .map(p => p.innerText.trim())
           .filter(t => t.length > 30);
         
-        if (bodyParagraphs.length > 3) {
+        if (bodyParagraphs.length > 5 && bodyParagraphs.join('').length > 1000) {
           return bodyParagraphs.join('\n\n');
         }
 
+        // Fallback final: innerText do body completo
         return document.body.innerText;
       });
 
