@@ -67,21 +67,35 @@ export class IngestionService {
             if (response.status === 200 && typeof response.data === 'string') {
               const $ = cheerio.load(response.data);
               
-              // Remover elementos ruidosos
-              $('script, style, nav, footer, header, iframe, noscript').remove();
-              
-              const text = $('body').text().replace(/\s+/g, ' ').trim();
-              
-              // Validação de Densidade: Aumentado para 400 chars para garantir conteúdo real
-              if (text.length > 400) {
-                logInfo(`[IngestionService] Sucesso via Axios (${text.length} chars).`);
-                result = { 
-                  content: text, 
-                  format: 'html', 
-                  metadata: { sourceUrl: url, title: $('title').text() } 
-                };
+              // Detecção de Paywall ou Bloqueio comum
+              const pageTitle = $('title').text().toLowerCase();
+              const bodyText = $('body').text().toLowerCase();
+              const isBlocked = pageTitle.includes('access denied') || 
+                               pageTitle.includes('403 forbidden') || 
+                               bodyText.includes('paywall') ||
+                               bodyText.includes('assinante');
+
+              if (isBlocked) {
+                logWarn(`[IngestionService] Bloqueio ou Paywall detectado via Axios. Recorrendo ao Scraper Pesado...`);
               } else {
-                logWarn(`[IngestionService] Conteúdo via Axios muito curto (${text.length} chars). Tentando Scraper Pesado...`);
+                // Remover elementos ruidosos
+                $('script, style, nav, footer, header, iframe, noscript, aside, .ads, .sidebar').remove();
+                
+                // Tentar focar no conteúdo principal primeiro
+                const mainContent = $('article, main, .content, .post-content, .article-body, #main-content, .texto-materia').text().replace(/\s+/g, ' ').trim();
+                const text = mainContent.length > 400 ? mainContent : $('body').text().replace(/\s+/g, ' ').trim();
+                
+                // Validação de Densidade: Aumentado para 500 chars para garantir conteúdo real
+                if (text.length > 500) {
+                  logInfo(`[IngestionService] Sucesso via Axios (${text.length} chars).`);
+                  result = { 
+                    content: text, 
+                    format: 'html', 
+                    metadata: { sourceUrl: url, title: $('title').text() } 
+                  };
+                } else {
+                  logWarn(`[IngestionService] Conteúdo via Axios insuficiente (${text.length} chars). Tentando Scraper Pesado...`);
+                }
               }
             }
           } catch (e) {

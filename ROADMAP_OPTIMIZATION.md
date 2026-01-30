@@ -20,9 +20,9 @@ Este documento detalha o plano estratégico para resolver os problemas de latên
 
 ## 🚀 3. Fase 2: Otimização de Ingestão (Economia de Recursos)
 **Objetivo:** Reduzir o uso de memória e CPU em 50%.
-- [ ] **Estratégia Lite-First:** Modificar o `IngestionService` para usar `axios` + `cheerio` por padrão.
-- [ ] **Playwright sob Demanda:** Acionar o navegador apenas quando o HTML simples falhar ou for detectado um SPA.
-- [ ] **Pool de Navegadores:** Limitar o número de instâncias simultâneas do Chromium para evitar crash do servidor.
+- [x] **Estratégia Lite-First:** Modificar o `IngestionService` para usar `axios` + `cheerio` por padrão.
+- [x] **Playwright sob Demanda:** Acionar o navegador apenas quando o HTML simples falhar ou for detectado um SPA.
+- [x] **Pool de Navegadores:** Limitar o número de instâncias simultâneas do Chromium para evitar crash do servidor. (Limite: 1 em produção)
 
 ---
 ## 💾 4. Fase 3: Persistência de Estados e Polling
@@ -42,7 +42,7 @@ Este documento detalha o plano estratégico para resolver os problemas de latên
 ---
 
 ## 📅 Cronograma de Execução
-1. **Dia 1:** Finalização da Fase 1 (Workers) e Início da Fase 2 (Ingestion).
+1. **Dia 1:** Finalização da Fase 1 (Workers) e Fase 2 (Ingestion). (CONCLUÍDO)
 2. **Dia 2:** Implementação da Fase 3 (Persistência) e Testes de Integração. (CONCLUÍDO)
 3. **Dia 3:** Deploy em Produção e Monitoramento de Logs.
 

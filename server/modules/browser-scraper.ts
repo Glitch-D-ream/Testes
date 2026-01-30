@@ -24,7 +24,9 @@ let playwrightAvailable = false;
  */
 export class BrowserScraper {
   private activeBrowsers = 0;
-  private readonly MAX_CONCURRENT_BROWSERS = 2; // Limite rigoroso para Railway (512MB-1GB RAM)
+  // Limite ultra-rigoroso para Railway Free Tier (512MB RAM)
+  private readonly MAX_CONCURRENT_BROWSERS = process.env.NODE_ENV === 'production' ? 1 : 2; 
+  private readonly GLOBAL_TIMEOUT = 45000; // 45 segundos de timeout global
   private queue: Array<() => void> = [];
 
   private userAgents = [
@@ -116,16 +118,26 @@ export class BrowserScraper {
       logInfo(`[BrowserScraper] Lançando Chromium (Ativos: ${this.activeBrowsers})...`);
       browser = await chromium.launch({ 
         headless: true, 
-        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'] 
+        args: [
+          '--no-sandbox', 
+          '--disable-setuid-sandbox', 
+          '--disable-dev-shm-usage',
+          '--disable-gpu',
+          '--js-flags="--max-old-space-size=128"' // Limitar memória do motor JS do Chromium
+        ] 
       });
       
       const context = await browser.newContext({ 
         userAgent: this.getRandomUserAgent(),
-        viewport: { width: 1280, height: 800 }
+        viewport: { width: 1280, height: 720 }
       });
       
       const page = await context.newPage();
-      await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
+      
+      // Bloquear recursos pesados para economizar banda e RAM
+      await page.route('**/*.{png,jpg,jpeg,gif,webp,svg,mp4,webm,woff,woff2,ttf,otf,css}', route => route.abort());
+
+      await page.goto(url, { waitUntil: 'domcontentloaded', timeout: this.GLOBAL_TIMEOUT });
       
       // Esperar um pouco para SPAs carregarem
       await page.waitForTimeout(2000);
@@ -140,7 +152,16 @@ export class BrowserScraper {
         toRemove.forEach(s => document.querySelectorAll(s).forEach(el => el.remove()));
 
         // 2. Tentar encontrar o container principal de conteúdo
-        const mainSelectors = ['article', 'main', '[role="main"]', '.content', '.post-content', '.article-body', '#main-content', '.texto-materia'];
+        const mainSelectors = [
+          'article', 'main', '[role="main"]', 
+          '.content', '.post-content', '.article-body', '#main-content', 
+          '.texto-materia', // Geral BR
+          '.content-text__container', // G1
+          '.c-news__body', // Folha
+          '.n--noticia__content', // Estadão
+          '.article__content', // CNN Brasil
+          '.entry-content' // Blogs WordPress
+        ];
         for (const selector of mainSelectors) {
           const element = document.querySelector(selector);
           if (element && element.innerText.length > 500) {
