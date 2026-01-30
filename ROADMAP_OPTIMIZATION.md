@@ -41,9 +41,17 @@ Este documento detalha o plano estratégico para resolver os problemas de latên
 
 ---
 
+## 🧠 5. Fase 5: Inteligência em Camadas (Filtro Heurístico)
+**Objetivo:** Acelerar o fluxo em 5x usando processamento local leve.
+- [x] **HeuristicFilter:** Implementação de módulo NLP local (compromise) para destilação de conteúdo.
+- [x] **Pré-processamento:** Integração no `IngestionService` para reduzir volume de tokens enviado para IAs.
+- [ ] **Small Models:** Migração de tarefas de filtragem para modelos 3B/8B via Groq.
+
+---
+
 ## 📅 Cronograma de Execução
 1. **Dia 1:** Finalização da Fase 1 (Workers) e Fase 2 (Ingestion). (CONCLUÍDO)
-2. **Dia 2:** Implementação da Fase 3 (Persistência) e Testes de Integração. (CONCLUÍDO)
+2. **Dia 2:** Implementação da Fase 3 (Persistência) e Fase 5 (Heuristic Filter). (CONCLUÍDO)
 3. **Dia 3:** Deploy em Produção e Monitoramento de Logs.
 
 ---

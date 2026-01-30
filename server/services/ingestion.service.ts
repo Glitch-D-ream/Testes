@@ -154,17 +154,21 @@ export class IngestionService {
           return null;
         }
 
-        // Limitar tamanho do conteúdo para não estourar memória/tokens
-        if (result.content.length > 15000) {
-          const chunks = chunkingService.chunkText(result.content);
-          if (options.keywords && options.keywords.length > 0) {
-            const relevantChunks = chunkingService.filterRelevantChunks(chunks, options.keywords);
-            result.content = relevantChunks.length > 0 
-              ? relevantChunks.map(c => c.content).join('\n\n[...]\n\n')
-              : result.content.substring(0, 15000);
-          } else {
-            result.content = result.content.substring(0, 15000);
-          }
+        // ═══════════════════════════════════════════════════════════════════════
+        // OTIMIZAÇÃO SETH VII: Destilação Heurística Local
+        // ═══════════════════════════════════════════════════════════════════════
+        const originalLength = result.content.length;
+        // Tentar extrair o nome do político do contexto se possível, ou usar genérico
+        const targetHint = result.metadata.title || 'político';
+        result.content = heuristicFilter.distill(result.content, targetHint);
+        
+        if (result.content.length < originalLength) {
+          logInfo(`[IngestionService] Conteúdo destilado: ${originalLength} -> ${result.content.length} chars.`);
+        }
+
+        // Limitar tamanho final para segurança de tokens
+        if (result.content.length > 12000) {
+          result.content = result.content.substring(0, 12000);
         }
 
         return result;
