@@ -95,6 +95,7 @@ export class BrainAgent {
       const supabase = getSupabase();
       const updateProgress = async (progress: number, statusText?: string) => {
         if (existingId) {
+          logInfo(`[Brain v6] [Progress ${progress}%] ${statusText || 'Processando...'}`);
           await supabase.from('analyses').update({ 
             progress, 
             text: statusText || undefined,
@@ -226,6 +227,7 @@ export class BrainAgent {
       ]);
 
       logInfo(`[Brain v6] Análise de coerência concluída`);
+      await updateProgress(60, `Consolidando dados de coerência e integridade...`);
       logInfo(`[Brain v6] - Votações analisadas: ${voteAnalysis.length}`);
       logInfo(`[Brain v6] - Gastos analisados: ${expenseAnalysis.results.length}`);
       logInfo(`[Brain v6] - Contradições temporais: ${temporalAnalysis.contradictions.length}`);
@@ -300,11 +302,13 @@ export class BrainAgent {
                              doublePassReport || 
                              await aiService.generateReport(technicalPrompt);
 
+      await updateProgress(85, `Gerando relatório técnico final...`);
+
       // ═══════════════════════════════════════════════════════════════════════
       // FASE 4: HUMANIZAÇÃO DO RELATÓRIO - REINTEGRADO
       // ═══════════════════════════════════════════════════════════════════════
       logInfo(`[Brain v6] === FASE 4: HUMANIZAÇÃO DO RELATÓRIO ===`);
-      await updateProgress(90, `Finalizando dossiê humanizado...`);
+      await updateProgress(95, `Finalizando dossiê humanizado e auditável...`);
 
       let humanizedReport = '';
       try {

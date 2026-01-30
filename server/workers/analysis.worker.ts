@@ -42,6 +42,7 @@ export default async function analysisWorker(job: Job): Promise<any> {
 
   } catch (error: any) {
     const errorMessage = error.message || 'Erro desconhecido na auditoria';
+    const errorStack = error.stack || '';
     logError(`[AnalysisWorker] ❌ Falha crítica na auditoria de ${politicianName}:`, error);
 
     // Registrar falha no banco para o usuário não ficar no "carregamento infinito"
@@ -49,6 +50,8 @@ export default async function analysisWorker(job: Job): Promise<any> {
       await supabase.from('analyses').update({ 
         status: 'failed', 
         error_message: `Erro no processamento: ${errorMessage}`,
+        // Salvar detalhes técnicos no campo text para auditoria se falhar
+        text: `FALHA TÉCNICA: ${errorMessage}\n\nStack: ${errorStack.substring(0, 500)}`,
         updated_at: new Date().toISOString()
       }).eq('id', analysisId);
     }
