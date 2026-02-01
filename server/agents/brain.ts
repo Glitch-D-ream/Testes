@@ -11,6 +11,7 @@
 
 import { getSupabase } from '../core/database.ts';
 import { logInfo, logError, logWarn } from '../core/logger.ts';
+import { nanoid } from 'nanoid';
 import { filterAgent } from './filter.ts';
 import { aiService } from '../services/ai.service.ts';
 import { absenceAgent } from './absence.ts';
@@ -85,9 +86,11 @@ export class BrainAgent {
       // 2. Se não temos um existingId, criamos um agora para o frontend monitorar
       let analysisId = existingId;
       if (!analysisId) {
+        const newId = nanoid();
         const { data: newAnalysis, error: insertError } = await supabase
           .from('analyses')
           .insert([{
+            id: newId,
             politician_name: profile.name,
             office: profile.office,
             party: profile.party,
@@ -100,7 +103,7 @@ export class BrainAgent {
           .single();
         
         if (insertError) throw insertError;
-        analysisId = newAnalysis.id;
+        analysisId = newId;
       }
 
       // 3. DISPARAR GITHUB ACTIONS (SEM AWAIT NO PROCESSAMENTO, APENAS NO DISPARO)
