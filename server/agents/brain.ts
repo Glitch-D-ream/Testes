@@ -104,12 +104,11 @@ export class BrainAgent {
       }
 
       // 3. DISPARAR GITHUB ACTIONS (SEM AWAIT NO PROCESSAMENTO, APENAS NO DISPARO)
-      logInfo(`[Brain v6.2] Disparando Worker para ID: ${analysisId}`);
+      logInfo(`[Brain v6.2] Disparando Super-Worker para ID: ${analysisId}`);
       
-      // Disparo em background - não usamos await na promessa de conclusão do Worker,
-      // apenas na requisição de disparo para o GitHub.
-      this.triggerGitHubWorker(profile, analysisId).catch(err => {
-        logError(new Error(`Falha crítica ao disparar Worker: ${err.message}`));
+      // Disparo em background - Super-Orchestrator unificado
+      this.triggerSuperWorker(profile, analysisId).catch(err => {
+        logError(new Error(`Falha crítica ao disparar Super-Worker: ${err.message}`));
       });
 
       // 4. RETORNAR IMEDIATAMENTE PARA O FRONTEND
@@ -128,14 +127,14 @@ export class BrainAgent {
   }
 
   /**
-   * Dispara o Worker do GitHub Actions
+   * Dispara o Super-Worker Unificado (Coleta + IA)
    */
-  private async triggerGitHubWorker(profile: any, analysisId: string) {
+  private async triggerSuperWorker(profile: any, analysisId: string) {
     try {
       await axios.post(
         `https://api.github.com/repos/Glitch-D-ream/Testes/dispatches`,
         {
-          event_type: 'run-scout-orchestrator',
+          event_type: 'run-super-orchestrator',
           client_payload: {
             politicianName: profile.name,
             analysisId: analysisId,
@@ -147,15 +146,15 @@ export class BrainAgent {
             Authorization: `Bearer ${process.env.GITHUB_TOKEN}`,
             Accept: 'application/vnd.github.v3+json'
           },
-          timeout: 10000 // Timeout curto para o disparo
+          timeout: 10000
         }
       );
-      logInfo(`[Brain v6.2] GitHub Actions disparado para ${profile.name}`);
+      logInfo(`[Brain v6.2] Super-Worker disparado com sucesso para ${profile.name}`);
     } catch (e: any) {
       const supabase = getSupabase();
       await supabase.from('analyses').update({
         status: 'error',
-        text: `Erro ao iniciar mineradores na nuvem: ${e.message}`
+        text: `Erro ao iniciar Super-Worker: ${e.message}`
       }).eq('id', analysisId);
       throw e;
     }

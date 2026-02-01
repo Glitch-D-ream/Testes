@@ -1,35 +1,33 @@
-name: Scout Orchestrator (Parallel Mining)
+name: Super Orchestrator (Coleta + IA)
 
 on:
   repository_dispatch:
-    types: [run-scout-orchestrator]
+    types: [run-super-orchestrator]
 
 jobs:
-  mine:
+  analyze:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
-
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
+      - uses: actions/checkout@v4
+      
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
+          cache: 'pnpm'
 
       - name: Install dependencies
-        run: npm install
+        run: pnpm install --no-frozen-lockfile
 
-      - name: Run Scout Orchestrator
+      - name: Run Super Orchestrator
         env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           POLITICIAN_NAME: ${{ github.event.client_payload.politicianName }}
           ANALYSIS_ID: ${{ github.event.client_payload.analysisId }}
           POLITICIAN_STATE: ${{ github.event.client_payload.state }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-        run: |
-          npx ts-node server/scripts/scout-orchestrator.ts
-          npx ts-node server/scripts/finalize-scout-analysis.ts
+          HUGGINGFACE_TOKEN: ${{ secrets.HUGGINGFACE_TOKEN }}
+        run: npx ts-node server/scripts/super-orchestrator.ts
