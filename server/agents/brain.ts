@@ -246,11 +246,38 @@ export class BrainAgent {
         sources: filteredSources
       });
 
+          // ═══════════════════════════════════════════════════════════════════════
+      // FASE 3: DUAL-CHAIN AI (GITHUB ACTIONS)
       // ═══════════════════════════════════════════════════════════════════════
-      // FASE 3: VALIDAÇÃO CRUZADA (CONSENSUS VALIDATOR) - REINTEGRADO
+      logInfo(`[Brain v6] === FASE 3: DUAL-CHAIN AI (GITHUB ACTIONS) ===`);
+      await updateProgress(75, `Disparando processamento pesado (DeepSeek + Qwen) no GitHub Actions...`);
+      
+      if (existingId) {
+        try {
+          const { Octokit } = await import('@octokit/rest');
+          const octokit = new Octokit({ auth: process.env.GITHUB_TOKEN });
+          
+          await octokit.repos.createDispatchEvent({
+            owner: 'Glitch-D-ream',
+            repo: 'Testes',
+            event_type: 'start-dual-chain-analysis',
+            client_payload: { analysis_id: existingId }
+          });
+          
+          logInfo(`[Brain v6] Workflow Dual-Chain disparado para análise: ${existingId}`);
+          
+          // Nota: Em produção, o Brain esperaria o webhook de conclusão.
+          // Para este fluxo, registraremos que a IA local foi acionada.
+        } catch (dispatchError) {
+          logError(`[Brain v6] Falha ao disparar GitHub Actions:`, dispatchError as Error);
+        }
+      }
+
       // ═══════════════════════════════════════════════════════════════════════
-      logInfo(`[Brain v6] === FASE 3: VALIDAÇÃO CRUZADA ===`);
-      await updateProgress(70, `Validando veredito com rede de consenso de IAs...`);
+      // FASE 4: VALIDAÇÃO CRUZADA E CONSENSO
+      // ═══════════════════════════════════════════════════════════════════════
+      logInfo(`[Brain v6] === FASE 4: VALIDAÇÃO CRUZADA E CONSENSO ===`);
+      await updateProgress(80, `Validando veracidade das informações e buscando consenso...`);
 
       const combinedContext = this.buildCombinedContext(
         dataSources, absenceReport, vulnerabilityReport, benchmarkResult, 
