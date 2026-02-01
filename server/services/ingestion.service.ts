@@ -32,8 +32,8 @@ export interface IngestionResult {
  * Estratégia "Lite-First": Tenta Axios/Cheerio antes de recorrer ao Playwright.
  */
 export class IngestionService {
-  private readonly AXIOS_TIMEOUT = 10000; 
-  private readonly SCRAPER_TIMEOUT = 20000;
+  private readonly AXIOS_TIMEOUT = 8000; 
+  private readonly SCRAPER_TIMEOUT = 15000; // MODO TURBO: 15s max para Playwright
 
   private detectFormat(url: string): IngestionFormat {
     const ext = url.split('.').pop()?.toLowerCase().split('?')[0];
