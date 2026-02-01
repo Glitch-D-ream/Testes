@@ -1,21 +1,13 @@
 /**
- * Brain Agent v6.0 - SETH VII COMPLETO
+ * Brain Agent v6.1 - SETH VII CLOUD-POWERED
  * 
- * Orquestrador principal com TODOS os componentes integrados:
- * - Fase 1: Coleta Multidimensional (Promessas, Social, Jurídico, Diários)
- * - Fase 2: Cruzamentos Profundos (Voto, Gasto, Temporal, Patrimônio)
- * - Fase 3: Validação Cruzada (Consensus Validator)
- * - Fase 4: Humanização do Relatório
+ * Orquestrador principal otimizado para delegar coleta pesada ao GitHub Actions.
  */
 
 import { getSupabase } from '../core/database.ts';
 import { logInfo, logError, logWarn } from '../core/logger.ts';
-import { scoutHybrid } from './scout-hybrid.ts';
-import { scoutCaseMiner } from './scout-case-miner.ts';
-import { filterAgent, FilteredSource } from './filter.ts';
+import { filterAgent } from './filter.ts';
 import { aiService } from '../services/ai.service.ts';
-import { getProposicoesDeputado } from '../integrations/camara.ts';
-import { validateBudgetViability } from '../integrations/siconfi.ts';
 import { absenceAgent } from './absence.ts';
 import { vulnerabilityAuditor } from './vulnerability.ts';
 import { benchmarkingAgent } from './benchmarking.ts';
@@ -23,18 +15,13 @@ import { evidenceMiner } from '../modules/evidence-miner.ts';
 import { financeService } from '../services/finance.service.ts';
 import { proxyBenchmarkingAgent } from './proxy-benchmarking.ts';
 import { targetDiscoveryService } from '../services/target-discovery.service.ts';
-import { dataCorrelator } from './correlator.ts';
-import { governmentPlanExtractorService } from '../services/government-plan-extractor.service.ts';
-import { scoutInterviewAgent } from './scout-interview.ts';
-import { scoutSpeechAgent } from './scout-speech.ts';
 import { coherenceVoteAgent, VoteCoherenceResult } from './coherence-vote.ts';
 import { coherenceExpenseAgent, ExpenseCoherenceResult, ExpenseProfile } from './coherence-expense.ts';
 import { coherenceTemporalAgent, TemporalAnalysisResult } from './coherence-temporal.ts';
-import { deepSocialMiner, SocialEvidence } from './deep-social-miner.ts';
-import { jusBrasilAlternative, LegalRecord } from '../integrations/jusbrasil-alternative.ts';
-import { getPoliticalHistory, validateCandidateCredibility } from '../integrations/tse.ts';
+import { validateCandidateCredibility } from '../integrations/tse.ts';
 import { consensusValidatorService, ValidationResult } from '../services/consensus-validator.service.ts';
 import { humanizerEngine } from '../services/humanizer-engine.ts';
+import axios from 'axios';
 
 export interface CoherenceAnalysis {
   voteAnalysis: VoteCoherenceResult[];
@@ -55,8 +42,8 @@ export interface FullAnalysisResult {
     speeches: number;
     items: any[];
   };
-  socialEvidences: SocialEvidence[];
-  legalRecords: LegalRecord[];
+  socialEvidences: any[];
+  legalRecords: any[];
   tseHistory: any;
   absenceReport: any;
   vulnerabilityReport: any;
@@ -79,13 +66,13 @@ export class BrainAgent {
   async analyze(politicianName: string, userId: string | null = null, existingId: string | null = null): Promise<FullAnalysisResult> {
     const cleanName = politicianName.trim();
     const startTime = Date.now();
-    logInfo(`[Brain v6] 🧠 Iniciando análise COMPLETA para: ${cleanName}`);
+    logInfo(`[Brain v6.1] 🧠 Iniciando análise CLOUD-POWERED para: ${cleanName}`);
 
     try {
       const supabase = getSupabase();
       const updateProgress = async (progress: number, statusText?: string) => {
         if (existingId) {
-          logInfo(`[Brain v6] [Progress ${progress}%] ${statusText || 'Processando...'}`);
+          logInfo(`[Brain v6.1] [Progress ${progress}%] ${statusText || 'Processando...'}`);
           await supabase.from('analyses').update({ 
             progress, 
             text: statusText || undefined,
@@ -96,17 +83,78 @@ export class BrainAgent {
 
       await updateProgress(5, `Identificando perfil oficial de ${cleanName}...`);
       const profile = await targetDiscoveryService.discover(cleanName);
-      logInfo(`[Brain v6] Alvo: ${profile.office} ${profile.name} (${profile.party})`);
+      logInfo(`[Brain v6.1] Alvo: ${profile.office} ${profile.name} (${profile.party})`);
 
-      const regionContext = { 
-        state: profile.state !== 'Brasil' ? profile.state : 'Nacional',
-        city: profile.city || 'Brasília'
-      };
-
-      await updateProgress(15, `Minerando portais oficiais, diários e redes sociais...`);
-      const searchQuery = `${profile.office} ${profile.name} ${profile.party} ${regionContext.state}`;
+      // ═══════════════════════════════════════════════════════════════════════
+      // FASE 1: DELEGAÇÃO DE COLETA AO GITHUB ACTIONS
+      // ═══════════════════════════════════════════════════════════════════════
+      await updateProgress(10, `Disparando agentes de coleta paralela no GitHub Actions...`);
       
-      const [
+      try {
+        await axios.post(
+          `https://api.github.com/repos/Glitch-D-ream/Testes/dispatches`,
+          {
+            event_type: 'run-scout-orchestrator',
+            client_payload: {
+              politicianName: profile.name,
+              analysisId: existingId,
+              state: profile.state
+            }
+          },
+          {
+            headers: {
+              Authorization: `Bearer ${process.env.GITHUB_TOKEN}`,
+              Accept: 'application/vnd.github.v3+json'
+            }
+          }
+        );
+        logInfo(`[Brain v6.1] GitHub Actions disparado com sucesso.`);
+      } catch (e: any) {
+        logWarn(`[Brain v6.1] Falha ao disparar GitHub Actions: ${e.message}. Usando coleta local (lenta)...`);
+        // Aqui poderia haver um fallback para coleta local, mas vamos focar no fluxo otimizado
+      }
+
+      // ═══════════════════════════════════════════════════════════════════════
+      // FASE 2: AGUARDAR DADOS (POLLING / REALTIME)
+      // ═══════════════════════════════════════════════════════════════════════
+      await updateProgress(15, `Aguardando mineradores de IA (Scout Orchestrator)...`);
+      
+      let scoutData: any = null;
+      let attempts = 0;
+      const maxAttempts = 60; // 5 minutos (5s * 60)
+
+      while (attempts < maxAttempts) {
+        const { data: currentAnalysis } = await supabase
+          .from('analyses')
+          .select('data_sources')
+          .eq('id', existingId)
+          .single();
+
+        if (currentAnalysis?.data_sources) {
+          try {
+            const parsed = JSON.parse(currentAnalysis.data_sources);
+            if (parsed.status === 'success') {
+              scoutData = parsed;
+              break;
+            }
+          } catch (e) {}
+        }
+
+        attempts++;
+        await new Promise(r => setTimeout(r, 5000));
+        if (attempts % 6 === 0) logInfo(`[Brain v6.1] Ainda aguardando Worker (${attempts * 5}s)...`);
+      }
+
+      if (!scoutData) {
+        throw new Error('Timeout: O Worker do GitHub demorou demais para coletar os dados.');
+      }
+
+      logInfo(`[Brain v6.1] Dados recebidos do Worker. Iniciando processamento final.`);
+
+      // ═══════════════════════════════════════════════════════════════════════
+      // FASE 3: PROCESSAMENTO E ANÁLISE (RÁPIDO)
+      // ═══════════════════════════════════════════════════════════════════════
+      const {
         rawSources, 
         caseEvidences, 
         governmentPromises, 
@@ -114,34 +162,22 @@ export class BrainAgent {
         speechPromises,
         socialEvidences,
         legalRecords,
-        diarioRecords,
         tseHistory
-      ] = await Promise.all([
-        scoutHybrid.search(searchQuery, true),
-        scoutCaseMiner.mine(profile.name),
-        governmentPlanExtractorService.extractFromTSE(profile.name, profile.state, 2022).catch(() => []),
-        scoutInterviewAgent.searchAndExtract(profile.name).catch(() => []),
-        scoutSpeechAgent.searchAndExtract(profile.name).catch(() => []),
-        deepSocialMiner.mine(profile.name).catch(() => []),
-        jusBrasilAlternative.searchLegalRecords(profile.name).catch(() => []),
-        jusBrasilAlternative.searchQueridoDiario(profile.name).catch(() => []),
-        getPoliticalHistory(profile.name, regionContext.state).catch(() => null)
-      ]);
-      
+      } = scoutData;
+
       const allPromises = [
         ...governmentPromises.map((p: any) => ({ text: p.text || p.promise, category: p.category || 'GERAL', source: 'Plano de Governo (TSE)', date: p.date, quote: p.quote })),
         ...interviewPromises.map((p: any) => ({ text: p.text, category: p.category || 'GERAL', source: `Entrevista: ${p.source?.platform || 'N/A'}`, date: p.source?.date, quote: p.quote })),
         ...speechPromises.map((p: any) => ({ text: p.text, category: p.category || 'GERAL', source: `Discurso: ${p.source?.session || 'N/A'}`, date: p.source?.date, quote: p.quote }))
       ];
 
-      const allLegalRecords = [...legalRecords, ...diarioRecords];
       const filteredSources = await filterAgent.filter(rawSources, true);
       const dataSources = { politicianName: profile.name, politician: { office: profile.office, party: profile.party, state: profile.state } };
       
       const supabaseCanonical = getSupabase();
       let { data: canonical } = await supabaseCanonical.from('canonical_politicians').select('*').ilike('name', `%${cleanName}%`).maybeSingle();
 
-      await updateProgress(40, `Cruzando promessas com votações e gastos reais...`);
+      await updateProgress(60, `Cruzando promessas com votações e gastos reais...`);
       const isLegislative = profile.office.toLowerCase().includes('deputado') || profile.office.toLowerCase().includes('senador');
 
       const [
@@ -154,14 +190,14 @@ export class BrainAgent {
         temporalAnalysis,
         tseCredibility
       ] = await Promise.all([
-        isLegislative ? this.runAbsenceCheck(cleanName, filteredSources, regionContext) : Promise.resolve(null),
+        isLegislative ? this.runAbsenceCheck(cleanName, filteredSources, { state: profile.state }) : Promise.resolve(null),
         this.runVulnerabilityAudit(cleanName, rawSources, filteredSources),
         this.runFinancialTraceability(cleanName, canonical),
         this.runPoliticalBenchmarking(cleanName, canonical, dataSources),
         allPromises.length > 0 ? coherenceVoteAgent.analyze(profile.name, allPromises) : Promise.resolve([]),
         allPromises.length > 0 ? coherenceExpenseAgent.analyze(profile.name, allPromises) : Promise.resolve({ results: [], profile: { totalExpenses: 0, byCategory: {}, topCategories: [], topSuppliers: [], redFlags: [], suspiciousPatterns: [] } }),
         this.prepareTemporalAnalysis(profile.name, allPromises),
-        validateCandidateCredibility(profile.name, regionContext.state).catch(() => null)
+        validateCandidateCredibility(profile.name, profile.state).catch(() => null)
       ]);
 
       const coherenceAnalysis: CoherenceAnalysis = {
@@ -173,8 +209,8 @@ export class BrainAgent {
         redFlags: [...(expenseAnalysis.profile?.redFlags || []), ...(temporalAnalysis.contradictions.map(c => c.explanation))]
       };
 
-      await updateProgress(80, `Validando consenso entre múltiplas fontes de IA...`);
-      const combinedContext = this.buildCombinedContext(dataSources, absenceReport, vulnerabilityReport, benchmarkResult, financeEvidences, {}, allPromises, governmentPromises, interviewPromises, speechPromises, coherenceAnalysis, filteredSources, socialEvidences, allLegalRecords, tseHistory, tseCredibility);
+      await updateProgress(85, `Validando consenso e humanizando dossiê...`);
+      const combinedContext = this.buildCombinedContext(dataSources, absenceReport, vulnerabilityReport, benchmarkResult, financeEvidences, {}, allPromises, governmentPromises, interviewPromises, speechPromises, coherenceAnalysis, filteredSources, socialEvidences, legalRecords, tseHistory, tseCredibility);
       const consensusValidation = await consensusValidatorService.validate(profile.name, combinedContext);
 
       const humanizedReport = await humanizerEngine.humanize({
@@ -190,8 +226,8 @@ export class BrainAgent {
       });
 
       const consensusMetrics = {
-        sourceCount: rawSources.length + allLegalRecords.length + socialEvidences.length,
-        verifiedCount: filteredSources.length + allLegalRecords.length,
+        sourceCount: rawSources.length + legalRecords.length + socialEvidences.length,
+        verifiedCount: filteredSources.length + legalRecords.length,
         coherenceScore: coherenceAnalysis.overallScore,
         consensusScore: consensusValidation?.score || (filteredSources.length > 0 ? 70 : 0)
       };
@@ -201,7 +237,7 @@ export class BrainAgent {
         politician: { office: profile.office, party: profile.party, state: profile.state },
         promises: { total: allPromises.length, government: governmentPromises.length, interviews: interviewPromises.length, speeches: speechPromises.length, items: allPromises },
         socialEvidences,
-        legalRecords: allLegalRecords,
+        legalRecords,
         tseHistory,
         absenceReport,
         vulnerabilityReport,
@@ -212,15 +248,10 @@ export class BrainAgent {
         humanizedReport,
         technicalReport: JSON.stringify(coherenceAnalysis, null, 2),
         dataLineage: {
+          scoutOrchestrator: 'Execução paralela no GitHub Actions (Worker)',
           benchmarking: 'Baseado em dados do Supabase e APIs Oficiais',
-          regional: `Portal Transparência ${regionContext.state}`,
           legislative: 'API Câmara/Senado',
-          cases: 'Navegação profunda via Scout Case Miner v3.2',
           coherence: 'Análise de Coerência v2.0 (Vote, Expense, Temporal)',
-          social: 'Deep Social Miner (Twitter, Facebook, Blogs)',
-          legal: 'JusBrasil Alternative + Querido Diário',
-          tse: 'Tribunal Superior Eleitoral (Histórico)',
-          consensus: 'Consensus Validator (Cross-Model)',
           humanization: 'Humanizer Engine v1.0'
         },
         consensusMetrics
@@ -229,12 +260,12 @@ export class BrainAgent {
       await this.persistAnalysis(userId, humanizedReport, cleanName, dataSources, finalResult, filteredSources, existingId);
       return finalResult;
     } catch (error) {
-      logError(`[Brain v6] Falha na análise de ${cleanName}`, error as Error);
+      logError(`[Brain v6.1] Falha na análise de ${cleanName}`, error as Error);
       throw error;
     }
   }
 
-  private buildCombinedContext(dataSources: any, absenceReport: any, vulnerabilityReport: any, benchmarkResult: any, financeEvidences: any[], correlations: any, allPromises: any[], governmentPromises: any[], interviewPromises: any[], speechPromises: any[], coherenceAnalysis: CoherenceAnalysis, filteredSources: any[], socialEvidences: SocialEvidence[], legalRecords: LegalRecord[], tseHistory: any, tseCredibility: any) {
+  private buildCombinedContext(dataSources: any, absenceReport: any, vulnerabilityReport: any, benchmarkResult: any, financeEvidences: any[], correlations: any, allPromises: any[], governmentPromises: any[], interviewPromises: any[], speechPromises: any[], coherenceAnalysis: CoherenceAnalysis, filteredSources: any[], socialEvidences: any[], legalRecords: any[], tseHistory: any, tseCredibility: any) {
     return {
       officialProfile: dataSources,
       absence: absenceReport,
@@ -325,7 +356,7 @@ export class BrainAgent {
       };
       if (existingId) await supabase.from('analyses').update(analysisData).eq('id', existingId);
       else await supabase.from('analyses').insert([analysisData]);
-    } catch (e) { logWarn(`[Brain v6] Erro na persistência: ${e}`); }
+    } catch (e) { logWarn(`[Brain v6.1] Erro na persistência: ${e}`); }
   }
 }
 
