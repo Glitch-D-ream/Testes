@@ -1,5 +1,5 @@
 
-import { logInfo, logError } from '../core/logger.ts';
+import { logInfo, logError, logWarn } from '../core/logger.ts';
 import { directSearchImproved } from '../modules/direct-search-improved.ts';
 import { ingestionService } from '../services/ingestion.service.ts';
 
@@ -11,47 +11,61 @@ export interface SocialEvidence {
   relevance: number;
 }
 
+/**
+ * DeepSocialMiner v3.2 - HIGH SPEED EDITION
+ */
 export class DeepSocialMiner {
-  /**
-   * Mineração profunda em redes sociais, blogs e entrevistas
-   */
+  private readonly MAX_SOURCES = 8; // Reduzido para focar em qualidade
+  private readonly CONCURRENT_INGESTS = 4;
+
   async mine(targetName: string): Promise<SocialEvidence[]> {
-    logInfo(`[DeepSocialMiner] Iniciando mineração social para: ${targetName}`);
+    logInfo(`[DeepSocialMiner] 📱 Mineração social otimizada para: ${targetName}`);
     
     const queries = [
       `${targetName} site:twitter.com`,
       `${targetName} site:instagram.com`,
-      `${targetName} "entrevista" OR "entrevistado"`,
-      `${targetName} blog OR "artigo de opinião"`,
+      `${targetName} "entrevista" OR "declaração"`,
       `${targetName} "polêmica" site:youtube.com`
     ];
 
-    const evidences: SocialEvidence[] = [];
-
     try {
+      // 1. Busca rápida em paralelo
       const searchResults = await Promise.all(
         queries.map(q => directSearchImproved.search(q).catch(() => []))
       );
 
       const flatResults = searchResults.flat().slice(0, 15);
-      
-      logInfo(`[DeepSocialMiner] Encontradas ${flatResults.length} potenciais fontes sociais/blogs.`);
+      logInfo(`[DeepSocialMiner] ${flatResults.length} fontes candidatas encontradas.`);
 
-      for (const res of flatResults) {
-        const platform = this.detectPlatform(res.url);
-        
-        // Ingestão rápida apenas de texto para evitar timeouts
-        const ingested = await ingestionService.ingest(res.url).catch(() => null);
-        
-        if (ingested && ingested.content.length > 100) {
-          evidences.push({
-            platform,
-            content: ingested.content,
-            url: res.url,
-            relevance: this.calculateRelevance(ingested.content, targetName)
-          });
-        }
-      }
+      const evidences: SocialEvidence[] = [];
+      
+      // 2. Ingestão paralela controlada
+      const targetResults = flatResults.slice(0, this.MAX_SOURCES);
+      const processBatch = async (results: any[]) => {
+        return Promise.all(results.map(async (res) => {
+          try {
+            const platform = this.detectPlatform(res.url);
+            // Ingestão ultra-rápida (timeout de 10s para social)
+            const ingested = await Promise.race([
+              ingestionService.ingest(res.url),
+              new Promise<null>((_, reject) => setTimeout(() => reject(new Error('Timeout')), 10000))
+            ]).catch(() => null);
+            
+            if (ingested && ingested.content.length > 100) {
+              return {
+                platform,
+                content: ingested.content.substring(0, 2000),
+                url: res.url,
+                relevance: this.calculateRelevance(ingested.content, targetName)
+              };
+            }
+          } catch (e) {}
+          return null;
+        }));
+      };
+
+      const results = await processBatch(targetResults);
+      results.forEach(r => { if (r) evidences.push(r as SocialEvidence); });
 
       return evidences.sort((a, b) => b.relevance - a.relevance);
     } catch (error) {
@@ -72,10 +86,9 @@ export class DeepSocialMiner {
   private calculateRelevance(content: string, target: string): number {
     const keywords = ['corrupção', 'promessa', 'voto', 'escândalo', 'emenda', 'opinião'];
     let score = 0;
-    if (content.toLowerCase().includes(target.toLowerCase())) score += 50;
-    keywords.forEach(k => {
-      if (content.toLowerCase().includes(k)) score += 10;
-    });
+    const lowerContent = content.toLowerCase();
+    if (lowerContent.includes(target.toLowerCase())) score += 50;
+    keywords.forEach(k => { if (lowerContent.includes(k)) score += 10; });
     return Math.min(score, 100);
   }
 }

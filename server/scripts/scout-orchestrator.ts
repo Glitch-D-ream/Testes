@@ -1,8 +1,7 @@
 /**
- * Scout Orchestrator v1.0 - GITHUB ACTIONS EDITION
+ * Scout Orchestrator v1.1 - PERFORMANCE & RELIABILITY
  * 
- * Este script é projetado para rodar no GitHub Actions e orquestrar
- * todos os agentes Scout em paralelo, utilizando a CPU/IA local do Worker.
+ * Otimizado para execução no GitHub Actions com progresso em tempo real.
  */
 
 import { scoutHybrid } from '../agents/scout-hybrid.ts';
@@ -14,7 +13,7 @@ import { scoutInterviewAgent } from '../agents/scout-interview.ts';
 import { scoutSpeechAgent } from '../agents/scout-speech.ts';
 import { getPoliticalHistory } from '../integrations/tse.ts';
 import { getSupabase } from '../core/database.ts';
-import { logInfo, logError } from '../core/logger.ts';
+import { logInfo, logError, logWarn } from '../core/logger.ts';
 
 async function runOrchestrator() {
   const politicianName = process.env.POLITICIAN_NAME;
@@ -26,39 +25,45 @@ async function runOrchestrator() {
     process.exit(1);
   }
 
-  logInfo(`🚀 Iniciando Scout Orchestrator para: ${politicianName} (ID: ${analysisId})`);
+  const supabase = getSupabase();
+  const updateProgress = async (progress: number, text: string) => {
+    logInfo(`[Orchestrator] [${progress}%] ${text}`);
+    await supabase.from('analyses').update({ progress, text }).eq('id', analysisId);
+  };
+
+  logInfo(`🚀 Iniciando Scout Orchestrator para: ${politicianName}`);
 
   try {
-    const supabase = getSupabase();
-
-    // 1. Execução Paralela Massiva de todos os Scouts
-    logInfo(`[Orchestrator] Disparando agentes de coleta em paralelo...`);
-    
-    const [
-      rawSources, 
-      caseEvidences, 
-      governmentPromises, 
-      interviewPromises, 
-      speechPromises,
-      socialEvidences,
-      legalRecords,
-      diarioRecords,
-      tseHistory
-    ] = await Promise.all([
-      scoutHybrid.search(politicianName, true).catch(e => { logError(e); return []; }),
-      scoutCaseMiner.mine(politicianName).catch(e => { logError(e); return []; }),
+    // 1. Grupo A: Fontes Oficiais e Histórico (Rápido)
+    await updateProgress(15, "Minerando TSE, Planos de Governo e Histórico Político...");
+    const [governmentPromises, tseHistory] = await Promise.all([
       governmentPlanExtractorService.extractFromTSE(politicianName, state, 2022).catch(() => []),
-      scoutInterviewAgent.searchAndExtract(politicianName).catch(() => []),
-      scoutSpeechAgent.searchAndExtract(politicianName).catch(() => []),
-      deepSocialMiner.mine(politicianName).catch(() => []),
-      jusBrasilAlternative.searchLegalRecords(politicianName).catch(() => []),
-      jusBrasilAlternative.searchQueridoDiario(politicianName).catch(() => []),
       getPoliticalHistory(politicianName, state).catch(() => null)
     ]);
 
-    logInfo(`[Orchestrator] Coleta finalizada. Consolidando resultados...`);
+    // 2. Grupo B: Notícias e Casos (Médio - Pesado)
+    await updateProgress(25, "Buscando notícias e evidências forenses profundas...");
+    const [rawSources, caseEvidences] = await Promise.all([
+      scoutHybrid.search(politicianName, true).catch(() => []),
+      scoutCaseMiner.mine(politicianName).catch(() => [])
+    ]);
 
-    // 2. Consolidar e Salvar no Supabase (Bucket ou Tabela de Contexto)
+    // 3. Grupo C: Social e Jurídico (Pesado)
+    await updateProgress(35, "Analisando redes sociais e registros jurídicos...");
+    const [socialEvidences, legalRecords, diarioRecords] = await Promise.all([
+      deepSocialMiner.mine(politicianName).catch(() => []),
+      jusBrasilAlternative.searchLegalRecords(politicianName).catch(() => []),
+      jusBrasilAlternative.searchQueridoDiario(politicianName).catch(() => [])
+    ]);
+
+    // 4. Grupo D: Falas e Entrevistas
+    await updateProgress(45, "Extraindo promessas de discursos e entrevistas...");
+    const [interviewPromises, speechPromises] = await Promise.all([
+      scoutInterviewAgent.searchAndExtract(politicianName).catch(() => []),
+      scoutSpeechAgent.searchAndExtract(politicianName).catch(() => [])
+    ]);
+
+    // Consolidar Resultados
     const scoutContext = {
       rawSources,
       caseEvidences,
@@ -73,23 +78,20 @@ async function runOrchestrator() {
       status: 'success'
     };
 
-    // Atualizar a análise no Supabase com os dados coletados
-    // Usamos o campo data_sources para armazenar o contexto pesado para o BrainAgent ler depois
-    const { error } = await supabase
-      .from('analyses')
-      .update({
-        data_sources: JSON.stringify(scoutContext),
-        progress: 40, // Avança o progresso para a fase de análise
-        text: 'Coleta multidimensional finalizada pelo Worker. Iniciando análise forense...'
-      })
-      .eq('id', analysisId);
+    await supabase.from('analyses').update({
+      data_sources: JSON.stringify(scoutContext),
+      progress: 50,
+      text: 'Coleta finalizada. Iniciando cruzamento de dados e veredito...'
+    }).eq('id', analysisId);
 
-    if (error) throw error;
-
-    logInfo(`✅ Scout Orchestrator finalizado com sucesso. Dados persistidos para ID: ${analysisId}`);
+    logInfo(`✅ Scout Orchestrator finalizado com sucesso.`);
 
   } catch (error: any) {
     logError(error);
+    await supabase.from('analyses').update({
+      status: 'error',
+      text: `Falha na coleta do Orchestrator: ${error.message}`
+    }).eq('id', analysisId);
     process.exit(1);
   }
 }

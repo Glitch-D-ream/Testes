@@ -15,64 +15,82 @@ export interface CaseEvidence {
   source: string;
 }
 
+/**
+ * ScoutCaseMiner v3.3 - PERFORMANCE OPTIMIZED
+ * Foco em velocidade e extração direta de evidências críticas.
+ */
 export class ScoutCaseMiner {
-  /**
-   * Realiza uma mineração profunda de casos, entrevistas e notícias
-   */
+  private readonly MAX_URLS = 3; // Reduzido de 5 para 3 para maior velocidade
+  private readonly INGESTION_TIMEOUT = 25000; // 25s por URL
+
   async mine(politicianName: string): Promise<CaseEvidence[]> {
-    logInfo(`[CaseMiner] Iniciando mineração profunda para: ${politicianName}`);
+    logInfo(`[CaseMiner] 🔍 Iniciando mineração ultra-rápida para: ${politicianName}`);
     
-    // 1. Buscar URLs relevantes focadas em entrevistas e polêmicas
     const queries = [
-      `${politicianName} entrevista exclusiva`,
       `${politicianName} declarações polêmicas`,
-      `${politicianName} processo judicial notícias`,
-      `${politicianName} investigação Ministério Público`
+      `${politicianName} investigação processo judicial`
     ];
 
     const allUrls = new Set<string>();
-    for (const query of queries) {
-      const results = await directSearchImproved.search(query, false);
-      results.forEach(r => allUrls.add(r.url));
+    try {
+      // Busca paralela de URLs
+      const searchPromises = queries.map(q => directSearchImproved.search(q, false).catch(() => []));
+      const searchResults = await Promise.all(searchPromises);
+      searchResults.flat().forEach(r => {
+        if (r.url && !r.url.includes('wikipedia.org')) allUrls.add(r.url);
+      });
+    } catch (e) {
+      logError(new Error(`[CaseMiner] Falha na busca inicial de URLs`));
     }
 
-    const targetUrls = Array.from(allUrls).slice(0, 5); // Limitar a 5 fontes de alta densidade
-    logInfo(`[CaseMiner] ${targetUrls.length} URLs candidatas encontradas.`);
+    const targetUrls = Array.from(allUrls).slice(0, this.MAX_URLS);
+    logInfo(`[CaseMiner] ${targetUrls.length} URLs selecionadas para análise profunda.`);
 
     const evidences: CaseEvidence[] = [];
 
-    for (const url of targetUrls) {
+    // Processamento em paralelo com limites de tempo individuais
+    const processPromises = targetUrls.map(async (url) => {
       try {
-        logInfo(`[CaseMiner] Extraindo conteúdo de: ${url}`);
+        logInfo(`[CaseMiner] Processando: ${new URL(url).hostname}`);
         
-        // Usar o IngestionService que já lida com redirecionamentos e extração robusta
-        const content = await ingestionService.ingest(url);
+        // Timeout forçado para a ingestão
+        const contentResult = await Promise.race([
+          ingestionService.ingest(url),
+          new Promise<null>((_, reject) => setTimeout(() => reject(new Error('Timeout de Ingestão')), this.INGESTION_TIMEOUT))
+        ]).catch(() => null);
 
-        if (!content || content.length < 500) {
-          logWarn(`[CaseMiner] Conteúdo insuficiente em ${url}, pulando.`);
-          continue;
-        }
+        if (!contentResult || contentResult.content.length < 400) return null;
 
-        // 2. Processar com HuggingFace (Sumarização, NER e Quotes)
-        const summary = await huggingFaceService.summarize(content);
-        const entities = await huggingFaceService.extractEntities(summary);
+        const content = contentResult.content;
+        
+        // Processamento de IA ultra-rápido ou fallback
+        const [summary, entities] = await Promise.all([
+          huggingFaceService.summarize(content).catch(() => content.substring(0, 500)),
+          huggingFaceService.extractEntities(content.substring(0, 1000)).catch(() => [])
+        ]);
+
         const quotes = huggingFaceService.extractQuotes(content);
 
-        evidences.push({
-          title: `Evidência de ${new URL(url).hostname}`,
+        return {
+          title: `Evidência: ${new URL(url).hostname}`,
           url,
-          content: content.substring(0, 5000), // Limitar para não estourar memória
+          content: content.substring(0, 3000),
           summary,
           entities,
-          quotes,
+          quotes: quotes.slice(0, 5),
           source: new URL(url).hostname
-        });
+        };
 
       } catch (error: any) {
-        logError(`[CaseMiner] Erro ao processar ${url}: ${error.message}`);
+        logWarn(`[CaseMiner] Falha em ${url}: ${error.message}`);
+        return null;
       }
-    }
-    logInfo(`[CaseMiner] Mineração concluída. ${evidences.length} evidências sólidas encontradas.`);
+    });
+
+    const results = await Promise.all(processPromises);
+    results.forEach(res => { if (res) evidences.push(res); });
+
+    logInfo(`[CaseMiner] Finalizado. ${evidences.length} evidências extraídas.`);
     return evidences;
   }
 }
