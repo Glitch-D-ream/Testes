@@ -8,8 +8,11 @@ jobs:
   analyze:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      
+      - name: Checkout (Shallow)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1 # Otimização: Baixa apenas o último commit
+
       - name: Install pnpm
         uses: pnpm/action-setup@v4
         with:
@@ -21,16 +24,8 @@ jobs:
           node-version: '22'
           cache: 'pnpm'
 
-      - name: Cache pnpm modules
-        uses: actions/cache@v4
-        with:
-          path: ~/.pnpm-store
-          key: ${{ runner.os }}-pnpm-${{ hashFiles('**/pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-pnpm-
-
       - name: Install dependencies
-        run: pnpm install --no-frozen-lockfile
+        run: pnpm install --no-frozen-lockfile --prefer-offline # Otimização: Prioriza cache local
 
       - name: Cache Playwright Browsers
         id: playwright-cache
