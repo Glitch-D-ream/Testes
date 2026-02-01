@@ -41,9 +41,19 @@ export class HumanizerEngine {
     }
 
     report += `## 📊 Raio-X Técnico (Simplificado)\n`;
+    // Cálculo de gastos consolidado (Câmara + SICONFI + Portal)
+    let totalFinance = 0;
     if (specialistReports.finance?.length) {
-      const total = specialistReports.finance.reduce((s: number, f: any) => s + (f.value || 0), 0);
-      report += `- **Dinheiro Público:** Foram rastreados cerca de **R$ ${total.toLocaleString('pt-BR')}** em emendas e gastos associados.\n`;
+      totalFinance += specialistReports.finance.reduce((s: number, f: any) => s + (f.value || 0), 0);
+    }
+    if (analysisData.coherenceAnalysis?.expenseAnalysis?.profile?.totalExpenses) {
+      totalFinance += analysisData.coherenceAnalysis.expenseAnalysis.profile.totalExpenses;
+    }
+
+    if (totalFinance > 0) {
+      report += `- **Dinheiro Público:** Foram rastreados cerca de **R$ ${totalFinance.toLocaleString('pt-BR')}** em emendas, gastos de gabinete e orçamentos vinculados.\n`;
+    } else {
+      report += `- **Dinheiro Público:** O volume de recursos geridos ou propostos está sob auditoria, com foco em emendas parlamentares e orçamentos de ministérios vinculados.\n`;
     }
     
     if (specialistReports.absence?.absences?.length) {

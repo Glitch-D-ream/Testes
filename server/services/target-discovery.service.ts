@@ -65,6 +65,20 @@ const KNOWN_FIGURES: Record<string, Partial<PoliticianProfile>> = {
     city: 'São Paulo',
     isHighProfile: true,
     profileType: 'PARLAMENTAR'
+  },
+  'lula': {
+    office: 'Presidente da República',
+    party: 'PT',
+    state: 'Brasil',
+    isHighProfile: true,
+    profileType: 'FIGURA_PUBLICA'
+  },
+  'luiz inacio lula da silva': {
+    office: 'Presidente da República',
+    party: 'PT',
+    state: 'Brasil',
+    isHighProfile: true,
+    profileType: 'FIGURA_PUBLICA'
   }
 };
 
@@ -146,6 +160,10 @@ export class TargetDiscoveryService {
     
     // Se a IA disse que é "Presidente", verificar se o nome está realmente associado a esse cargo
     if (officeLower.includes('presidente')) {
+      // Exceção para figuras históricas/conhecidas
+      const highProfileNames = ['lula', 'bolsonaro', 'dilma', 'temer', 'fhc'];
+      if (highProfileNames.some(n => nameLower.includes(n))) return office;
+
       // Verificar se o texto diz explicitamente que o alvo É presidente
       const isActuallyPresident = 
         textLower.includes(`${nameLower} é presidente`) ||
