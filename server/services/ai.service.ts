@@ -79,99 +79,46 @@ TEXTO PARA AUDITORIA:
 ${text}`;
   }
 
-  private async analyzeWithOpenSource(text: string): Promise<AIAnalysisResult> {
-    const models = ['deepseek-r1', 'llama-3.3-70b', 'qwen-qwq', 'mistral-large'];
-    let lastError: any;
-
-    for (const model of models) {
-      try {
-        logInfo(`[AI] Tentando modelo Pollinations: ${model}...`);
-        const response = await axios.post('https://text.pollinations.ai/', {
-          messages: [
-            { role: 'system', content: 'Você é um auditor forense político. Responda apenas JSON.' },
-            { role: 'user', content: this.promptTemplate(text) }
-          ],
-          model: model,
-          jsonMode: true
-        }, { timeout: 45000 });
-
-        let content = response.data;
-        if (typeof content === 'string') {
-          const jsonMatch = content.match(/\{[\s\S]*\}/);
-          content = JSON.parse(jsonMatch ? jsonMatch[0] : content);
-        }
-
-        if (content && (content.promises || content.verdict)) {
-          return {
-            promises: content.promises || [],
-            contradictions: content.contradictions || [],
-            overallSentiment: content.overallSentiment || 'Informativo',
-            credibilityScore: content.credibilityScore || 50,
-            verdict: content.verdict || { facts: [], skepticism: [] }
-          };
-        }
-      } catch (error) {
-        lastError = error;
-        continue;
-      }
-    }
-    throw lastError || new Error('Falha em todos os modelos gratuitos');
-  }
-
+  /**
+   * OTIMIZAÇÃO v4.0: Model Tiering
+   * Tenta modelos ultra-rápidos (Flash) primeiro para ganhar velocidade.
+   */
   async analyzeText(text: string): Promise<AIAnalysisResult> {
-    const openRouterKey = process.env.OPENROUTER_API_KEY;
-    const groqKey = process.env.GROQ_API_KEY;
-    const geminiKey = process.env.GEMINI_API_KEY;
+    logInfo(`[AI] Iniciando análise de texto (Tiering Mode)...`);
 
-    // 1. Tentar Gemini Service (Motor Principal v3.2)
-    // Reduzimos o tempo de espera para o Gemini para não travar o frontend
+    // 1. Tentar modelos Flash (Ultra-rápidos) via Nexo de Resiliência
     try {
-      const geminiPromise = geminiService.analyzeText(text, this.promptTemplate.bind(this));
-      const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Gemini Timeout')), 15000));
-      return await Promise.race([geminiPromise, timeoutPromise]) as AIAnalysisResult;
-    } catch (e) { 
-      logWarn(`[AI] Gemini Service falhou ou demorou demais. Tentando fallbacks rápidos...`); 
-    }
-
-    // 2. Tentar GLM-4.7 (China - Alta Velocidade e Gratuito)
-    try {
-      logInfo(`[AI] Tentando GLM-4.7-Flash (Prioridade de Velocidade)...`);
+      logInfo(`[AI] Camada 1: Tentando modelos Flash (Velocidade Máxima)...`);
       const { aiResilienceNexus } = await import('./ai-resilience-nexus.ts');
-      return await aiResilienceNexus.chatJSON<AIAnalysisResult>(text + "\nUSE_MODEL: glm-4");
+      // Forçamos o uso de modelos leves como Llama-3-8B ou Mistral
+      const response = await aiResilienceNexus.chat(this.promptTemplate(text) + "\nUSE_MODEL: openai");
+      return normalizationService.normalizeAIOutput(response.content);
     } catch (e) { 
-      logWarn(`[AI] GLM-4.7 falhou. Tentando outros fallbacks...`); 
+      logWarn(`[AI] Camada 1 falhou. Recorrendo à Camada 2 (Raciocínio Profundo)...`); 
     }
 
-    // 3. Tentar Groq (Alta Velocidade)
-    if (groqKey && !groqKey.includes('your-')) {
-      try {
-        const completion = await groqService.generateCompletion('Auditor forense. JSON apenas.', this.promptTemplate(text));
-        return normalizationService.normalizeAIOutput(completion);
-      } catch (e) { logWarn(`[AI] Groq falhou...`); }
+    // 2. Tentar Gemini Service (Motor de Raciocínio Profundo)
+    try {
+      return await geminiService.analyzeText(text, this.promptTemplate.bind(this));
+    } catch (e) { 
+      logWarn(`[AI] Camada 2 falhou. Tentando fallbacks finais...`); 
     }
 
-    // 4. Fallback Final: Nexo de Resiliência Global (Cascata Completa)
-    logInfo(`[AI] Ativando Nexo de Resiliência Global...`);
+    // 3. Fallback Final: Nexo de Resiliência Global (Cascata Completa)
     const { aiResilienceNexus } = await import('./ai-resilience-nexus.ts');
-    return await aiResilienceNexus.chatJSON<AIAnalysisResult>(text);
+    const finalResponse = await aiResilienceNexus.chat(this.promptTemplate(text));
+    return normalizationService.normalizeAIOutput(finalResponse.content);
   }
 
   async generateReport(prompt: string): Promise<string> {
-    // 1. Tentar Gemini Service para relatórios
     try {
-      return await geminiService.generateCompletion(prompt);
-    } catch (e) { 
-      logWarn(`[AI] Gemini Service falhou no relatório. Tentando fallbacks...`); 
-    }
-
-    // 2. Fallback para Nexo de Resiliência
-    try {
-      logInfo(`[AI] Gerando relatório via Nexo de Resiliência...`);
+      // Prioridade para velocidade no relatório também
       const { aiResilienceNexus } = await import('./ai-resilience-nexus.ts');
-      const response = await aiResilienceNexus.chat(prompt);
+      const response = await aiResilienceNexus.chat(prompt + "\nUSE_MODEL: openai");
       return response.content;
-    } catch (e) {
-      return `FALHA NA GERAÇÃO DE IA. DADOS BRUTOS: ${prompt.substring(0, 500)}`;
+    } catch (e) { 
+      logWarn(`[AI] Falha no relatório rápido. Usando Gemini...`);
+      return await geminiService.generateCompletion(prompt).catch(() => "Erro na geração de relatório.");
     }
   }
 }

@@ -1,8 +1,7 @@
 /**
- * Super Orchestrator v1.0 - UNIFIED CLOUD INTELLIGENCE
+ * Super Orchestrator v2.0 - TURBO PARALLEL INTELLIGENCE
  * 
- * Este script unifica a coleta (Scout) e o processamento de IA (Dual-Chain)
- * em um único fluxo de execução no GitHub Actions.
+ * Otimizado para execução em paralelo total de todas as fontes de dados.
  */
 
 import { scoutHybrid } from '../agents/scout-hybrid.ts';
@@ -33,36 +32,43 @@ async function runSuperOrchestrator() {
     await supabase.from('analyses').update({ progress, text }).eq('id', analysisId);
   };
 
-  logInfo(`🚀 Iniciando Super-Orchestrator (Coleta + IA) para: ${politicianName}`);
+  logInfo(`🚀 Iniciando Super-Orchestrator TURBO para: ${politicianName}`);
 
   try {
     // ═══════════════════════════════════════════════════════════════════════
-    // FASE 1: COLETA MULTIDIMENSIONAL (SCOUT)
+    // FASE 1: COLETA MULTIDIMENSIONAL RADICAL (PARALELISMO TOTAL)
     // ═══════════════════════════════════════════════════════════════════════
-    await updateProgress(10, "Minerando dados oficiais (TSE e Planos de Governo)...");
-    const [governmentPromises, tseHistory] = await Promise.all([
-      governmentPlanExtractorService.extractFromTSE(politicianName, state, 2022).catch(() => []),
-      getPoliticalHistory(politicianName, state).catch(() => null)
+    await updateProgress(10, "Iniciando Coleta Multidimensional Radical (Turbo Mode)...");
+    
+    logInfo(`[Super-Worker] Disparando todos os agentes de coleta simultaneamente...`);
+    
+    const startTime = Date.now();
+
+    // Disparamos TODAS as fontes em paralelo para ganho máximo de tempo
+    const [
+      governmentPromises, 
+      tseHistory,
+      rawSources, 
+      caseEvidences,
+      socialEvidences, 
+      legalRecords, 
+      diarioRecords,
+      interviewPromises, 
+      speechPromises
+    ] = await Promise.all([
+      governmentPlanExtractorService.extractFromTSE(politicianName, state, 2022).catch(e => { logWarn(`Erro GovPlan: ${e.message}`); return []; }),
+      getPoliticalHistory(politicianName, state).catch(e => { logWarn(`Erro TSE: ${e.message}`); return null; }),
+      scoutHybrid.search(politicianName, true).catch(e => { logWarn(`Erro Scout: ${e.message}`); return []; }),
+      scoutCaseMiner.mine(politicianName).catch(e => { logWarn(`Erro CaseMiner: ${e.message}`); return []; }),
+      deepSocialMiner.mine(politicianName).catch(e => { logWarn(`Erro Social: ${e.message}`); return []; }),
+      jusBrasilAlternative.searchLegalRecords(politicianName).catch(e => { logWarn(`Erro Legal: ${e.message}`); return []; }),
+      jusBrasilAlternative.searchQueridoDiario(politicianName).catch(e => { logWarn(`Erro Diario: ${e.message}`); return []; }),
+      scoutInterviewAgent.searchAndExtract(politicianName).catch(e => { logWarn(`Erro Interview: ${e.message}`); return []; }),
+      scoutSpeechAgent.searchAndExtract(politicianName).catch(e => { logWarn(`Erro Speech: ${e.message}`); return []; })
     ]);
 
-    await updateProgress(25, "Buscando notícias e evidências forenses profundas...");
-    const [rawSources, caseEvidences] = await Promise.all([
-      scoutHybrid.search(politicianName, true).catch(() => []),
-      scoutCaseMiner.mine(politicianName).catch(() => [])
-    ]);
-
-    await updateProgress(40, "Analisando redes sociais e registros jurídicos...");
-    const [socialEvidences, legalRecords, diarioRecords] = await Promise.all([
-      deepSocialMiner.mine(politicianName).catch(() => []),
-      jusBrasilAlternative.searchLegalRecords(politicianName).catch(() => []),
-      jusBrasilAlternative.searchQueridoDiario(politicianName).catch(() => [])
-    ]);
-
-    await updateProgress(55, "Extraindo promessas de falas e entrevistas...");
-    const [interviewPromises, speechPromises] = await Promise.all([
-      scoutInterviewAgent.searchAndExtract(politicianName).catch(() => []),
-      scoutSpeechAgent.searchAndExtract(politicianName).catch(() => [])
-    ]);
+    const duration = ((Date.now() - startTime) / 1000).toFixed(1);
+    logInfo(`[Super-Worker] Coleta finalizada em ${duration}s.`);
 
     // ═══════════════════════════════════════════════════════════════════════
     // FASE 2: PROCESSAMENTO DE IA E VEREDITO (DUAL-CHAIN)
@@ -82,7 +88,6 @@ async function runSuperOrchestrator() {
       status: 'success'
     };
 
-    // Chamar a lógica de finalização do BrainAgent diretamente no Worker
     logInfo(`[Super-Worker] Executando BrainAgent.finalizeAnalysis na nuvem...`);
     const finalResult = await brainAgent.finalizeAnalysis(analysisId, scoutData);
 
@@ -91,24 +96,24 @@ async function runSuperOrchestrator() {
     // ═══════════════════════════════════════════════════════════════════════
     await updateProgress(90, "Finalizando dossiê e estruturando relatórios...");
 
-    // Adicionar o carimbo da Dual-Chain local
     await supabase.from('analyses').update({
       ai_verdict_local: {
-        engine: 'Dual-Chain Super-Worker (GitHub Actions)',
+        engine: 'Dual-Chain Super-Worker v2.0 (Turbo)',
         processed_at: new Date().toISOString(),
         confidence: finalResult.consensusMetrics?.consensusScore || 70,
-        summary: finalResult.humanizedReport.substring(0, 500)
+        summary: finalResult.humanizedReport.substring(0, 500),
+        duration_scout: `${duration}s`
       }
     }).eq('id', analysisId);
 
     await updateProgress(100, "Análise forense concluída com sucesso!");
-    logInfo(`✅ Super-Orchestrator finalizado para ${politicianName}.`);
+    logInfo(`✅ Super-Orchestrator TURBO finalizado para ${politicianName}.`);
 
   } catch (error: any) {
     logError(error);
     await supabase.from('analyses').update({
       status: 'error',
-      text: `Falha crítica no Super-Worker: ${error.message}`
+      text: `Falha crítica no Super-Worker Turbo: ${error.message}`
     }).eq('id', analysisId);
     process.exit(1);
   }
