@@ -51,4 +51,5 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           ANALYSIS_ID: ${{ github.event.client_payload.analysis_id || github.event.inputs.analysis_id }}
+          ANALYSIS_CONTEXT: ${{ toJson(github.event.client_payload.context) }}
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN_CUSTOM }}
