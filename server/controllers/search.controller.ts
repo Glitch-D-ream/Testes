@@ -86,7 +86,7 @@ export class SearchController {
 
       const { data, error } = await supabase
         .from('analyses')
-        .select('id, status, error_message, probability_score')
+        .select('id, status, text, error_message, probability_score')
         .eq('id', id)
         .single();
 

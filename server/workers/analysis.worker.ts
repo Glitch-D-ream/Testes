@@ -28,14 +28,9 @@ export default async function analysisWorker(job: Job): Promise<any> {
     // O BrainAgent já lida com Scout, Filter, Coerência e Consenso
     const result = await brainAgent.analyze(politicianName, userId, analysisId);
 
-    // 3. O BrainAgent já salva no Supabase ao final, mas garantimos o status aqui
-    if (analysisId) {
-      await supabase.from('analyses').update({ 
-        status: 'completed', 
-        progress: 100,
-        updated_at: new Date().toISOString()
-      }).eq('id', analysisId);
-    }
+    // 3. O BrainAgent já disparou o Super-Worker no GitHub.
+    // NÃO marcamos como 'completed' aqui, pois o trabalho real está apenas começando na nuvem.
+    logInfo(`[AnalysisWorker] 🚀 Super-Worker disparado. Aguardando conclusão via GitHub Actions para: ${politicianName}`);
 
     logInfo(`[AnalysisWorker] ✅ Auditoria concluída com sucesso para: ${politicianName}`);
     return { success: true, analysisId };

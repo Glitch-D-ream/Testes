@@ -121,6 +121,7 @@ export class SearchService {
       id: analysisId,
       user_id: userId,
       author: politicianName,
+      politician_name: politicianName,
       text: `Análise automática iniciada para ${politicianName}`,
       status: 'processing'
     }]);

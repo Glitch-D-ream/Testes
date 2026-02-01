@@ -68,12 +68,18 @@ export default function SearchBar() {
             clearInterval(pollInterval);
             setIsProcessing(false);
             setError(data.error_message || 'O motor de auditoria encontrou inconsistências fatais nos dados.');
-          } else if (data.status === 'processing') {
-            // Atualização dinâmica de status baseada no tempo real
-            if (pollCount < 10) setStatus('Scout: Minerando web e portais oficiais...');
-            else if (pollCount < 25) setStatus('Ironclad: Validando orçamentos e emendas...');
-            else if (pollCount < 45) setStatus('Brain: Correlacionando fatos e discursos...');
-            else setStatus('Finalizando dossiê forense (IA Raciocínio Profundo)...');
+          } else {
+            // Para qualquer outro status (incluindo 'processing' ou 'pending')
+            // Priorizar o texto vindo do banco de dados se disponível
+            if (data.text && data.text.length > 5) {
+              setStatus(data.text);
+            } else {
+              // Fallback para atualização baseada em tempo
+              if (pollCount < 10) setStatus('Scout: Minerando web e portais oficiais...');
+              else if (pollCount < 25) setStatus('Ironclad: Validando orçamentos e emendas...');
+              else if (pollCount < 45) setStatus('Brain: Correlacionando fatos e discursos...');
+              else setStatus('Finalizando dossiê forense (IA Raciocínio Profundo)...');
+            }
           }
         } catch (err) {
           console.error('Erro no polling:', err);

@@ -1,0 +1,44 @@
+graph TD
+    subgraph "Ambiente de Produção (Railway/Vercel)"
+        A[Usuário clica em 'Iniciar Auditoria'] --> B[Backend: BrainAgent.analyze]
+        B --> C{Criar Registro no Supabase}
+        C --> D[Status: 'processing']
+        D --> E[Disparar GitHub Action via API]
+    end
+
+    subgraph "GitHub Actions (Super Orchestrator)"
+        E --> F[Workflow: super-orchestrator.yml]
+        F --> G[Script: super-orchestrator.ts]
+        
+        subgraph "Fase 1: Coleta (Scout)"
+            G --> H[TSE / Planos de Governo]
+            G --> I[Notícias / Evidências Forenses]
+            G --> J[Redes Sociais / Registros Jurídicos]
+            G --> K[Falas / Entrevistas]
+        end
+        
+        subgraph "Fase 2: IA (Dual-Chain)"
+            H & I & J & K --> L[BrainAgent.finalizeAnalysis]
+            L --> M[Raciocínio Forense Profundo]
+        end
+        
+        subgraph "Fase 3: Conclusão"
+            M --> N[Atualizar Supabase: Resultado Final]
+            N --> O[Status: 'completed']
+            O --> P[Progresso: 100%]
+        end
+    end
+
+    subgraph "Banco de Dados (Supabase)"
+        C -.-> Q[(Tabela: analyses)]
+        N -.-> Q
+    end
+
+    subgraph "Frontend (Navegador)"
+        Q -.-> R[Polling/Realtime: Monitorar Progresso]
+        R --> S[Exibir Relatório Final]
+    end
+
+    style E fill:#f96,stroke:#333,stroke-width:2px
+    style G fill:#bbf,stroke:#333,stroke-width:2px
+    style Q fill:#dfd,stroke:#333,stroke-width:2px
