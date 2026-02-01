@@ -20,6 +20,27 @@ export function AnalysisResults() {
   useEffect(() => {
     if (id) {
       getById(id);
+      
+      // Polling para verificar atualizações da IA local (Dual-Chain)
+      // Nota: Em um ambiente com Supabase Client no frontend, usaríamos .on('postgres_changes')
+      const pollInterval = setInterval(async () => {
+        try {
+          const apiUrl = import.meta.env.VITE_API_URL || '';
+          const response = await fetch(`${apiUrl}/api/analyze/${id}`);
+          if (response.ok) {
+            const updatedData = await response.json();
+            // Se o veredito da IA local apareceu ou o status mudou para completed
+            if (updatedData.ai_verdict_local || updatedData.status === 'completed') {
+              getById(id); // Recarrega os dados no estado do hook
+              clearInterval(pollInterval);
+            }
+          }
+        } catch (e) {
+          console.error('Erro no polling de atualização:', e);
+        }
+      }, 5000); // Verifica a cada 5 segundos
+
+      return () => clearInterval(pollInterval);
     }
   }, [id, getById]);
 
@@ -91,12 +112,26 @@ export function AnalysisResults() {
         <ForensicResultCard 
           politicianName={data.author || 'Alvo'}
           score={data.probability_score || data.probabilityScore || 0}
-          verdict={data.data_sources?.budgetVerdict || 'Análise baseada em dados oficiais e discursos minerados.'}
+          verdict={data.ai_verdict_local?.deepseek_reasoning || data.data_sources?.budgetVerdict || 'Análise baseada em dados oficiais e discursos minerados.'}
           analysisDate={new Date(data.created_at || Date.now()).toLocaleDateString('pt-BR')}
           confidence={85}
           category="Auditoria Forense"
           data={data}
         />
+
+        {/* Alerta de Processamento IA Local */}
+        {data.status === 'processing_ai' && (
+          <motion.div 
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mt-4 p-4 bg-blue-500/10 border border-blue-500/20 rounded-2xl flex items-center gap-4"
+          >
+            <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
+            <p className="text-[10px] font-black uppercase tracking-widest text-blue-400">
+              🧠 Dual-Chain AI está processando o raciocínio forense profundo...
+            </p>
+          </motion.div>
+        )}
 
         {/* Evidence Vault - NOVO COMPONENTE */}
         <EvidenceVault sources={data.data_sources} />

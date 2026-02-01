@@ -261,7 +261,19 @@ export class BrainAgent {
             owner: 'Glitch-D-ream',
             repo: 'Testes',
             event_type: 'start-dual-chain-analysis',
-            client_payload: { analysis_id: existingId }
+            client_payload: { 
+              analysis_id: existingId,
+              context: {
+                politicianName: profile.name,
+                office: profile.office,
+                party: profile.party,
+                state: profile.state,
+                promisesCount: allPromises.length,
+                evidenceCount: filteredSources.length,
+                coherenceScore: coherenceAnalysis.overallScore,
+                redFlags: coherenceAnalysis.redFlags
+              }
+            }
           });
           
           logInfo(`[Brain v6] Workflow Dual-Chain disparado para análise: ${existingId}`);
