@@ -38,15 +38,15 @@ jobs:
           restore-keys: |
             ai-models-v1-
 
-      - name: 📥 Download Models (if not cached)
-        if: steps.cache-models.outputs.cache-hit != 'true'
-        run: pnpm tsx server/scripts/setup-ai-models.ts
-
       - name: 🛠️ Install Dependencies
         run: pnpm install
 
+      - name: 📥 Download Models (if not cached)
+        if: steps.cache-models.outputs.cache-hit != 'true'
+        run: npx tsx server/scripts/setup-ai-models.ts
+
       - name: 🧠 Run Dual-Chain Analysis
-        run: pnpm tsx server/scripts/dual-chain-worker.ts
+        run: npx tsx server/scripts/dual-chain-worker.ts
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
