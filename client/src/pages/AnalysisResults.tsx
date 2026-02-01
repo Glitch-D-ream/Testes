@@ -116,6 +116,55 @@ export function AnalysisResults() {
             <BenchmarkingPanel benchmark={data.data_sources.benchmarkResult} />
           )}
 
+          {/* Dual-Chain AI Verdict (DeepSeek + Qwen) */}
+          {data.ai_verdict_local && (
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="glass rounded-[2.5rem] border border-blue-500/20 overflow-hidden bg-blue-500/5"
+            >
+              <div className="bg-blue-500/10 px-10 py-6 border-b border-blue-500/20 flex justify-between items-center">
+                <h3 className="text-[10px] font-black text-blue-400 uppercase tracking-[0.2em]">🧠 Veredito Dual-Chain (DeepSeek-R1 + Qwen)</h3>
+                <span className="text-[10px] font-black bg-blue-500/20 text-blue-400 px-3 py-1 rounded-full border border-blue-500/30 uppercase tracking-widest">
+                  Processamento Local
+                </span>
+              </div>
+              <div className="p-10 space-y-8">
+                {/* DeepSeek Reasoning */}
+                <div className="space-y-4">
+                  <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Raciocínio Forense (Chain of Thought)</h4>
+                  <div className="p-6 rounded-3xl bg-slate-900/50 border border-slate-800/50 prose prose-invert prose-sm max-w-none">
+                    <ReactMarkdown>{data.ai_verdict_local.deepseek_reasoning}</ReactMarkdown>
+                  </div>
+                </div>
+                
+                {/* Qwen Structured Data */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-4">
+                    <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Fatos Extraídos</h4>
+                    <div className="flex flex-wrap gap-2">
+                      {data.ai_verdict_local.qwen_output?.keyFacts?.map((fact: string, i: number) => (
+                        <span key={i} className="text-[10px] font-bold bg-slate-800 text-slate-300 px-3 py-1.5 rounded-lg border border-slate-700">
+                          {fact}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="space-y-4">
+                    <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Entidades Mapeadas</h4>
+                    <div className="flex flex-wrap gap-2">
+                      {data.ai_verdict_local.qwen_output?.entities?.map((entity: string, i: number) => (
+                        <span key={i} className="text-[10px] font-bold bg-blue-500/10 text-blue-400 px-3 py-1.5 rounded-lg border border-blue-500/20">
+                          {entity}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
           {/* Rastreabilidade Financeira */}
           {(data.data_sources?.projects?.length > 0 || data.data_sources?.budgetVerdict) && (
             <motion.div 
