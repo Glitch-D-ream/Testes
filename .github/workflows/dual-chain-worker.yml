@@ -1,0 +1,54 @@
+
+name: 🧠 Dual-Chain AI Worker (DeepSeek & Qwen)
+
+on:
+  repository_dispatch:
+    types: [start-dual-chain-analysis]
+  workflow_dispatch:
+    inputs:
+      analysis_id:
+        description: 'ID da análise no Supabase'
+        required: true
+
+jobs:
+  process-analysis:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 🟢 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: 📦 Install pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8
+
+      - name: 💾 Restore AI Models Cache
+        id: cache-models
+        uses: actions/cache@v3
+        with:
+          path: server/models/bin
+          key: ai-models-v1-${{ hashFiles('server/scripts/setup-ai-models.ts') }}
+          restore-keys: |
+            ai-models-v1-
+
+      - name: 📥 Download Models (if not cached)
+        if: steps.cache-models.outputs.cache-hit != 'true'
+        run: pnpm tsx server/scripts/setup-ai-models.ts
+
+      - name: 🛠️ Install Dependencies
+        run: pnpm install
+
+      - name: 🧠 Run Dual-Chain Analysis
+        run: pnpm tsx server/scripts/dual-chain-worker.ts
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          ANALYSIS_ID: ${{ github.event.client_payload.analysis_id || github.event.inputs.analysis_id }}
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN_CUSTOM }}
