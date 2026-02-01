@@ -217,7 +217,7 @@ export class BrainAgent {
       };
 
       const combinedContext = this.buildCombinedContext(dataSources, absenceReport, vulnerabilityReport, benchmarkResult, financeEvidences, {}, allPromises, governmentPromises, interviewPromises, speechPromises, coherenceAnalysis, filteredSources, socialEvidences, legalRecords, tseHistory, tseCredibility);
-      const consensusValidation = await consensusValidatorService.validate(profile.name, combinedContext);
+      const consensusValidation = await consensusValidatorService.validateWithCrossModel(combinedContext);
 
       const humanizedReport = await humanizerEngine.humanize({
         targetName: cleanName,
@@ -242,7 +242,7 @@ export class BrainAgent {
           sourceCount: rawSources.length + legalRecords.length + socialEvidences.length,
           verifiedCount: filteredSources.length + legalRecords.length,
           coherenceScore: coherenceAnalysis.overallScore,
-          consensusScore: consensusValidation?.score || 70
+          consensusScore: consensusValidation?.consensusScore || 70
         }
       };
 

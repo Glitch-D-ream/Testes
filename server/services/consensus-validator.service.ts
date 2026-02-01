@@ -155,7 +155,7 @@ export class ConsensusValidatorService {
 
     try {
       // Forçamos o uso do Qwen via Nexus para o desempate
-      const response = await aiResilienceNexus.chat(judgePrompt + "\nUSE_MODEL: qwen");
+      const response = await aiResilienceNexus.chat(judgePrompt + "\nUSE_MODEL: openai");
       
       const parseSafe = (content: string) => {
         try {
