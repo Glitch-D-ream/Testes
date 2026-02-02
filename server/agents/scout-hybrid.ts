@@ -26,9 +26,9 @@ export interface RawSource {
 }
 
 export class ScoutHybrid {
-  async search(query: string, deepSearch: boolean = false, options: { fastMode?: boolean } = {}): Promise<RawSource[]> {
-    return IntelligentCache.get(`search:${deepSearch ? 'deep' : 'normal'}:${query}:${options.fastMode ? 'fast' : 'full'}`, async () => {
-      logInfo(`[ScoutHybrid] Iniciando busca híbrida (${deepSearch ? 'DEEP' : 'NORMAL'}${options.fastMode ? ' - FAST' : ''}): ${query}`);
+  async search(query: string, deepSearch: boolean = false): Promise<RawSource[]> {
+    return IntelligentCache.get(`search:${deepSearch ? 'deep' : 'normal'}:${query}`, async () => {
+      logInfo(`[ScoutHybrid] Iniciando busca híbrida (${deepSearch ? 'DEEP' : 'NORMAL'}): ${query}`);
       
       const sources: RawSource[] = [];
       const apiFailures: string[] = [];
@@ -93,9 +93,9 @@ export class ScoutHybrid {
         })());
       }
 
-      // Task: Ingestão de Documentos (se necessário e NÃO for modo rápido)
+      // Task: Ingestão de Documentos (se necessário)
       const allNews = [...newsResults, ...extraFederalResults];
-      if (!options.fastMode && (apiFailures.length > 0 || deepSearch)) {
+      if (apiFailures.length > 0 || deepSearch) {
         parallelTasks.push((async () => {
           logWarn(`[ScoutHybrid] Ativando busca paralela por Documentos/PDFs...`);
           const docQueries = [
@@ -118,10 +118,9 @@ export class ScoutHybrid {
         })());
       }
 
-      // Task: Ingestão de Notícias Principal (limitada no modo rápido)
+      // Task: Ingestão de Notícias Principal
       parallelTasks.push((async () => {
-        const newsLimit = options.fastMode ? 5 : 15;
-        const newsToIngest = allNews.slice(0, newsLimit);
+        const newsToIngest = allNews.slice(0, 15);
         logInfo(`[ScoutHybrid] Ingerindo ${newsToIngest.length} notícias em paralelo...`);
         const newsIngested = await Promise.all(newsToIngest.map(r => 
           ingestionService.ingest(r.url).then(content => content ? {
