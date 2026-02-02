@@ -19,12 +19,16 @@ export class HumanizerEngine {
     report += `${verdict.reasoning}\n\n`;
 
     report += `## ⚖️ O que você precisa saber\n`;
-    verdict.mainFindings.forEach((f: string) => {
-      report += `- **${f}**\n`;
-    });
+    if (verdict?.mainFindings && Array.isArray(verdict.mainFindings)) {
+      verdict.mainFindings.forEach((f: string) => {
+        report += `- **${f}**\n`;
+      });
+    } else {
+      report += `- Informações em fase de consolidação.\n`;
+    }
     report += `\n`;
 
-    if (verdict.contradictions && verdict.contradictions.length > 0) {
+    if (verdict?.contradictions && Array.isArray(verdict.contradictions) && verdict.contradictions.length > 0) {
       report += `## ⚠️ "Diz vs. Faz" (Contradições)\n`;
       verdict.contradictions.forEach((c: string) => {
         report += `- ${c}\n`;
