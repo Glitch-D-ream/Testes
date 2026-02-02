@@ -65,26 +65,33 @@ async function runSuperOrchestrator() {
     // MODO PROFUNDO: Restaurando todas as fontes oficiais e cruzamentos
     logInfo(`[Super-Worker] Iniciando coleta multidimensional profunda...`);
     
+    // --- CONFIGURAÇÃO DE AGENTES ATIVOS ---
+    // Mantendo apenas um Legislativo (TSE) e um de Rede Social (DeepSocial)
+    // Para reativar outros agentes, descomente as linhas abaixo e adicione-as ao Promise.all
     const [
       governmentPromises, 
       tseHistory,
+      socialEvidences,
+      // Agentes desativados temporariamente (retornando arrays vazios)
       rawSources, 
       caseEvidences,
-      socialEvidences, 
       legalRecords, 
       diarioRecords,
       interviewPromises, 
       speechPromises
     ] = await Promise.all([
+      // ATIVOS:
       governmentPlanExtractorService.extractFromTSE(politicianName, state, 2022).catch(e => { logWarn(`Erro GovPlan: ${e.message}`); return []; }),
       getPoliticalHistory(politicianName, state).catch(e => { logWarn(`Erro TSE: ${e.message}`); return null; }),
-      scoutHybrid.search(politicianName, true).catch(e => { logWarn(`Erro Scout: ${e.message}`); return []; }),
-      scoutCaseMiner.mine(politicianName).catch(e => { logWarn(`Erro CaseMiner: ${e.message}`); return []; }),
       deepSocialMiner.mine(politicianName).catch(e => { logWarn(`Erro Social: ${e.message}`); return []; }),
-      jusBrasilAlternative.searchLegalRecords(politicianName).catch(e => { logWarn(`Erro Legal: ${e.message}`); return []; }),
-      jusBrasilAlternative.searchQueridoDiario(politicianName).catch(e => { logWarn(`Erro Diario: ${e.message}`); return []; }),
-      scoutInterviewAgent.searchAndExtract(politicianName).catch(e => { logWarn(`Erro Interview: ${e.message}`); return []; }),
-      scoutSpeechAgent.searchAndExtract(politicianName).catch(e => { logWarn(`Erro Speech: ${e.message}`); return []; })
+
+      // DESATIVADOS (Simulados):
+      Promise.resolve([]), // scoutHybrid.search
+      Promise.resolve([]), // scoutCaseMiner.mine
+      Promise.resolve([]), // jusBrasilAlternative.searchLegalRecords
+      Promise.resolve([]), // jusBrasilAlternative.searchQueridoDiario
+      Promise.resolve([]), // scoutInterviewAgent.searchAndExtract
+      Promise.resolve([])  // scoutSpeechAgent.searchAndExtract
     ]);
 
     const duration = ((Date.now() - startTime) / 1000).toFixed(1);
