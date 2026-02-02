@@ -172,8 +172,19 @@ export class BrainAgent {
     const supabase = getSupabase();
 
     try {
-      const { data: analysis } = await supabase.from('analyses').select('*').eq('id', analysisId).single();
-      if (!analysis) throw new Error('Análise não encontrada para finalização.');
+      // Log de depuração para verificar conexão e ID
+      logInfo(`[Brain v6.2] Buscando análise no Supabase: ${analysisId}`);
+      const { data: analysis, error: fetchError } = await supabase.from('analyses').select('*').eq('id', analysisId).single();
+      
+      if (fetchError) {
+        logError(`[Brain v6.2] Erro ao buscar análise ${analysisId}:`, fetchError as any);
+        throw new Error(`Erro ao buscar análise: ${fetchError.message}`);
+      }
+
+      if (!analysis) {
+        logWarn(`[Brain v6.2] Análise ${analysisId} não retornou dados.`);
+        throw new Error('Análise não encontrada para finalização.');
+      }
 
       const cleanName = analysis.politician_name;
       const profile = { name: cleanName, office: analysis.office, party: analysis.party, state: analysis.state };

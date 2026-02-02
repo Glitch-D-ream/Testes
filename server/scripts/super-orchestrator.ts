@@ -27,6 +27,24 @@ async function runSuperOrchestrator() {
   }
 
   const supabase = getSupabase();
+
+  // Retry logic para buscar a análise (evitar erro de sincronismo)
+  let analysis = null;
+  for (let i = 0; i < 5; i++) {
+    const { data, error } = await supabase.from('analyses').select('*').eq('id', analysisId).single();
+    if (data) {
+      analysis = data;
+      break;
+    }
+    logWarn(`[Super-Worker] Tentativa ${i + 1}/5: Análise ${analysisId} não encontrada. Aguardando...`);
+    await new Promise(resolve => setTimeout(resolve, 2000));
+  }
+
+  if (!analysis) {
+    logError(new Error(`Análise ${analysisId} não encontrada no Supabase após 5 tentativas.`));
+    process.exit(1);
+  }
+
   const updateProgress = async (progress: number, text: string) => {
     logInfo(`[Super-Worker] [${progress}%] ${text}`);
     await supabase.from('analyses').update({ progress, text }).eq('id', analysisId);

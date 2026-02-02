@@ -19,9 +19,13 @@ jobs:
           node-version: 20
 
       - name: Instalar pnpm
-        uses: pnpm/action-setup@v2
+        uses: pnpm/action-setup@v4
         with:
-          version: 8
+          version: 10
+          run_install: false
+
+      - name: Adicionar pnpm ao PATH
+        run: echo "PNPM_HOME=$HOME/.local/share/pnpm" >> $GITHUB_ENV && echo "$HOME/.local/share/pnpm" >> $GITHUB_PATH
 
       - name: Instalar Dependências
         run: pnpm install --no-frozen-lockfile
