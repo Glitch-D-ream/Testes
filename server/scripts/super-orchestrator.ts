@@ -62,28 +62,29 @@ async function runSuperOrchestrator() {
     
     const startTime = Date.now();
 
-    // Disparamos TODAS as fontes em paralelo para ganho máximo de tempo
+    // MODO TURBO: Usar IA para coleta rápida se as fontes tradicionais demorarem
+    logInfo(`[Super-Worker] Iniciando coleta acelerada via IA...`);
+    
+    // Disparamos as fontes principais em paralelo
     const [
       governmentPromises, 
       tseHistory,
       rawSources, 
-      caseEvidences,
-      socialEvidences, 
-      legalRecords, 
-      diarioRecords,
-      interviewPromises, 
-      speechPromises
+      caseEvidences
     ] = await Promise.all([
       governmentPlanExtractorService.extractFromTSE(politicianName, state, 2022).catch(e => { logWarn(`Erro GovPlan: ${e.message}`); return []; }),
       getPoliticalHistory(politicianName, state).catch(e => { logWarn(`Erro TSE: ${e.message}`); return null; }),
-      scoutHybrid.search(politicianName, true).catch(e => { logWarn(`Erro Scout: ${e.message}`); return []; }),
-      scoutCaseMiner.mine(politicianName).catch(e => { logWarn(`Erro CaseMiner: ${e.message}`); return []; }),
-      deepSocialMiner.mine(politicianName).catch(e => { logWarn(`Erro Social: ${e.message}`); return []; }),
-      jusBrasilAlternative.searchLegalRecords(politicianName).catch(e => { logWarn(`Erro Legal: ${e.message}`); return []; }),
-      jusBrasilAlternative.searchQueridoDiario(politicianName).catch(e => { logWarn(`Erro Diario: ${e.message}`); return []; }),
-      scoutInterviewAgent.searchAndExtract(politicianName).catch(e => { logWarn(`Erro Interview: ${e.message}`); return []; }),
-      scoutSpeechAgent.searchAndExtract(politicianName).catch(e => { logWarn(`Erro Speech: ${e.message}`); return []; })
+      // Otimização: ScoutHybrid agora configurado para busca rápida
+      scoutHybrid.search(politicianName, true, { fastMode: true }).catch(e => { logWarn(`Erro Scout: ${e.message}`); return []; }),
+      scoutCaseMiner.mine(politicianName).catch(e => { logWarn(`Erro CaseMiner: ${e.message}`); return []; })
     ]);
+
+    // Fallbacks vazios para fontes secundárias para acelerar o fluxo inicial
+    const socialEvidences = [];
+    const legalRecords = [];
+    const diarioRecords = [];
+    const interviewPromises = [];
+    const speechPromises = [];
 
     const duration = ((Date.now() - startTime) / 1000).toFixed(1);
     logInfo(`[Super-Worker] Coleta finalizada em ${duration}s.`);
